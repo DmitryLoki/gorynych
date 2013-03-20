@@ -1,3 +1,4 @@
 *.pyc
 .trial_temp/
 .idea/
+.DS_Store

@@ -9,22 +9,22 @@ class Name(ValueObject):
     Usage can be found in test_types
     '''
 
-    def __init__(self, firstname=None, lastname=None):
-        if firstname:
-            self.firstname = firstname
+    def __init__(self, name=None, surname=None):
+        if name:
+            self.firstname = name
         else:
             raise ValueError("Firstname must be set.")
 
-        if lastname:
-            self.lastname = lastname
+        if surname:
+            self.lastname = surname
         else:
             raise ValueError("Lastname must be set.")
 
-    def get_shortname(self):
+    def short(self):
         return '. '.join((self.firstname.capitalize()[0],
             self.lastname.capitalize()))
 
-    def get_fullname(self):
+    def full(self):
         return ' '.join((self.firstname.capitalize(),
                          self.lastname.capitalize()))
 
@@ -33,10 +33,10 @@ class Country(ValueObject):
 
     def __init__(self, code=None):
         if code:
-            self.code = code.upper()
+            self._code = code.upper()
         else:
             raise ValueError("Country can't be set with null code.")
 
-    def get_code(self):
-        return self.code
+    def code(self):
+        return self._code
 

@@ -1,9 +1,7 @@
 '''
 Tracker Aggregate.
 '''
-from gorynych.common.domain.model import AggregateRoot, ValueObject, \
-    DomainEvent
-from gorynych.common.infrastructure.messaging import DomainEventsPublisher
+from gorynych.common.domain.model import AggregateRoot, DomainEvent, IdentifierObject
 
 
 DEVICE_TYPES = ['tr203']
@@ -34,23 +32,13 @@ class TrackerDontHasOwner(Exception):
     pass
 
 
-class TrackerID(ValueObject):
-    def __init__(self, id=None):
-        self.__id = int(id)
-
-    def __repr__(self):
-        return self.__id
+class TrackerID(IdentifierObject):
 
     def __str__(self):
-        return "Tracker-%s" % self.__id
-
-    def __eq__(self, other):
-        return self.__id == other
+        return "Tracker-%s" % self.id
 
 
 class Tracker(AggregateRoot):
-
-    event_publisher = DomainEventsPublisher()
 
     def __init__(self, tracker_id, device_id, device_type):
         self.id = tracker_id

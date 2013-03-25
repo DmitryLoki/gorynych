@@ -5,6 +5,7 @@ import datetime
 
 from gorynych.common.domain.model import IdentifierObject, AggregateRoot
 from gorynych.common.domain.types import Name, Country
+from gorynych.info.domain.tracker import TrackerID
 
 MINYEAR = 2012
 
@@ -22,6 +23,7 @@ class Person(AggregateRoot):
         self._name = name
         self._country = country
         self.regdate = regdate
+        self.trackers = set()
 
     @property
     def country(self):
@@ -30,6 +32,14 @@ class Person(AggregateRoot):
     @property
     def name(self):
         return self._name.full()
+
+    def assign_tracker(self, tracker_id):
+        if isinstance(tracker_id, TrackerID):
+            self.trackers.add(tracker_id)
+
+    def unassign_tracker(self, tracker_id):
+        self.trackers.remove(tracker_id)
+
 
 
 class PersonFactory(object):

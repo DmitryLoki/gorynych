@@ -7,6 +7,13 @@ from gorynych.common.domain.model import AggregateRoot, DomainEvent, IdentifierO
 DEVICE_TYPES = ['tr203']
 
 class TrackerAssigned(DomainEvent):
+    '''
+    This event is fired then tracker is assigned to someone.
+
+    Event fields are:
+    @param id: id of aggregate to which tracker has been assigned.
+    @param tracker_id: tracker id.
+    '''
 
     def __init__(self, id=None, tracker_id=None):
         if not isinstance(tracker_id, TrackerID):

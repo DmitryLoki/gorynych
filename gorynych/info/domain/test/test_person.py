@@ -5,6 +5,7 @@ import mock
 
 from gorynych.info.domain import person
 from gorynych.info.domain.tracker import TrackerID
+from gorynych.info.domain.contest import ContestID
 
 def create_person(name='John', surname='Doe',
                   country='UA', email='johndoe@example.com', reg_year=2012,
@@ -52,6 +53,20 @@ class PersonTest(unittest.TestCase):
             TrackerID(16))
         self.person.unassign_tracker(TrackerID(15))
         self.assertFalse(TrackerID(15) in self.person.trackers)
+
+    def test_participate_in_contest(self):
+        self.person.participate_in_contest(ContestID('some contest'),
+            'paraglider')
+        self.assertTrue(ContestID('some contest') in self.person.contests)
+        self.assertEqual(self.person._contests[ContestID('some contest')],
+            'paraglider')
+
+        self.assertRaises(ValueError, self.person.participate_in_contest,
+            14, 2)
+
+        self.person.dont_participate_in_contest(ContestID('some contest'))
+        self.assertFalse(ContestID('some contest') in self.person.contests)
+
 
 if __name__ == '__main__':
     unittest.main()

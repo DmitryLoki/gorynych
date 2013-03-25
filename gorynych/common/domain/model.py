@@ -40,6 +40,12 @@ class IdentifierObject(object):
         '''
         return hash(self.id)
 
+    def __repr__(self):
+        '''
+        Make object human-readable in logs.
+        '''
+        return self.id
+
 class AggregateRoot(object):
     '''
     Base class for aggregate roots.

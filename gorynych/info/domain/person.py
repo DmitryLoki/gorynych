@@ -6,8 +6,13 @@ import datetime
 from gorynych.common.domain.model import IdentifierObject, AggregateRoot
 from gorynych.common.domain.types import Name, Country
 from gorynych.info.domain.tracker import TrackerID
+from gorynych.info.domain.contest import ContestID
 
+# First registration was occured in 2012 year.
 MINYEAR = 2012
+
+# Person can participate in contest with one of this roles.
+ROLES = frozenset(['paraglider', 'organizator'])
 
 class PersonID(IdentifierObject):
     '''
@@ -24,6 +29,7 @@ class Person(AggregateRoot):
         self._country = country
         self.regdate = regdate
         self.trackers = set()
+        self._contests = dict()
 
     @property
     def country(self):
@@ -40,6 +46,24 @@ class Person(AggregateRoot):
     def unassign_tracker(self, tracker_id):
         self.trackers.remove(tracker_id)
 
+    def participate_in_contest(self, contest_id, role):
+        if isinstance(contest_id, ContestID):
+            if role in ROLES:
+                self._contests[contest_id] = role
+            else:
+                raise ValueError("Bad role: %s" % role)
+        else:
+            raise ValueError("Bad contest id. ContestID: %r" % contest_id)
+
+    @property
+    def contests(self):
+        return self._contests.keys()
+
+    def dont_participate_in_contest(self, contest_id):
+        try:
+            del self._contests[contest_id]
+        except KeyError:
+            pass
 
 
 class PersonFactory(object):

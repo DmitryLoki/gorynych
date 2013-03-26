@@ -52,3 +52,17 @@ class Address(ValueObject):
         self.lon = float(coordinates[1])
         if not (-90 < self.lat < 90 and -180 <= self.lon <= 180):
             raise ValueError("Coordinates not in their range or format.")
+
+
+class Checkpoint(ValueObject):
+    def __init__(self, name, geometry, times=None, ch_type=None, radius=None):
+        self.type = ch_type.strip().lower()
+        self.name = name.strip().upper()
+        if geometry.geom_type == 'Point':
+            try:
+                self.radius = int(radius)
+            except TypeError:
+                raise ValueError("Bad radius for cylinder checkpoint.")
+            self.geometry = geometry
+        if times:
+            self.start_time, self.end_time = times

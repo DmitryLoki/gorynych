@@ -55,7 +55,7 @@ class Address(ValueObject):
 
 
 class Checkpoint(ValueObject):
-    def __init__(self, name, geometry, times=None, ch_type=None, radius=None):
+    def __init__(self, name, geometry, ch_type=None, times=None, radius=None):
         if ch_type:
             self.type = ch_type.strip().lower()
         else:

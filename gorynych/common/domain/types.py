@@ -40,3 +40,15 @@ class Country(ValueObject):
     def code(self):
         return self._code
 
+
+class Address(ValueObject):
+
+    def __init__(self, place, country, coordinates):
+        self.place = place.strip().capitalize()
+        if not isinstance(country, Country):
+            country = Country(country)
+        self.country = country.code()
+        self.lat = float(coordinates[0])
+        self.lon = float(coordinates[1])
+        if not (-90 < self.lat < 90 and -180 <= self.lon <= 180):
+            raise ValueError("Coordinates not in their range or format.")

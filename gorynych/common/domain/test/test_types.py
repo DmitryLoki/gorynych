@@ -44,19 +44,31 @@ class AddressTest(unittest.TestCase):
 
 class CheckpointTest(unittest.TestCase):
     def test_creating(self):
-        ch1 = types.Checkpoint(name='A01', geometry=Point(42.502, 0.798),
+        point1 = Point(42.502, 0.798)
+        ch1 = types.Checkpoint(name='A01', geometry=point1,
                                 ch_type='TO', times=(2, None), radius=2)
         ch2 = types.Checkpoint(name='A01', geometry=Point(42.502, 0.798),
-                                ch_type='ss', times=(4, 6), radius=3)
+                                 times=(4, 6), radius=3)
         ch3 = types.Checkpoint(name='B02', geometry=Point(1,2), ch_type='es',
             radius=3)
         ch4 = types.Checkpoint(name='g10', geometry=Point(2,2),
             ch_type='goal', radius=3, times=(None, 8))
 
+        self.assertEqual(ch1.geometry, point1)
+        self.assertEqual(ch1.radius, 2)
+
         self.assertEqual(ch3.type, 'es')
         self.assertEqual(ch1.type, 'to')
+        self.assertEqual(ch2.type, 'ordinal')
+
+        self.assertIsNone(ch3.start_time)
+        self.assertIsNone(ch3.end_time)
+
         self.assertEqual(ch4.name, 'G10')
         self.assertEqual(ch2.name, 'A01')
+
+    def test_bad_creating(self):
+        self.assertRaises(ValueError, types.Checkpoint, 'A01', Point(1,1))
 
 
 if __name__ == '__main__':

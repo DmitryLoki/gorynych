@@ -56,7 +56,10 @@ class Address(ValueObject):
 
 class Checkpoint(ValueObject):
     def __init__(self, name, geometry, times=None, ch_type=None, radius=None):
-        self.type = ch_type.strip().lower()
+        if ch_type:
+            self.type = ch_type.strip().lower()
+        else:
+            self.type = 'ordinal'
         self.name = name.strip().upper()
         if geometry.geom_type == 'Point':
             try:
@@ -66,3 +69,5 @@ class Checkpoint(ValueObject):
             self.geometry = geometry
         if times:
             self.start_time, self.end_time = times
+        else:
+            self.start_time, self.end_time = None, None

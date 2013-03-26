@@ -1,10 +1,12 @@
 import unittest
 
 import mock
+from shapely.geometry import Point
 
 from gorynych.info.domain import contest
-from gorynych.common.domain.types import Address, Name, Country
+from gorynych.common.domain.types import Address, Name, Country, Checkpoint
 from gorynych.info.domain.tracker import TrackerID
+from gorynych.info.domain.race import RaceID
 
 def create_contest(id, start_time, end_time, title='  Hello world  ',
                    place ='Yrupinsk', country='rU', coords=(45.23, -23.22)):
@@ -70,6 +72,26 @@ class ContestTest(unittest.TestCase):
             contest.ParagliderRegisteredOnContest('person2', '1')))
         self.assertEqual(mock_calls[-2], mock.call.publish(
                 contest.ParagliderRegisteredOnContest('person1', '1')))
+
+    def test_new_race(self):
+        cont = create_contest('cont1', 1, 15)
+        cont.register_paraglider('person2', 'mantrA 9', '757')
+        cont.register_paraglider('person1', 'mantrA 9', '747')
+
+        ch1 = Checkpoint('A01', Point(42.502, 0.798), 'TO', (2, None), 2)
+        ch2 = Checkpoint('A01', Point(42.502, 0.798), 'ss', (4, 6), 3)
+        ch3 = Checkpoint('B02', Point(1,2), 'es', radius=3)
+        ch4 = Checkpoint('g10', Point(2,2), 'goal', (None, 8), 3)
+        race = cont.new_race('Speed Run', [ch1, ch2, ch3, ch4], 'task 4')
+        self.assertEqual(race.task.type, 'speedrun')
+        self.assertEqual(race.checkpoints, [ch1, ch2, ch3, ch4])
+        self.assertEqual(race.title, 'Task 4')
+        self.assertTupleEqual((1, 15), race.timelimits)
+
+        self.assertEqual(len(cont.races), 1)
+        self.assertIsInstance(cont.races[0], RaceID)
+
+#        self.assertEqual(len(race.paragliders), 2)
 
 
 if __name__ == '__main__':

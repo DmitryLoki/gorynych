@@ -6,7 +6,6 @@ import datetime
 from gorynych.common.domain.model import IdentifierObject, AggregateRoot
 from gorynych.common.domain.types import Name, Country
 from gorynych.info.domain.tracker import TrackerID
-from gorynych.info.domain.contest import ContestID
 
 # First registration was occured in 2012 year.
 MINYEAR = 2012
@@ -47,6 +46,8 @@ class Person(AggregateRoot):
         self.trackers.remove(tracker_id)
 
     def participate_in_contest(self, contest_id, role):
+        # TODO: does person really need to keep information about contests in which he or she take participatance?
+        from gorynych.info.domain.contest import ContestID
         if isinstance(contest_id, ContestID):
             if role in ROLES:
                 self._contests[contest_id] = role
@@ -99,3 +100,8 @@ class PersonFactory(object):
         person.event_publisher = self.event_publisher
         return person
 
+    
+class PersonRepository(object):
+    @classmethod
+    def get_by_id(cls, id):
+        pass

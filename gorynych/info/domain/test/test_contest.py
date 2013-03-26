@@ -34,10 +34,7 @@ class ContestFactoryTest(unittest.TestCase):
         self.assertRaises(ValueError, create_contest, 1, 3, 1)
 
 
-if __name__ == '__main__':
-    unittest.main()
-
-class TestParaglider(unittest.TestCase):
+class ParagliderTest(unittest.TestCase):
     def test_success_creation(self):
         p = contest.Paraglider('1', Name('Vasya', 'Pupkin'),
                             Country('RU'), 'Mantra 9', 15, 16)
@@ -45,3 +42,35 @@ class TestParaglider(unittest.TestCase):
         self.assertEqual(p.glider, 'mantra')
         self.assertEqual(p.contest_number, 15)
         self.assertEqual(p.tracker_id, TrackerID(16))
+
+
+class ContestTest(unittest.TestCase):
+    def test_register_paraglider(self):
+        cont = create_contest('1', 1, 2)
+        cont.register_paraglider('person1', 'mantrA 9', '747')
+        self.assertEqual(len(cont._participants), 1)
+        self.assertEqual(cont._participants['person1']['role'], 'paraglider')
+        self.assertEqual(cont._participants['person1']['glider'], 'mantra')
+        self.assertEqual(cont._participants['person1']['contest_number'], 747)
+
+        cont.register_paraglider('person2', 'mantrA 9', '757')
+        self.assertEqual(len(cont._participants), 2)
+        self.assertEqual(cont._participants['person2']['role'], 'paraglider')
+        self.assertEqual(cont._participants['person2']['glider'], 'mantra')
+        self.assertEqual(cont._participants['person2']['contest_number'], 757)
+
+        self.assertRaises(ValueError, cont.register_paraglider, 'person3',
+            'mantrA 9', '757')
+
+        mock_calls = cont.event_publisher.mock_calls
+        # len(mock_calls) == 3 because of call.__nonzero()__ call after
+        # contest creation.
+        self.assertEqual(len(mock_calls), 3)
+        self.assertEqual(mock_calls[-1], mock.call.publish(
+            contest.ParagliderRegisteredOnContest('person2', '1')))
+        self.assertEqual(mock_calls[-2], mock.call.publish(
+                contest.ParagliderRegisteredOnContest('person1', '1')))
+
+
+if __name__ == '__main__':
+    unittest.main()

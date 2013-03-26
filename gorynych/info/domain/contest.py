@@ -1,12 +1,13 @@
 '''
 Contest Aggregate.
 '''
-from gorynych.common.domain.model import IdentifierObject, AggregateRoot, ValueObject
+from gorynych.common.domain.model import IdentifierObject, AggregateRoot, ValueObject, DomainEvent
 from gorynych.common.domain.types import Address, Name, Country
 from gorynych.info.domain.tracker import TrackerID
 
 class ContestID(IdentifierObject):
     pass
+
 
 class ContestFactory(object):
 
@@ -28,6 +29,16 @@ class ContestFactory(object):
         return contest
 
 
+class ParagliderRegisteredOnContest(DomainEvent):
+    def __init__(self, id, contest_id):
+        self.contest_id = contest_id
+        DomainEvent.__init__(self, id)
+
+    def __eq__(self, other):
+        return self.id == other.id and self.timestamp == other.timestamp and (
+            self.contest_id == other.contest_id)
+
+
 class Contest(AggregateRoot):
 
     def __init__(self, id, title, start_time, end_time, address):
@@ -37,6 +48,36 @@ class Contest(AggregateRoot):
         self.end_time = end_time
         self.address = address
         self._participants = dict()
+
+    def register_paraglider(self, person_id, glider, contest_number):
+        paraglider_before = self._participants.get(person_id)
+
+        glider = glider.strip().split(' ')[0].lower()
+        self._participants[person_id] = dict(role='paraglider',
+            contest_number=int(contest_number), glider=glider)
+        if not self.invariants_are_correct():
+            self._rollback_register_paraglider(paraglider_before, person_id)
+            raise ValueError("Paraglider must have unique contest number.")
+        self.event_publisher.publish(ParagliderRegisteredOnContest(
+                                                        person_id, self.id))
+
+    def invariants_are_correct(self):
+        """
+        Check next invariants for contest:
+        every paraglider has unique contest_number
+        """
+        contest_numbers = set()
+        paragliders = set()
+        for key in self._participants.keys():
+            if self._participants[key]['role'] == 'paraglider':
+                contest_numbers.add(self._participants[key]['contest_number'])
+                paragliders.add(key)
+        all_contest_numbers_uniq = len(paragliders) == len(contest_numbers)
+        return all_contest_numbers_uniq
+
+
+    def _rollback_register_paraglider(self, paraglider_before, person_id):
+        self._participants[person_id] = paraglider_before
 
 
 class Paraglider(ValueObject):

@@ -44,15 +44,14 @@ class PersonTest(unittest.TestCase):
 
     def test_tracker_assignment(self):
         self.person.assign_tracker(TrackerID(15))
-        self.assertTrue(TrackerID(15) in self.person.trackers)
-        self.assertFalse(TrackerID(16) in self.person.trackers)
+        self.assertEqual(self.person.tracker, TrackerID(15))
 
     def test_tracker_unassignment(self):
         self.person.assign_tracker(TrackerID(15))
         self.assertRaises(KeyError, self.person.unassign_tracker,
             TrackerID(16))
         self.person.unassign_tracker(TrackerID(15))
-        self.assertFalse(TrackerID(15) in self.person.trackers)
+        self.assertIsNone(self.person.tracker)
 
     def test_participate_in_contest(self):
         self.person.participate_in_contest(ContestID('some contest'),

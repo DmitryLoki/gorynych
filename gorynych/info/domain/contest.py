@@ -55,7 +55,7 @@ class Contest(AggregateRoot):
         self.end_time = end_time
         self.address = address
         self._participants = dict()
-        self.races = list()
+        self.race_ids = list()
 
     def register_paraglider(self, person_id, glider, contest_number):
         paraglider_before = deepcopy(self._participants.get(person_id))
@@ -114,7 +114,7 @@ class Contest(AggregateRoot):
         race.checkpoints = checkpoints
         # TODO: the same for transport and organizers.
         race = self._fill_race_with_paragliders(race)
-        self.races.append(race_id)
+        self.race_ids.append(race_id)
         return race
 
     def _fill_race_with_paragliders(self, race):

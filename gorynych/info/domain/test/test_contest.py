@@ -107,8 +107,8 @@ class ContestTest(unittest.TestCase):
         self.assertEqual(race.title, 'Task 4')
         self.assertTupleEqual((1, 15), race.timelimits)
 
-        self.assertEqual(len(cont.races), 1)
-        self.assertIsInstance(cont.races[0], RaceID)
+        self.assertEqual(len(cont.race_ids), 1)
+        self.assertIsInstance(cont.race_ids[0], RaceID)
 
         self.assertEqual(len(race.paragliders), 2)
         p1 = race.paragliders[747]

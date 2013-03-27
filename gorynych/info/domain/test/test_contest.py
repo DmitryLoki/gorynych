@@ -9,10 +9,10 @@ from gorynych.info.domain.tracker import TrackerID
 from gorynych.info.domain.race import RaceID
 
 def create_contest(id, start_time, end_time, title='  Hello world  ',
-                   place ='Yrupinsk', country='rU', coords=(45.23, -23.22)):
+                   place='Yrupinsk', country='rU', coords=(45.23, -23.22)):
     factory = contest.ContestFactory(mock.MagicMock())
     cont = factory.create_contest(id, title, start_time, end_time, place,
-                                                        country, coords)
+        country, coords)
     return cont
 
 
@@ -54,7 +54,7 @@ class ContestFactoryTest(unittest.TestCase):
 class ParagliderTest(unittest.TestCase):
     def test_success_creation(self):
         p = contest.Paraglider('1', Name('Vasya', 'Pupkin'),
-                            Country('RU'), 'Mantra 9', 15, 16)
+            Country('RU'), 'Mantra 9', 15, 16)
         self.assertEqual(p.person_id, '1')
         self.assertEqual(p.glider, 'mantra')
         self.assertEqual(p.contest_number, 15)
@@ -86,7 +86,7 @@ class ContestTest(unittest.TestCase):
         self.assertEqual(mock_calls[-1], mock.call.publish(
             contest.ParagliderRegisteredOnContest('person2', '1')))
         self.assertEqual(mock_calls[-2], mock.call.publish(
-                contest.ParagliderRegisteredOnContest('person1', '1')))
+            contest.ParagliderRegisteredOnContest('person1', '1')))
 
     @mock.patch('gorynych.common.infrastructure.persistence.get_repository')
     def test_new_race(self, patched):
@@ -99,8 +99,8 @@ class ContestTest(unittest.TestCase):
 
         ch1 = Checkpoint('A01', Point(42.502, 0.798), 'TO', (2, None), 2)
         ch2 = Checkpoint('A01', Point(42.502, 0.798), 'ss', (4, 6), 3)
-        ch3 = Checkpoint('B02', Point(1,2), 'es', radius=3)
-        ch4 = Checkpoint('g10', Point(2,2), 'goal', (None, 8), 3)
+        ch3 = Checkpoint('B02', Point(1, 2), 'es', radius=3)
+        ch4 = Checkpoint('g10', Point(2, 2), 'goal', (None, 8), 3)
         race = cont.new_race('Speed Run', [ch1, ch2, ch3, ch4], 'task 4')
         self.assertEqual(race.task.type, 'speedrun')
         self.assertEqual(race.checkpoints, [ch1, ch2, ch3, ch4])
@@ -114,11 +114,52 @@ class ContestTest(unittest.TestCase):
         p1 = race.paragliders[747]
         p2 = race.paragliders[757]
         self.assertEqual((p1.person_id, p1.name, p1.tracker_id, p1.glider,
-              p1.country), ('person1', 'N. Surname', 'tracker1', 'gin', 'RU'))
+                          p1.country),
+            ('person1', 'N. Surname', 'tracker1', 'gin', 'RU'))
         self.assertEqual((p2.person_id, p2.name, p2.tracker_id, p2.glider,
-           p2.country), ('person2', 'N. Surname', 'tracker2', 'mantra', 'RU'))
+                          p2.country),
+            ('person2', 'N. Surname', 'tracker2', 'mantra', 'RU'))
 
+
+class ContestTestWithRegisteredParagliders(unittest.TestCase):
+
+
+    def setUp(self):
+        self.cont = create_contest('cont1', 1, 15)
+        self.cont.register_paraglider('person2', 'mantrA 9', '757')
+        self.cont.register_paraglider('person1', 'gIn 9', '747')
+
+        self.person1 = self.cont._participants['person1']
+        self.person2 = self.cont._participants['person2']
+
+    def tearDown(self):
+        del self.cont
+        del self.person1
+        del self.person2
+
+    def test_correct_change_participant_data(self):
+        self.cont.change_participant_data('person1', glider='ajAx  ',
+            contest_number='0')
+        self.assertEqual(self.person1['glider'], 'ajax')
+        self.assertEqual(self.person1['contest_number'], 0)
+
+    def test_no_data(self):
+        self.assertRaises(ValueError, self.cont.change_participant_data,
+            'person2')
+
+    def test_wrong_parameters(self):
+        self.assertRaises(ValueError, self.cont.change_participant_data,
+            'person3', contest_number=9, glider='ajax')
+        self.cont.change_participant_data('person1', cotest_number=9,
+            glider='aJax')
+        self.assertEqual(self.person1['contest_number'], 747)
+        self.assertEqual(self.person1['glider'], 'ajax')
+
+    def test_violate_invariants(self):
+        self.assertRaises(ValueError, self.cont.change_participant_data,
+            'person1', contest_number='757')
 
 
 if __name__ == '__main__':
     unittest.main()
+

@@ -2,9 +2,10 @@
 Contest Aggregate.
 '''
 import uuid
+from copy import deepcopy
 
-
-from gorynych.common.domain.model import IdentifierObject, AggregateRoot, ValueObject, DomainEvent
+from gorynych.common.domain.model import IdentifierObject, AggregateRoot
+from gorynych.common.domain.model import ValueObject, DomainEvent
 from gorynych.common.domain.types import Address, Name, Country
 from gorynych.common.infrastructure import persistence
 from gorynych.info.domain.tracker import TrackerID
@@ -57,7 +58,7 @@ class Contest(AggregateRoot):
         self.races = list()
 
     def register_paraglider(self, person_id, glider, contest_number):
-        paraglider_before = self._participants.get(person_id)
+        paraglider_before = deepcopy(self._participants.get(person_id))
 
         glider = glider.strip().split(' ')[0].lower()
         self._participants[person_id] = dict(role='paraglider',
@@ -131,6 +132,25 @@ class Contest(AggregateRoot):
                         self._participants[key]['contest_number'],
                         person.tracker)
         return race
+
+    def change_participant_data(self, person_id, **kwargs):
+        if not kwargs:
+            raise ValueError("No new data has been received.")
+        try:
+            old_person = deepcopy(self._participants[person_id])
+        except KeyError:
+            raise ValueError("No person with such id.")
+
+        for key in kwargs.keys():
+            if key == 'contest_number':
+                kwargs[key] = int(kwargs[key])
+            if key == 'glider':
+                kwargs[key] = kwargs[key].strip().split(' ')[0].lower()
+            self._participants[person_id][key] = kwargs[key]
+
+        if not self._invariants_are_correct():
+            self._participants[person_id] = old_person
+            raise ValueError("Paraglider must have unique contest number.")
 
 
 class Paraglider(ValueObject):

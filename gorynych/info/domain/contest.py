@@ -8,7 +8,6 @@ from gorynych.common.domain.model import IdentifierObject, AggregateRoot, ValueO
 from gorynych.common.domain.types import Address, Name, Country
 from gorynych.info.domain.tracker import TrackerID
 from gorynych.info.domain.race import RaceID, Race, RACETASKS
-from gorynych.info.domain.person import PersonRepository
 
 class ContestID(IdentifierObject):
     pass

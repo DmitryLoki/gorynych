@@ -4,6 +4,8 @@ Contest Aggregate.
 import uuid
 from copy import deepcopy
 
+from zope.interface.interfaces import Interface
+
 from gorynych.common.domain.model import IdentifierObject, AggregateRoot
 from gorynych.common.domain.model import ValueObject, DomainEvent
 from gorynych.common.domain.types import Address, Name, Country
@@ -11,6 +13,28 @@ from gorynych.common.infrastructure import persistence
 from gorynych.info.domain.tracker import TrackerID
 from gorynych.info.domain.race import RaceID, Race, RACETASKS
 from gorynych.info.domain.person import IPersonRepository
+
+
+class IContestRepository(Interface):
+    def get_by_id(id):
+        '''
+
+        @param id:
+        @type id:
+        @return:
+        @rtype:
+        '''
+
+    def save(obj):
+        '''
+
+        @param obj:
+        @type obj:
+        @return:
+        @rtype:
+        '''
+
+
 
 class ContestID(IdentifierObject):
     pass

@@ -3,6 +3,8 @@ Aggregate Race.
 '''
 from copy import deepcopy
 
+from zope.interface.interfaces import Interface
+
 from gorynych.common.domain.model import AggregateRoot, IdentifierObject, ValueObject, DomainEvent
 from gorynych.common.domain.types import Checkpoint
 
@@ -83,3 +85,23 @@ class Race(AggregateRoot):
 
     def _rollback_set_checkpoints(self, old_checkpoints):
         self._checkpoints = old_checkpoints
+
+
+class IRaceRepository(Interface):
+    def get_by_id(id):
+        '''
+
+        @param id:
+        @type id:
+        @return:
+        @rtype:
+        '''
+
+    def save(obj):
+        '''
+
+        @param obj:
+        @type obj:
+        @return:
+        @rtype:
+        '''

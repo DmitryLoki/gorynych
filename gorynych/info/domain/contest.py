@@ -101,6 +101,7 @@ class Contest(AggregateRoot):
         '''
         race_id = RaceID(uuid.uuid4())
         race = Race(race_id)
+        race.event_publisher = self.event_publisher
         race_type = ''.join(race_type.strip().lower().split())
         if race_type in RACETASKS.keys():
             race.task = RACETASKS[race_type]()
@@ -111,9 +112,9 @@ class Contest(AggregateRoot):
         race.timelimits = (self.start_time, self.end_time)
         # Here Race is created and we start to fill it with useful
         # information.
+        race = self._fill_race_with_paragliders(race)
         race.checkpoints = checkpoints
         # TODO: the same for transport and organizers.
-        race = self._fill_race_with_paragliders(race)
         self.race_ids.append(race_id)
         return race
 

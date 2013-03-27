@@ -6,8 +6,10 @@ import uuid
 
 from gorynych.common.domain.model import IdentifierObject, AggregateRoot, ValueObject, DomainEvent
 from gorynych.common.domain.types import Address, Name, Country
+from gorynych.common.infrastructure import persistence
 from gorynych.info.domain.tracker import TrackerID
 from gorynych.info.domain.race import RaceID, Race, RACETASKS
+from gorynych.info.domain.person import IPersonRepository
 
 class ContestID(IdentifierObject):
     pass
@@ -75,7 +77,8 @@ class Contest(AggregateRoot):
         paragliders = set()
         for key in self._participants.keys():
             if self._participants[key]['role'] == 'paraglider':
-                contest_numbers.add(self._participants[key]['contest_number'])
+                contest_numbers.add(
+                    self._participants[key]['contest_number'])
                 paragliders.add(key)
         all_contest_numbers_uniq = len(paragliders) == len(contest_numbers)
         return all_contest_numbers_uniq
@@ -114,18 +117,19 @@ class Contest(AggregateRoot):
         return race
 
     def _fill_race_with_paragliders(self, race):
-        # TODO: repository :), then uncomment this.
-#        for key in self._participants.keys():
-#            if self._participants[key]['role'] == 'paraglider':
-#                person = PersonRepository.get_by_id(key)
-#                if len(person.trackers):
-#                    race.paragliders.add(Paraglider(
-#                        key,
-#                        person.name,
-#                        person.country,
-#                        self._participants[key]['glider'],
-#                        self._participants[key]['contest_number'],
-#                        person.pop()))
+        for key in self._participants.keys():
+            if self._participants[key]['role'] == 'paraglider':
+                person = persistence.get_repository(IPersonRepository
+                                                    ).get_by_id(key)
+                if person and person.tracker:
+                    race.paragliders[
+                      self._participants[key]['contest_number']] = Paraglider(
+                        key,
+                        person.name,
+                        person.country,
+                        self._participants[key]['glider'],
+                        self._participants[key]['contest_number'],
+                        person.tracker)
         return race
 
 
@@ -145,8 +149,8 @@ class Paraglider(ValueObject):
             tracker_id = TrackerID(tracker_id)
 
         self.person_id = person_id
-        self.name = name
-        self.country = country
+        self.name = name.short()
+        self.country = country.code()
         self.glider = glider.strip().split(' ')[0].lower()
         self.contest_number = int(contest_number)
         self.tracker_id = tracker_id

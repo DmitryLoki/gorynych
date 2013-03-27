@@ -40,9 +40,7 @@ class TrackerDontHasOwner(Exception):
 
 
 class TrackerID(IdentifierObject):
-
-    def __str__(self):
-        return "Tracker-%s" % self.id
+    pass
 
 
 class Tracker(AggregateRoot):

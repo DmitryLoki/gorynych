@@ -52,7 +52,7 @@ class Race(AggregateRoot):
         self._checkpoints = []
         self.title = ''
         self.timelimits = ()
-        self.paragliders = set()
+        self.paragliders = dict()
 
     @property
     def checkpoints(self):

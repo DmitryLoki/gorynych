@@ -28,7 +28,7 @@ class Person(AggregateRoot):
         self._name = name
         self._country = country
         self.regdate = regdate
-        self.trackers = set()
+        self.tracker = None
         self._contests = dict()
 
     @property
@@ -41,10 +41,12 @@ class Person(AggregateRoot):
 
     def assign_tracker(self, tracker_id):
         if isinstance(tracker_id, TrackerID):
-            self.trackers.add(tracker_id)
+            self.tracker = tracker_id
 
     def unassign_tracker(self, tracker_id):
-        self.trackers.remove(tracker_id)
+        if not self.tracker == tracker_id:
+            raise KeyError("No such tracker.")
+        self.tracker = None
 
     def participate_in_contest(self, contest_id, role):
         # TODO: does person really need to keep information about contests in which he or she take participatance?

@@ -76,9 +76,13 @@ class TrackerTest(unittest.TestCase):
 
 
 class TrackerIDTest(unittest.TestCase):
-    def test(self):
+    def test_int(self):
         t_id = TrackerID(1)
         self.assertEqual(1, t_id)
+
+    def test_str(self):
+        t_str = TrackerID('hello')
+        self.assertEqual('hello', t_str)
 
 
 if __name__ == '__main__':

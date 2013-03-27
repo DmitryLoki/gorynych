@@ -2,13 +2,39 @@
 Contest Aggregate.
 '''
 import uuid
+from copy import deepcopy
 
+from zope.interface.interfaces import Interface
 
-from gorynych.common.domain.model import IdentifierObject, AggregateRoot, ValueObject, DomainEvent
+from gorynych.common.domain.model import IdentifierObject, AggregateRoot
+from gorynych.common.domain.model import ValueObject, DomainEvent
 from gorynych.common.domain.types import Address, Name, Country
+from gorynych.common.infrastructure import persistence
 from gorynych.info.domain.tracker import TrackerID
 from gorynych.info.domain.race import RaceID, Race, RACETASKS
-from gorynych.info.domain.person import PersonRepository
+from gorynych.info.domain.person import IPersonRepository
+
+
+class IContestRepository(Interface):
+    def get_by_id(id):
+        '''
+
+        @param id:
+        @type id:
+        @return:
+        @rtype:
+        '''
+
+    def save(obj):
+        '''
+
+        @param obj:
+        @type obj:
+        @return:
+        @rtype:
+        '''
+
+
 
 class ContestID(IdentifierObject):
     pass
@@ -53,10 +79,10 @@ class Contest(AggregateRoot):
         self.end_time = end_time
         self.address = address
         self._participants = dict()
-        self.races = list()
+        self.race_ids = list()
 
     def register_paraglider(self, person_id, glider, contest_number):
-        paraglider_before = self._participants.get(person_id)
+        paraglider_before = deepcopy(self._participants.get(person_id))
 
         glider = glider.strip().split(' ')[0].lower()
         self._participants[person_id] = dict(role='paraglider',
@@ -76,7 +102,8 @@ class Contest(AggregateRoot):
         paragliders = set()
         for key in self._participants.keys():
             if self._participants[key]['role'] == 'paraglider':
-                contest_numbers.add(self._participants[key]['contest_number'])
+                contest_numbers.add(
+                    self._participants[key]['contest_number'])
                 paragliders.add(key)
         all_contest_numbers_uniq = len(paragliders) == len(contest_numbers)
         return all_contest_numbers_uniq
@@ -98,6 +125,7 @@ class Contest(AggregateRoot):
         '''
         race_id = RaceID(uuid.uuid4())
         race = Race(race_id)
+        race.event_publisher = self.event_publisher
         race_type = ''.join(race_type.strip().lower().split())
         if race_type in RACETASKS.keys():
             race.task = RACETASKS[race_type]()
@@ -108,26 +136,46 @@ class Contest(AggregateRoot):
         race.timelimits = (self.start_time, self.end_time)
         # Here Race is created and we start to fill it with useful
         # information.
+        race = self._fill_race_with_paragliders(race)
         race.checkpoints = checkpoints
         # TODO: the same for transport and organizers.
-        race = self._fill_race_with_paragliders(race)
-        self.races.append(race_id)
+        self.race_ids.append(race_id)
         return race
 
     def _fill_race_with_paragliders(self, race):
-        # TODO: repository :), then uncomment this.
-#        for key in self._participants.keys():
-#            if self._participants[key]['role'] == 'paraglider':
-#                person = PersonRepository.get_by_id(key)
-#                if len(person.trackers):
-#                    race.paragliders.add(Paraglider(
-#                        key,
-#                        person.name,
-#                        person.country,
-#                        self._participants[key]['glider'],
-#                        self._participants[key]['contest_number'],
-#                        person.pop()))
+        for key in self._participants.keys():
+            if self._participants[key]['role'] == 'paraglider':
+                person = persistence.get_repository(IPersonRepository
+                                                    ).get_by_id(key)
+                if person and person.tracker:
+                    race.paragliders[
+                      self._participants[key]['contest_number']] = Paraglider(
+                        key,
+                        person.name,
+                        person.country,
+                        self._participants[key]['glider'],
+                        self._participants[key]['contest_number'],
+                        person.tracker)
         return race
+
+    def change_participant_data(self, person_id, **kwargs):
+        if not kwargs:
+            raise ValueError("No new data has been received.")
+        try:
+            old_person = deepcopy(self._participants[person_id])
+        except KeyError:
+            raise ValueError("No person with such id.")
+
+        for key in kwargs.keys():
+            if key == 'contest_number':
+                kwargs[key] = int(kwargs[key])
+            if key == 'glider':
+                kwargs[key] = kwargs[key].strip().split(' ')[0].lower()
+            self._participants[person_id][key] = kwargs[key]
+
+        if not self._invariants_are_correct():
+            self._participants[person_id] = old_person
+            raise ValueError("Paraglider must have unique contest number.")
 
 
 class Paraglider(ValueObject):
@@ -146,8 +194,8 @@ class Paraglider(ValueObject):
             tracker_id = TrackerID(tracker_id)
 
         self.person_id = person_id
-        self.name = name
-        self.country = country
+        self.name = name.short()
+        self.country = country.code()
         self.glider = glider.strip().split(' ')[0].lower()
         self.contest_number = int(contest_number)
         self.tracker_id = tracker_id

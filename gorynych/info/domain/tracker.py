@@ -1,10 +1,20 @@
 '''
 Tracker Aggregate.
 '''
+from zope.interface.interfaces import Interface
+
 from gorynych.common.domain.model import AggregateRoot, DomainEvent, IdentifierObject
 
 
 DEVICE_TYPES = ['tr203']
+
+class ITrackerRepository(Interface):
+    def get_by_id(id):
+        '''
+        '''
+    def save(obj):
+        '''
+        '''
 
 class TrackerAssigned(DomainEvent):
     '''
@@ -40,9 +50,7 @@ class TrackerDontHasOwner(Exception):
 
 
 class TrackerID(IdentifierObject):
-
-    def __str__(self):
-        return "Tracker-%s" % self.id
+    pass
 
 
 class Tracker(AggregateRoot):

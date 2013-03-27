@@ -2,6 +2,7 @@
 Aggregate Person.
 '''
 import datetime
+from zope.interface.interfaces import Interface
 
 from gorynych.common.domain.model import IdentifierObject, AggregateRoot
 from gorynych.common.domain.types import Name, Country
@@ -27,7 +28,7 @@ class Person(AggregateRoot):
         self._name = name
         self._country = country
         self.regdate = regdate
-        self.trackers = set()
+        self.tracker = None
         self._contests = dict()
 
     @property
@@ -40,10 +41,12 @@ class Person(AggregateRoot):
 
     def assign_tracker(self, tracker_id):
         if isinstance(tracker_id, TrackerID):
-            self.trackers.add(tracker_id)
+            self.tracker = tracker_id
 
     def unassign_tracker(self, tracker_id):
-        self.trackers.remove(tracker_id)
+        if not self.tracker == tracker_id:
+            raise KeyError("No such tracker.")
+        self.tracker = None
 
     def participate_in_contest(self, contest_id, role):
         # TODO: does person really need to keep information about contests in which he or she take participatance?
@@ -101,7 +104,21 @@ class PersonFactory(object):
         return person
 
     
-class PersonRepository(object):
-    @classmethod
-    def get_by_id(cls, id):
-        pass
+class IPersonRepository(Interface):
+    def get_by_id(id):
+        '''
+        Return a person with id.
+        @param id:
+        @type id:
+        @return: a person
+        @rtype: Person
+        '''
+
+    def save(person):
+        '''
+        Persist person.
+        @param person:
+        @type person: Person
+        @return:
+        @rtype:
+        '''

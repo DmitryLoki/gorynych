@@ -71,3 +71,7 @@ class Checkpoint(ValueObject):
             self.start_time, self.end_time = times
         else:
             self.start_time, self.end_time = None, None
+
+    def __eq__(self, other):
+        # TODO: implement correct checkpoints comparison (it's better to do  it in ValueObject class)
+        return self.type == other.type and self.name == other.name

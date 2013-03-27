@@ -2,6 +2,7 @@
 Aggregate Person.
 '''
 import datetime
+from zope.interface.interfaces import Interface
 
 from gorynych.common.domain.model import IdentifierObject, AggregateRoot
 from gorynych.common.domain.types import Name, Country
@@ -101,7 +102,21 @@ class PersonFactory(object):
         return person
 
     
-class PersonRepository(object):
-    @classmethod
-    def get_by_id(cls, id):
-        pass
+class IPersonRepository(Interface):
+    def get_by_id(id):
+        '''
+        Return a person with id.
+        @param id:
+        @type id:
+        @return: a person
+        @rtype: Person
+        '''
+
+    def save(person):
+        '''
+        Persist person.
+        @param person:
+        @type person: Person
+        @return:
+        @rtype:
+        '''

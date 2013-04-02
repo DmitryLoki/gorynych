@@ -4,7 +4,7 @@ from twisted.web.test.requesthelper import DummyChannel
 from twisted.web.server import Request
 
 from gorynych.info.restui.resources import (APIResource,
-    parameters_from_request, BadParametersError)
+    parameters_from_request, BadParametersError, json_renderer)
 
 class SomeResource:
     def __init__(self, tree, service):
@@ -18,9 +18,6 @@ class SimpleAPIResource(APIResource):
                        'put': 'put_the_thing'}
     allowedMethods = ["GET"]
     renderers = {'application/json': lambda x, y: '::'.join((x, y))}
-
-    def read(self, res):
-        return res
 
 
 class SimpleService(object):
@@ -139,6 +136,15 @@ class RequestHandlingTest(unittest.TestCase):
         args = {'c': ['ru', 'de'], 'id': '1', 'race': '13'}
         self.assertRaises(BadParametersError, parameters_from_request,
             (uri, args))
+
+
+class JsonRendererTest(unittest.TestCase):
+    def test_base_contest_rendering(self):
+        self.assertEqual(json_renderer({'contest_id': 'hello',
+                            'contest_name': 'greeter'}, 'contest'),
+            '{"id": "hello", "name": "greeter"}')
+        self.assertRaises(TypeError, json_renderer, 1, 'contest')
+        self.assertRaises(ValueError, json_renderer, dict(), 'hui')
 
 
 if __name__ == '__main__':

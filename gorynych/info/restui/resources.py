@@ -1,6 +1,8 @@
 '''
 Resources for RESTful API.
 '''
+from string import Template
+
 from twisted.web import resource, server
 from twisted.internet import defer
 
@@ -8,9 +10,17 @@ class BadParametersError(Exception):
     '''
     Raised when bad parameters has been passed to the system.
     '''
+contest_template = '{"id": "$contest_id", "name": "$contest_name"}'
+json_templates = {'contest': Template(contest_template)}
 
-def json_renderer(body, name):
-    pass
+def json_renderer(template_values, template_name):
+    if not isinstance(template_values, dict):
+        raise TypeError("Dictionary must be passed as container for template"
+                        " values.")
+    template = json_templates.get(template_name)
+    if not template:
+        raise ValueError("Template with such name doesn't exist.")
+    return template.substitute(template_values)
 
 
 class APIResource(resource.Resource):
@@ -87,7 +97,7 @@ class APIResource(resource.Resource):
         return req, body
 
     def read(self, res):
-        raise NotImplementedError
+        return res
 
     def resource_created(self, res, req):
         '''
@@ -147,7 +157,7 @@ class ContestResourceCollection(APIResource):
     Resource /contest
     '''
     allowedMethods = ["GET", "POST"]
-    service_command = dict(post='create_new_contest')
+    service_command = dict(post='create_new_contest', get='get_contests')
     name = 'contest'
 
 
@@ -155,24 +165,29 @@ class ContestResource(APIResource):
     '''
     Resource /contest/{id}
     '''
+    service_command = dict(get='get_contest', put='change_contest')
 
 
 class RaceResourceCollection(APIResource):
     '''
     Resource /contest/{id}/race
     '''
+    service_command = dict(get='get_races', post='create_new_race')
 
 class RaceResource(APIResource):
     '''
     Resource /contest/{id}/race/{id}
     '''
+    service_command = dict(get='get_race', put='change_race')
 
 class ParagliderResourceCollection(APIResource):
     '''
     Resource /contest/{id}/race/{id}/paraglider
     '''
+    service_command = dict(get='get_race_paragliders')
 
 class ParagliderResource(APIResource):
     '''
     Resource /contest/{id}/race/{id}/paraglider/{id}
     '''
+    service_command = dict(get='get_paraglider')

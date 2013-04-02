@@ -140,8 +140,11 @@ class RequestHandlingTest(unittest.TestCase):
 
 class JsonRendererTest(unittest.TestCase):
     def test_base_contest_rendering(self):
+        from string import Template
+        template={'contest': Template(
+            '{"id": "$contest_id", "name": "$contest_name"}')}
         self.assertEqual(json_renderer({'contest_id': 'hello',
-                            'contest_name': 'greeter'}, 'contest'),
+                            'contest_name': 'greeter'}, 'contest', template),
             '{"id": "hello", "name": "greeter"}')
         self.assertRaises(TypeError, json_renderer, 1, 'contest')
         self.assertRaises(ValueError, json_renderer, dict(), 'hui')

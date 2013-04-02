@@ -1,6 +1,7 @@
 '''
 Resources for RESTful API.
 '''
+import os
 from string import Template
 
 from twisted.web import resource, server
@@ -10,14 +11,28 @@ class BadParametersError(Exception):
     '''
     Raised when bad parameters has been passed to the system.
     '''
-contest_template = '{"id": "$contest_id", "name": "$contest_name"}'
-json_templates = {'contest': Template(contest_template)}
 
-def json_renderer(template_values, template_name):
+JSON_TEMPLATES_DIR = 'json_templates'
+
+def load_json_templates(dir):
+    result = dict()
+    files_list = filter(os.path.isfile,
+        map(lambda x: os.path.join(dir, x), os.listdir(dir)))
+    for filename in files_list:
+        # read every nonempty *.json file and put content into json_templates
+        if filename.endswith('.json') and os.stat(filename).st_size > 0:
+            result[os.path.basename(filename).split('.')[0]] =\
+                                                Template(open(filename).read())
+
+JSON_TEMPLATES = load_json_templates(os.path.join(os.path.dirname(__file__),
+    JSON_TEMPLATES_DIR))
+
+
+def json_renderer(template_values, template_name, templates=JSON_TEMPLATES):
     if not isinstance(template_values, dict):
         raise TypeError("Dictionary must be passed as container for template"
                         " values.")
-    template = json_templates.get(template_name)
+    template = templates.get(template_name)
     if not template:
         raise ValueError("Template with such name doesn't exist.")
     return template.substitute(template_values)
@@ -158,7 +173,7 @@ class ContestResourceCollection(APIResource):
     '''
     allowedMethods = ["GET", "POST"]
     service_command = dict(post='create_new_contest', get='get_contests')
-    name = 'contest'
+    name = 'contest_collection'
 
 
 class ContestResource(APIResource):
@@ -166,6 +181,7 @@ class ContestResource(APIResource):
     Resource /contest/{id}
     '''
     service_command = dict(get='get_contest', put='change_contest')
+    name = 'contest'
 
 
 class RaceResourceCollection(APIResource):

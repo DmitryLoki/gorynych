@@ -23,19 +23,40 @@ def load_json_templates(dir):
         if filename.endswith('.json') and os.stat(filename).st_size > 0:
             result[os.path.basename(filename).split('.')[0]] =\
                                                 Template(open(filename).read())
+    return result
+
 
 JSON_TEMPLATES = load_json_templates(os.path.join(os.path.dirname(__file__),
     JSON_TEMPLATES_DIR))
 
 
-def json_renderer(template_values, template_name, templates=JSON_TEMPLATES):
-    if not isinstance(template_values, dict):
-        raise TypeError("Dictionary must be passed as container for template"
-                        " values.")
-    template = templates.get(template_name)
+def json_renderer(template_values, template_name,
+                  templates_dict=JSON_TEMPLATES):
+
+    def render(value, template):
+        ''' Do actual rendering. Return string.
+        '''
+        return template.substitute(value)
+
+    # get template from a dict
+    template = templates_dict.get(template_name)
     if not template:
         raise ValueError("Template with such name doesn't exist.")
-    return template.substitute(template_values)
+
+    if isinstance(template_values, list):
+        # Result will be json array.
+        result = '[' + render(template_values[0], template)
+        for value in template_values[1:]:
+            json_obj = render(value, template)
+            result = ','.join((result, json_obj))
+        result = ''.join((result, ']'))
+        return result
+
+    elif isinstance(template_values, dict):
+        return render(template_values, template)
+    else:
+        raise TypeError("Dictionary must be passed as container for template"
+                        " values.")
 
 
 class APIResource(resource.Resource):

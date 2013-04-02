@@ -139,15 +139,30 @@ class RequestHandlingTest(unittest.TestCase):
 
 
 class JsonRendererTest(unittest.TestCase):
-    def test_base_contest_rendering(self):
+    def setUp(self):
         from string import Template
-        template={'contest': Template(
+        self.template = {'contest': Template(
             '{"id": "$contest_id", "name": "$contest_name"}')}
+
+    def test_base_rendering(self):
         self.assertEqual(json_renderer({'contest_id': 'hello',
-                            'contest_name': 'greeter'}, 'contest', template),
+                        'contest_name': 'greeter'}, 'contest', self.template),
             '{"id": "hello", "name": "greeter"}')
         self.assertRaises(TypeError, json_renderer, 1, 'contest')
         self.assertRaises(ValueError, json_renderer, dict(), 'hui')
+
+    def test_list_rendering(self):
+        import json
+        test_list = [{'contest_id': 1, 'contest_name': 'one'},
+                {'contest_id': '2', 'contest_name': 'two'}]
+        result = json.loads(json_renderer(test_list, 'contest',
+            self.template))
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 2)
+        self.assertIsInstance(result[0], dict)
+        self.assertEqual(result[0]['id'], '1')
+        self.assertEqual(result[1]['id'], '2')
+
 
 
 if __name__ == '__main__':

@@ -210,21 +210,28 @@ class RaceResourceCollection(APIResource):
     Resource /contest/{id}/race
     '''
     service_command = dict(get='get_races', post='create_new_race')
+    name = 'contest_race_collection'
+
 
 class RaceResource(APIResource):
     '''
     Resource /contest/{id}/race/{id}
     '''
     service_command = dict(get='get_race', put='change_race')
+    name = 'contest_race'
+
 
 class ParagliderResourceCollection(APIResource):
     '''
     Resource /contest/{id}/race/{id}/paraglider
     '''
     service_command = dict(get='get_race_paragliders')
+    name = 'race_paragliders_collection'
+
 
 class ParagliderResource(APIResource):
     '''
     Resource /contest/{id}/race/{id}/paraglider/{id}
     '''
     service_command = dict(get='get_paraglider')
+    name = 'race_paraglider'

@@ -1,7 +1,11 @@
+'''
+Test base resources and functions for CoreAPI.
+'''
 import unittest
 
 from twisted.web.test.requesthelper import DummyChannel
 from twisted.web.server import Request
+from twisted.web.resource import NoResource
 
 from gorynych.info.restui.resources import (APIResource,
     parameters_from_request, BadParametersError, json_renderer)
@@ -34,7 +38,7 @@ class SimpleService(object):
 class APIResourceTest(unittest.TestCase):
     def setUp(self):
         self.tree_ = {
-            'contest': {'leaf': SomeResource, 'tree': 1}
+            '\w+-\w+-3\w+': {'leaf': SimpleAPIResource, 'tree': 1}
             , 'race': {'leaf': SomeResource, 'tree': 1}, }
         self.api_resource = APIResource(self.tree_, 'service')
 
@@ -42,8 +46,6 @@ class APIResourceTest(unittest.TestCase):
     def test_init(self):
         self.assertEqual(self.api_resource.isLeaf, 0)
         self.assertEqual(self.api_resource.service, 'service')
-        self.assertIsInstance(self.api_resource.tree, dict)
-        self.assertTrue(len(self.api_resource.tree) > 0)
         self.assertEqual(self.api_resource.default_content_type,
             'application/json')
 
@@ -54,6 +56,12 @@ class APIResourceTest(unittest.TestCase):
         self.assertIsInstance(some_result, SomeResource)
         self.assertEqual(some_result.tree, 1)
         self.assertEqual(some_result.service, 'service')
+
+    def test_regexp_child(self):
+        self.assertIsInstance(self.api_resource.getChild('axe2-fsb3-32a', 1),
+            SimpleAPIResource)
+        self.assertIsInstance(self.api_resource.getChild('axe2-fsb3-42a', 1),
+            NoResource)
 
 
 class APIResourceMethodTest(unittest.TestCase):

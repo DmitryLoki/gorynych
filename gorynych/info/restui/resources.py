@@ -2,6 +2,7 @@
 Resources for RESTful API.
 '''
 import os
+import re
 from string import Template
 
 from twisted.web import resource, server
@@ -85,8 +86,11 @@ class APIResource(resource.Resource):
         """
         if path == '':
             return self
-        return self.tree[path]['leaf'](
-                                self.tree[path]['tree'], self.service)
+        for key in self.tree.keys():
+            if re.search(key, path):
+                return self.tree[key]['leaf'](
+                                self.tree[key]['tree'], self.service)
+        return resource.NoResource()
 
     def render_GET(self, request):
         d = defer.Deferred()

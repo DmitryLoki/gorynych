@@ -2,6 +2,7 @@
 DDD-model specific base classes.
 '''
 import time
+import uuid
 
 from gorynych.common.infrastructure.messaging import DomainEventsPublisher
 
@@ -24,6 +25,8 @@ class IdentifierObject(object):
         if not id:
             raise AttributeError("No id in IdentifierObject.")
         self.id = id
+        if isinstance(id, uuid.UUID):
+            self.id = str(id)
 
     def __eq__(self, other):
         '''
@@ -45,6 +48,9 @@ class IdentifierObject(object):
         Make object human-readable in logs.
         '''
         return self.id
+
+    def __len__(self):
+        return len(self.id)
 
 class AggregateRoot(object):
     '''

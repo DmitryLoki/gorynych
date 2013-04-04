@@ -141,6 +141,14 @@ class Contest(AggregateRoot):
                 raise ValueError("Times values violate aggregate's "
                                  "invariants.")
 
+    @property
+    def paragliders(self):
+        result = []
+        for key in self._participants.keys():
+            if self._participants[key]['role'] == 'paraglider':
+                result.append(self._participants[key])
+        return result
+
 
     def register_paraglider(self, person_id, glider, contest_number):
         paraglider_before = deepcopy(self._participants.get(person_id))
@@ -153,6 +161,7 @@ class Contest(AggregateRoot):
             raise ValueError("Paraglider must have unique contest number.")
         self.event_publisher.publish(ParagliderRegisteredOnContest(
                                                         person_id, self.id))
+        return self
 
     def _invariants_are_correct(self):
         """
@@ -252,7 +261,7 @@ class Paraglider(ValueObject):
         if not isinstance(name, Name):
             raise TypeError("Name must be an instance of Name class.")
         if not isinstance(country, Country):
-            raise TypeError("Country must be an instance of Country class.")
+            country = Country(country)
         if not isinstance(tracker_id, TrackerID):
             tracker_id = TrackerID(tracker_id)
 

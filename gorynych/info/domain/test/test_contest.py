@@ -65,8 +65,10 @@ class ParagliderTest(unittest.TestCase):
 class ContestTest(unittest.TestCase):
     def test_register_paraglider(self):
         cont = create_contest('1', 1, 2)
-        cont.register_paraglider('person1', 'mantrA 9', '747')
+        c = cont.register_paraglider('person1', 'mantrA 9', '747')
+        self.assertIsInstance(c, contest.Contest)
         self.assertEqual(len(cont._participants), 1)
+        self.assertEqual(len(cont.paragliders), 1)
         self.assertEqual(cont._participants['person1']['role'], 'paraglider')
         self.assertEqual(cont._participants['person1']['glider'], 'mantra')
         self.assertEqual(cont._participants['person1']['contest_number'], 747)

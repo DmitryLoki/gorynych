@@ -13,12 +13,12 @@ class Name(ValueObject):
         if name:
             self._name = name.strip().capitalize()
         else:
-            raise ValueError("Firstname must be set.")
+            raise ValueError("Name must be set.")
 
         if surname:
             self._surname = surname.strip().capitalize()
         else:
-            raise ValueError("Lastname must be set.")
+            raise ValueError("Surname must be set.")
 
     def short(self):
         return '. '.join((self._name.capitalize()[0],

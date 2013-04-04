@@ -34,9 +34,11 @@ class PersonFactoryTest(unittest.TestCase):
 
     def test_bad_init(self):
         self.assertRaises(ValueError, create_person, 'Harold', 'Herzen',
-            'DE', 'boss@gmail.com', 2010, 11, 30)
+            'DE', 'boss@gmail.com', 2010, 11, 30, "Registration date range "
+                                                  "check is broken.")
         self.assertRaises(ValueError, create_person, 'Harold', 'Herzen',
-            'DE', 's@mail.ru', 2015, 11, 30)
+            'DE', 's@mail.ru', 2015, 11, 30, "Registration date range check "
+                                             "is broken.")
 
 
 class PersonTest(unittest.TestCase):

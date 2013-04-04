@@ -225,8 +225,12 @@ class ApplicationService(Service):
 
     def change_person(self, params):
         def change(pers, params):
-            pers.name = dict(name=params.get('name'),
-                surname=params.get('surname'))
+            new_name = dict()
+            if params.get('name'):
+                new_name['name'] = params['name']
+            if params.get('surname'):
+                new_name['surname'] = params['surname']
+            pers.name = new_name
             if params.get('country'):
                 pers.country = params['country']
             return pers

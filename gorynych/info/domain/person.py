@@ -35,9 +35,20 @@ class Person(AggregateRoot):
     def country(self):
         return self._country.code()
 
+    @country.setter
+    def country(self, value):
+        self._country = Country(value)
+
     @property
     def name(self):
-        return self._name.full()
+        return self._name
+
+    @name.setter
+    def name(self, value):
+        if not isinstance(value, dict):
+            TypeError("I'm waiting for a dictionary with name and surname.")
+        self._name = Name(name=value.get('name', self._name.name),
+                          surname=value.get('surname', self._name.surname))
 
     def assign_tracker(self, tracker_id):
         if isinstance(tracker_id, TrackerID):
@@ -94,8 +105,10 @@ class PersonFactory(object):
         @return: a new person
         @rtype: Person
         '''
+        year, month, day = int(year), int(month), int(day)
         if not MINYEAR <= year <= datetime.date.today().year:
-            raise ValueError("Year is out of range")
+            raise ValueError("Year is out of range %s-%s" %
+                             (MINYEAR, datetime.date.today().year))
         person = Person(Name(name, surname),
                         Country(country),
                         PersonID(email),

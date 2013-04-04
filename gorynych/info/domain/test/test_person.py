@@ -22,20 +22,23 @@ def create_person(name='John', surname='Doe',
 class PersonFactoryTest(unittest.TestCase):
     def test_good_init(self):
         self.assertEqual(person.MINYEAR, 2012)
-        pers = create_person('Harold', 'Herzen', 'DE', 'boss@gmail.com', 2012,
-            11, 30)
+        pers = create_person('Harold', 'Herzen', 'DE', 'boss@gmail.com', '2012',
+            11, '30')
 
-        self.assertEqual(pers.name, 'Harold Herzen')
+        self.assertEqual(pers.name.full(), 'Harold Herzen')
         self.assertEqual(pers.country, 'DE')
         self.assertEqual(pers.id, 'boss@gmail.com')
         self.assertEqual(pers.regdate, datetime.date(2012, 11, 30))
         self.assertIsInstance(pers.event_publisher, mock.MagicMock)
 
+
     def test_bad_init(self):
         self.assertRaises(ValueError, create_person, 'Harold', 'Herzen',
-            'DE', 'boss@gmail.com', 2010, 11, 30)
+            'DE', 'boss@gmail.com', 2010, 11, 30, "Registration date range "
+                                                  "check is broken.")
         self.assertRaises(ValueError, create_person, 'Harold', 'Herzen',
-            'DE', 's@mail.ru', 2015, 11, 30)
+            'DE', 's@mail.ru', 2015, 11, 30, "Registration date range check "
+                                             "is broken.")
 
 
 class PersonTest(unittest.TestCase):
@@ -65,6 +68,20 @@ class PersonTest(unittest.TestCase):
 
         self.person.dont_participate_in_contest(ContestID('some contest'))
         self.assertFalse(ContestID('some contest') in self.person.contests)
+
+    def test_name_setter(self):
+        self.person.name = dict(name='VAsya')
+        self.assertEqual(self.person.name.full(), 'Vasya Doe')
+
+        self.person.name = dict(surname=' pupkin')
+        self.assertEqual(self.person.name.full(), 'Vasya Pupkin')
+
+        self.person.name = dict(name='Nikolay', surname='vtoroy')
+        self.assertEqual(self.person.name.full(), 'Nikolay Vtoroy')
+
+    def test_country_setter(self):
+        self.person.country = 'RUSSIA!'
+        self.assertEqual(self.person.country, 'RU')
 
 
 if __name__ == '__main__':

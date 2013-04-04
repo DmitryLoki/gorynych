@@ -19,6 +19,11 @@ class IdentifierObjectTest(unittest.TestCase):
         id_2 = model.IdentifierObject('45')
         self.assertEqual(id_1, id_2)
 
+    def test_len(self):
+        a = model.IdentifierObject('234')
+        self.assertEqual(len(a), 3)
+        self.assertEqual(len(model.IdentifierObject(1023)), 1)
+
 
 if __name__ == '__main__':
     unittest.main()

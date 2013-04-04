@@ -6,13 +6,16 @@ from gorynych.common.domain import types
 
 class TypesTest(unittest.TestCase):
     def test_name(self):
-        name = types.Name('firstname', 'lastname')
+        name = types.Name('firsTname  ', '  laStname')
         self.assertEqual(name.short(), 'F. Lastname')
         self.assertEqual(name.full(), 'Firstname Lastname')
         self.assertRaises(ValueError, types.Name)
+        self.assertEqual(name.name, 'Firstname')
+        self.assertEqual(name.surname, 'Lastname')
+
 
     def test_country(self):
-        country = types.Country('mc')
+        country = types.Country('mc123')
         self.assertEqual(country.code(), 'MC')
         self.assertRaises(ValueError, types.Country)
 

@@ -35,7 +35,7 @@ class ContestFactoryTest(unittest.TestCase):
         factory = contest.ContestFactory(mock.MagicMock())
         self.assertIsInstance(factory.event_publisher, mock.MagicMock)
 
-    def test_successfull_contest_creation(self):
+    def test_contestid_successfull_contest_creation(self):
         cont = create_contest(contest.ContestID('ab'), 1, 2)
         self.assertIsInstance(cont.address, Address)
         self.assertEqual(cont.title, 'Hello World')
@@ -43,6 +43,7 @@ class ContestFactoryTest(unittest.TestCase):
         self.assertIsInstance(cont.event_publisher, mock.MagicMock)
         self.assertEqual(cont.id, contest.ContestID('ab'))
 
+    def test_str_successfull_contest_creation(self):
         cont = create_contest('ab', 1, 3)
         self.assertEqual(cont.end_time, 3)
         self.assertEqual(cont.id, contest.ContestID('ab'))
@@ -120,6 +121,20 @@ class ContestTest(unittest.TestCase):
         self.assertEqual((p2.person_id, p2.name, p2.tracker_id, p2.glider,
                           p2.country),
             ('person2', 'N. Surname', 'tracker2', 'mantra', 'RU'))
+
+    def test_times_changing(self):
+        cont = create_contest('cont1', 1, '15')
+        cont.start_time = '2'
+        self.assertEqual(cont.start_time, 2)
+        cont.end_time = '8'
+        self.assertEqual(cont.end_time, 8)
+        self.assertRaises(ValueError, setattr, cont, 'start_time', 8)
+        self.assertRaises(ValueError, setattr, cont, 'start_time', 9)
+        self.assertRaises(ValueError, setattr, cont, 'end_time', 2)
+        self.assertRaises(ValueError, setattr, cont, 'end_time', 1)
+        cont.change_times('10', '16')
+        self.assertEqual((cont.start_time, cont.end_time), (10, 16))
+        self.assertRaises(ValueError, cont.change_times, '10', '8')
 
 
 class ContestTestWithRegisteredParagliders(unittest.TestCase):

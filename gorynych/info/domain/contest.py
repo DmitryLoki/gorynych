@@ -75,11 +75,72 @@ class Contest(AggregateRoot):
     def __init__(self, id, title, start_time, end_time, address):
         self.id = id
         self.title = title
-        self.start_time = start_time
-        self.end_time = end_time
+        self._start_time = start_time
+        self._end_time = end_time
         self.address = address
         self._participants = dict()
         self.race_ids = list()
+
+    @property
+    def start_time(self):
+        return self._start_time
+
+    @start_time.setter
+    def start_time(self, value):
+        if int(value) == self.start_time:
+            return
+        old_start_time = self.start_time
+        self._start_time = int(value)
+        if not self._invariants_are_correct():
+            self._start_time = old_start_time
+            raise ValueError("Incorrect start_time violate aggregate's "
+                             "invariants.")
+
+    @property
+    def end_time(self):
+        return self._end_time
+
+    @end_time.setter
+    def end_time(self, value):
+        if int(value) == self.end_time:
+            return
+        old_end_time = self.end_time
+        self._end_time = int(value)
+        if not self._invariants_are_correct():
+            self._end_time = old_end_time
+            raise ValueError("Incorrect end_time violate aggregate's "
+                             "invariants.")
+
+    def change_times(self, start_time, end_time):
+        '''
+        Change both start time and end time of context.
+        @param start_time:
+        @type start_time: C{int}
+        @param end_time:
+        @type end_time: C{int}
+        @return:
+        @rtype:
+        @raise: ValueError if times violate aggregate's invariants.
+        '''
+        start_time = int(start_time)
+        end_time = int(end_time)
+        if int(start_time) >= int(end_time):
+            raise ValueError("Start_time must be less then end_time.")
+        if start_time == self.start_time:
+            self.end_time = end_time
+        elif end_time == self.end_time:
+            self.start_time = start_time
+        else:
+            old_start_time = self.start_time
+            old_end_time = self.end_time
+            self._start_time = start_time
+            self._end_time = end_time
+            if not self._invariants_are_correct():
+                self._start_time = old_start_time
+                self._end_time = old_end_time
+                raise ValueError("Times values violate aggregate's "
+                                 "invariants.")
+
 
     def register_paraglider(self, person_id, glider, contest_number):
         paraglider_before = deepcopy(self._participants.get(person_id))
@@ -106,7 +167,9 @@ class Contest(AggregateRoot):
                     self._participants[key]['contest_number'])
                 paragliders.add(key)
         all_contest_numbers_uniq = len(paragliders) == len(contest_numbers)
-        return all_contest_numbers_uniq
+
+        end_after_start = self.start_time < self.end_time
+        return all_contest_numbers_uniq and end_after_start
 
     def _rollback_register_paraglider(self, paraglider_before, person_id):
         self._participants[person_id] = paraglider_before

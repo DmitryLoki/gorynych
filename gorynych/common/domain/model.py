@@ -50,7 +50,11 @@ class IdentifierObject(object):
         return self.id
 
     def __len__(self):
-        return len(self.id)
+        # XXX: not sure is this correct and necessary.
+        try:
+            return len(self.id)
+        except TypeError:
+            return 1
 
 class AggregateRoot(object):
     '''

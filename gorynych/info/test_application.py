@@ -7,13 +7,16 @@ from zope.interface import implements
 from twisted.trial import unittest
 from twisted.internet import defer
 
-from gorynych.info.application import ApplicationService
+from gorynych.info.application import ApplicationService, read_person
 from gorynych.info.domain.contest import IContestRepository
 
 
-class GoodContestRepository:
-    implements(IContestRepository)
+class GoodRepository:
     store = dict()
+    def is_store_empty(self):
+        return len(self.store) == 0
+    def clean_store(self):
+        self.store = dict()
     def save(self, obj):
         self.store[obj.id] = obj
         return obj
@@ -49,7 +52,7 @@ class ContestServiceTest(unittest.TestCase):
         gc.collect()
 
     def test_succes_contest_creation(self, patched):
-        repository = GoodContestRepository()
+        repository = GoodRepository()
         patched.return_value = repository
         d = self.cs.create_new_contest(dict(title='hoi', start_time=1,
             end_time=2, contest_place='Боливия', contest_country='RU',
@@ -65,7 +68,7 @@ class ContestServiceTest(unittest.TestCase):
         self.assertEqual(cont2['id'], cont_list[0]['contest_id'])
 
         new_cont = self.cs.change_contest(dict(id=cont1['id'],
-            title='A')).result
+            title='A', start_time=2, end_time=6)).result
         self.assertEqual(new_cont['title'], 'A')
         self.assertEqual(repository.get_by_id(cont1['id']).title, 'A')
 
@@ -79,13 +82,52 @@ class ContestServiceTest(unittest.TestCase):
 
 
     def test_bad_contest_creation(self, patched):
-        patched.return_value = GoodContestRepository()
+        patched.return_value = GoodRepository()
         d = defer.Deferred()
         d.addCallback(self.cs.create_new_contest)
         d.callback(dict(title='hoi', start_time=3, end_time=2,
             contest_place='Боливия', contest_country='RU',
             hq_coords=[12.3, 42.9]))
         self.assertFailure(d, ValueError)
+
+
+@mock.patch('gorynych.common.infrastructure.persistence.get_repository')
+class PersonServiceTest(unittest.TestCase):
+    def setUp(self):
+        self.cs = ApplicationService(mock.Mock())
+        self.cs.startService()
+
+    def tearDown(self):
+        self.cs.stopService()
+        del self.cs
+        gc.collect()
+
+    def test_create_person(self, patched):
+        repository = GoodRepository()
+        patched.return_value = repository
+        if not repository.is_store_empty():
+            repository.clean_store()
+        repository.is_store_empty()
+
+        pers1 = self.cs.create_new_person(dict(name='Vasya', surname='Doe',
+            country='QQ', email='john@example.com', reg_date='2012,12,21')
+                                ).result
+        self.assertEqual(pers1['person_name'], 'Vasya Doe')
+        self.assertDictEqual(pers1,
+                        read_person(repository.get_by_id(pers1['person_id'])))
+
+        pers2 = self.cs.get_person(pers1['person_id']).result
+        self.assertDictEqual(pers1, pers2)
+
+        pers_list = self.cs.get_persons().result
+        self.assertIsInstance(pers_list, list)
+        self.assertEqual(pers1['person_id'], pers_list[0]['person_id'])
+
+        new_pers = self.cs.change_person(dict(id=pers1['person_id'],
+            name='Evlampyi')).result
+        self.assertEqual(new_pers['person_name'], 'Evlampyi Doe')
+        self.assertEqual(repository.get_by_id(new_pers['person_id'])._name
+            .name, 'Evlampyi')
 
 
 

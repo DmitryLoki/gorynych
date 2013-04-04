@@ -7,7 +7,7 @@ from zope.interface import Interface
 from twisted.application.service import Service
 from twisted.internet import defer
 
-from gorynych.info.domain import contest
+from gorynych.info.domain import contest, person
 from gorynych.common.infrastructure import persistence
 
 
@@ -88,6 +88,19 @@ def read_contest_list(cont_list):
             start_time=cont.start_time, end_time=cont.end_time))
     return result
 
+def read_person(pers):
+    if not pers:
+        return {}
+    return dict(person_name=pers.name, person_tracker=pers.tracker,
+        person_id=pers.id)
+
+
+def read_person_list(pers_list):
+    result = []
+    for pers in pers_list:
+        result.append(dict(person_id=pers.id, person_name=pers.name))
+    return result
+
 
 class ApplicationService(Service):
 
@@ -102,7 +115,7 @@ class ApplicationService(Service):
         Service.stopService(self)
 
 
-    def create_new_contest(self, params, id=None):
+    def create_new_contest(self, params):
         '''
         Create totally new contest, save it to repository and return dict
         with contest parameters.
@@ -112,8 +125,7 @@ class ApplicationService(Service):
         parameters.
         @rtype: C{dict}
         '''
-        if not id:
-            id = contest.ContestID(str(uuid.uuid4()))
+        id = contest.ContestID(str(uuid.uuid4()))
         cont = self.contest_factory.create_contest(id,
             params['title'],
             params['start_time'], params['end_time'],
@@ -135,18 +147,8 @@ class ApplicationService(Service):
         @return:
         @rtype:
         '''
-        if params:
-            limit = params.get('limit', None)
-            offset = params.get('offset', 0)
-        else:
-            limit = None
-            offset = 0
-
-        d = defer.succeed(limit)
-        d.addCallback(persistence.get_repository(contest.IContestRepository)
-                                                .get_list, offset)
-        d.addCallback(read_contest_list)
-        return d
+        return self._get_list_of_smth(params, contest.IContestRepository,
+            read_contest_list)
 
 
     def get_contest(self, id):
@@ -172,10 +174,6 @@ class ApplicationService(Service):
         @return:
         @rtype:
         '''
-        id = params.get('id')
-        if not id:
-            raise ValueError("No contest id has been received.")
-        del params['id']
 
         def change(cont, params):
             '''
@@ -187,17 +185,81 @@ class ApplicationService(Service):
             @return:
             @rtype:
             '''
+            if params.get('start_time') and params.get('end_time'):
+                cont.change_times(params['start_time'], params['end_time'])
+                del params['start_time']
+                del params['end_time']
+
             for param in params.keys():
                 setattr(cont, param, params[param])
             return cont
 
-        d = defer.succeed(id)
-        d.addCallback(persistence.get_repository(contest.IContestRepository
-                                ).get_by_id)
-        d.addCallback(change, params)
-        d.addCallback(persistence.get_repository(contest.IContestRepository)
-                                        .save)
-        d.addCallback(read_contest)
+        return self._change_aggregate(params, contest.IContestRepository,
+            change, read_contest)
+
+
+    def create_new_person(self, params):
+        factory = person.PersonFactory(self.event_publisher)
+        year, month, day = params['reg_date'].split(',')
+        pers = factory.create_person(params['name'], params['surname'],
+            params['country'], params['email'], year, month, day)
+        d = defer.succeed(pers)
+        d.addCallback(persistence.get_repository(person.IPersonRepository).
+                                                save)
+        d.addCallback(read_person)
         return d
 
+
+    def get_person(self, id):
+        d = defer.succeed(id)
+        d.addCallback(persistence.get_repository(person.IPersonRepository).
+                                                get_by_id)
+        d.addCallback(read_person)
+        return d
+
+
+    def get_persons(self, params=None):
+        return self._get_list_of_smth(params, person.IPersonRepository,
+            read_person_list)
+
+
+    def change_person(self, params):
+        def change(pers, params):
+            pers.name = dict(name=params.get('name'),
+                surname=params.get('surname'))
+            if params.get('country'):
+                pers.country = params['country']
+            return pers
+        return self._change_aggregate(params, person.IPersonRepository,
+            change, read_person)
+
+
+    def _change_aggregate(self, params, repo_interface, change_func,
+                          read_func):
+        id = params.get('id')
+        if not id:
+            raise ValueError("No contest id has been received.")
+        del params['id']
+
+        d = defer.succeed(id)
+        d.addCallback(persistence.get_repository(repo_interface).get_by_id)
+        d.addCallback(change_func, params)
+        d.addCallback(persistence.get_repository(repo_interface).save)
+        d.addCallback(read_func)
+        return d
+
+    def _get_list_of_smth(self, limit_offset_params, repo_interface,
+                          read_func):
+        if limit_offset_params:
+            limit = limit_offset_params.get('limit', None)
+            offset = limit_offset_params.get('offset', 0)
+        else:
+            limit = None
+            offset = 0
+
+        d = defer.succeed(limit)
+        d.addCallback(persistence.get_repository(repo_interface).get_list,
+            offset)
+        d.addCallback(read_func)
+        return d
 

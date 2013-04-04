@@ -25,7 +25,7 @@ class PersonFactoryTest(unittest.TestCase):
         pers = create_person('Harold', 'Herzen', 'DE', 'boss@gmail.com', '2012',
             11, '30')
 
-        self.assertEqual(pers.name, 'Harold Herzen')
+        self.assertEqual(pers.name.full(), 'Harold Herzen')
         self.assertEqual(pers.country, 'DE')
         self.assertEqual(pers.id, 'boss@gmail.com')
         self.assertEqual(pers.regdate, datetime.date(2012, 11, 30))
@@ -71,13 +71,13 @@ class PersonTest(unittest.TestCase):
 
     def test_name_setter(self):
         self.person.name = dict(name='VAsya')
-        self.assertEqual(self.person.name, 'Vasya Doe')
+        self.assertEqual(self.person.name.full(), 'Vasya Doe')
 
         self.person.name = dict(surname=' pupkin')
-        self.assertEqual(self.person.name, 'Vasya Pupkin')
+        self.assertEqual(self.person.name.full(), 'Vasya Pupkin')
 
         self.person.name = dict(name='Nikolay', surname='vtoroy')
-        self.assertEqual(self.person.name, 'Nikolay Vtoroy')
+        self.assertEqual(self.person.name.full(), 'Nikolay Vtoroy')
 
     def test_country_setter(self):
         self.person.country = 'RUSSIA!'

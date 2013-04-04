@@ -41,7 +41,7 @@ class Person(AggregateRoot):
 
     @property
     def name(self):
-        return self._name.full()
+        return self._name
 
     @name.setter
     def name(self, value):

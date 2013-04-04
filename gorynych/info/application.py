@@ -7,7 +7,7 @@ from zope.interface import Interface
 from twisted.application.service import Service
 from twisted.internet import defer
 
-from gorynych.info.domain import contest, person
+from gorynych.info.domain import contest, person, race
 from gorynych.common.infrastructure import persistence
 
 
@@ -91,7 +91,7 @@ def read_contest_list(cont_list):
 def read_person(pers):
     if not pers:
         return {}
-    return dict(person_name=pers.name, person_tracker=pers.tracker,
+    return dict(person_name=pers.name.full(), person_tracker=pers.tracker,
         person_id=pers.id)
 
 
@@ -100,6 +100,14 @@ def read_person_list(pers_list):
     for pers in pers_list:
         result.append(dict(person_id=pers.id, person_name=pers.name))
     return result
+
+
+def read_race(race):
+    return dict(type=race.task.type, title=race.title, id=race.id)
+
+
+def read_paraglider_list(p_list):
+    pass
 
 
 class ApplicationService(Service):
@@ -238,6 +246,28 @@ class ApplicationService(Service):
             change, read_person)
 
 
+    def create_new_race_for_contest(self, params):
+        d = defer.succeed(params['contest_id'])
+        d.addCallback(persistence.get_repository(contest.IContestRepository)
+                        .get_by_id)
+        d.addCallback(lambda cont: cont.new_race(params['race_type'],
+            params['checkpoints'], params['race_title']))
+        d.addCallback(persistence.get_repository(race.IRaceRepository).save)
+        d.addCallback(read_race)
+        return d
+
+
+    def register_paraglider_on_contest(self, params):
+        d = defer.succeed(params['contest_id'])
+        d.addCallback(persistence.get_repository(contest.IContestRepository)
+                    .get_by_id)
+        d.addCallback(lambda cont: cont.register_paraglider(
+            params['person_id'], params['glider'], params['contest_number']))
+        d.addCallback(persistence.get_repository(contest.IContestRepository)                                                .save)
+        d.addCallback(lambda _: None)
+        return d
+
+
     def _change_aggregate(self, params, repo_interface, change_func,
                           read_func):
         id = params.get('id')
@@ -266,4 +296,5 @@ class ApplicationService(Service):
             offset)
         d.addCallback(read_func)
         return d
+
 

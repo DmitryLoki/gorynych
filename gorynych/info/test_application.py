@@ -3,12 +3,14 @@ import gc
 
 import mock
 
+from shapely.geometry import Point
+
 from zope.interface import implements
 from twisted.trial import unittest
 from twisted.internet import defer
 
 from gorynych.info.application import ApplicationService, read_person
-from gorynych.info.domain.contest import IContestRepository
+from gorynych.common.domain.types import Checkpoint
 
 
 class GoodRepository:
@@ -35,13 +37,11 @@ class GoodRepository:
 
 
 class BadContestRepository:
-    implements(IContestRepository)
     def save(self, obj):
         raise IndentationError("boom")
 
 
-@mock.patch('gorynych.common.infrastructure.persistence.get_repository')
-class ContestServiceTest(unittest.TestCase):
+class ApplicationServiceTestCase(unittest.TestCase):
     def setUp(self):
         self.cs = ApplicationService(mock.Mock())
         self.cs.startService()
@@ -51,9 +51,15 @@ class ContestServiceTest(unittest.TestCase):
         del self.cs
         gc.collect()
 
+
+@mock.patch('gorynych.common.infrastructure.persistence.get_repository')
+class ContestServiceTest(ApplicationServiceTestCase):
+
     def test_succes_contest_creation(self, patched):
         repository = GoodRepository()
         patched.return_value = repository
+        if not repository.is_store_empty():
+            repository.clean_store()
         d = self.cs.create_new_contest(dict(title='hoi', start_time=1,
             end_time=2, contest_place='Боливия', contest_country='RU',
             hq_coords=[12.3, 42.9]))
@@ -92,15 +98,7 @@ class ContestServiceTest(unittest.TestCase):
 
 
 @mock.patch('gorynych.common.infrastructure.persistence.get_repository')
-class PersonServiceTest(unittest.TestCase):
-    def setUp(self):
-        self.cs = ApplicationService(mock.Mock())
-        self.cs.startService()
-
-    def tearDown(self):
-        self.cs.stopService()
-        del self.cs
-        gc.collect()
+class PersonServiceTest(ApplicationServiceTestCase):
 
     def test_create_person(self, patched):
         repository = GoodRepository()
@@ -128,6 +126,84 @@ class PersonServiceTest(unittest.TestCase):
         self.assertEqual(new_pers['person_name'], 'Evlampyi Doe')
         self.assertEqual(repository.get_by_id(new_pers['person_id'])._name
             .name, 'Evlampyi')
+
+
+class ContestParagliderRaceTest(unittest.TestCase):
+    def setUp(self):
+        from gorynych.info.domain.tracker import TrackerID
+        self.aps = ApplicationService(mock.Mock())
+        self.aps.startService()
+        self.repository = GoodRepository()
+        if not self.repository.is_store_empty():
+            self.repository.clean_store()
+
+        @mock.patch('gorynych.common.infrastructure.persistence.get_repository')
+        def fixture(patched):
+            patched.return_value = self.repository
+            c = self.aps.create_new_contest(dict(title='hoi', start_time=1,
+                end_time=2, contest_place='Боливия', contest_country='RU',
+                hq_coords=[12.3, 42.9])).result
+            p1 = self.aps.create_new_person(dict(name='Vasya', surname='Doe',
+                country='QQ', email='vas@example.com',
+                reg_date='2012,12,21')).result
+            p2 = self.aps.create_new_person(dict(name='John', surname='Doe',
+                country='QQ', email='john@example.com',
+                reg_date='2012,12,21')).result
+            return c['id'], p1['person_id'], p2['person_id']
+
+        self.cont_id, self.p1_id, self.p2_id = fixture()
+        pers = self.repository.get_by_id(self.p1_id)
+        pers.assign_tracker(TrackerID(15))
+        self.repository.save(pers)
+
+    def tearDown(self):
+        del self.repository
+        self.aps.stopService()
+        del self.aps
+        gc.collect()
+
+
+    @mock.patch('gorynych.common.infrastructure.persistence.get_repository')
+    def test_register_paraglider(self, patched):
+        patched.return_value = self.repository
+        self.aps.register_paraglider_on_contest(dict(
+            contest_id=self.cont_id, glider='gin', contest_number='1',
+            person_id=self.p1_id))
+        cont = self.repository.get_by_id(self.cont_id)
+        self.assertEqual(len(cont.paragliders), 1)
+
+        self.aps.register_paraglider_on_contest(dict(
+            contest_id=self.cont_id, glider='gin', contest_number='1',
+            person_id=self.p1_id))
+        self.assertEqual(len(cont.paragliders), 1, "Paraglider is duplicated"
+                                                   " on registration.")
+
+        d = self.aps.register_paraglider_on_contest(dict(
+            contest_id=self.cont_id, glider='gin', contest_number='1',
+            person_id=self.p2_id))
+        self.assertFailure(d, ValueError)
+
+        self.aps.register_paraglider_on_contest(dict(
+            contest_id=self.cont_id, glider='gin', contest_number='2',
+            person_id=self.p2_id))
+        self.assertEqual(len(cont.paragliders), 2, "Can't register another "
+                                                   "paraglider.")
+
+
+    @mock.patch('gorynych.common.infrastructure.persistence.get_repository')
+    def test_create_new_race(self, patched):
+        patched.return_value = self.repository
+        self.aps.register_paraglider_on_contest(dict(
+            contest_id=self.cont_id, glider='gin', contest_number='1',
+            person_id=self.p1_id))
+        ch1 = Checkpoint('A', Point(0.1, 2), radius=400)
+
+        race = self.aps.create_new_race_for_contest(dict(contest_id=self
+                .cont_id, race_type='speedrun', race_title='task 3',
+            checkpoints=[ch1])).result
+        self.assertEqual(race['id'], self.repository.get_by_id(race['id']).id)
+        self.assertEqual(race['type'], 'speedrun')
+
 
 
 

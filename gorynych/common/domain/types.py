@@ -11,29 +11,36 @@ class Name(ValueObject):
 
     def __init__(self, name=None, surname=None):
         if name:
-            self.firstname = name
+            self._name = name.strip().capitalize()
         else:
             raise ValueError("Firstname must be set.")
 
         if surname:
-            self.lastname = surname
+            self._surname = surname.strip().capitalize()
         else:
             raise ValueError("Lastname must be set.")
 
     def short(self):
-        return '. '.join((self.firstname.capitalize()[0],
-            self.lastname.capitalize()))
+        return '. '.join((self._name.capitalize()[0],
+            self._surname.capitalize()))
 
     def full(self):
-        return ' '.join((self.firstname.capitalize(),
-                         self.lastname.capitalize()))
+        return ' '.join((self._name, self._surname))
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def surname(self):
+        return self._surname
 
 
 class Country(ValueObject):
 
     def __init__(self, code=None):
         if code:
-            self._code = code.upper()
+            self._code = code[:2].upper()
         else:
             raise ValueError("Country can't be set with null code.")
 

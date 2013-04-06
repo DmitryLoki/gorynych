@@ -6,14 +6,13 @@ import unittest
 from twisted.web.test.requesthelper import DummyChannel
 from twisted.web.server import Request
 from twisted.web.resource import NoResource
+from twisted.python.failure import Failure
 
 from gorynych.info.restui.resources import (APIResource,
     parameters_from_request, BadParametersError, json_renderer)
 
-class SomeResource:
-    def __init__(self, tree, service):
-        self.tree = tree
-        self.service = service
+class SomeResource(APIResource):
+    pass
 
 
 class SimpleAPIResource(APIResource):
@@ -50,18 +49,34 @@ class APIResourceTest(unittest.TestCase):
             'application/json')
 
     def test_get_child(self):
-        self.assertIsInstance(self.api_resource.getChild('', 1), APIResource)
+        self.assertIsInstance(self.api_resource.getChild('', 1), NoResource)
 
         some_result = self.api_resource.getChild('race', 'hello')
         self.assertIsInstance(some_result, SomeResource)
         self.assertEqual(some_result.tree, 1)
         self.assertEqual(some_result.service, 'service')
 
+        self.assertIsInstance(some_result.getChild('', 1), SomeResource)
+
     def test_regexp_child(self):
         self.assertIsInstance(self.api_resource.getChild('axe2-fsb3-32a', 1),
             SimpleAPIResource)
         self.assertIsInstance(self.api_resource.getChild('axe2-fsb3-42a', 1),
             NoResource)
+
+    def test_handle_error_in_service(self):
+        import json
+        request = Request(DummyChannel(), 1)
+        request.gotLength(0)
+        req, msg = self.api_resource.handle_error_in_service(Failure(KeyError
+            ("foo")), request)
+        self.assertIsInstance(msg, str)
+        msg = json.loads(msg)
+        self.assertEqual(msg['message'], u"'foo'")
+        self.assertEqual(msg['error'], "KeyError")
+        self.assertEqual(req.code, 400)
+        self.assertEqual(req.responseHeaders.getRawHeaders('content-type'),
+                        ['application/json'])
 
 
 class APIResourceMethodTest(unittest.TestCase):
@@ -128,20 +143,20 @@ class RequestHandlingTest(unittest.TestCase):
 
     def test_parameters_from_args_and_url(self):
         uri = '/contest/1234/race/12/paraglider/'
-        args = {'c': ['ru', 'de'], 'id': '1'}
+        args = {'c': ['ru', 'de'], 'id': ['1']}
         self.assertDictEqual(parameters_from_request((uri, args)),
             {'contest': '1234', 'race': '12', 'c':['ru', 'de'], 'id': '1'})
 
 
     def test_duplicated_parameters_from_args_and_url(self):
         uri = '/contest/1234/race/12/paraglider/'
-        args = {'c': ['ru', 'de'], 'id': '1', 'race': '12'}
+        args = {'c': ['ru', 'de'], 'id': ['1'], 'race': ['12']}
         self.assertDictEqual(parameters_from_request((uri, args)),
             {'contest': '1234', 'race': '12', 'c':['ru', 'de'], 'id': '1'})
 
     def test_bad_duplicated_parameters_from_args_and_url(self):
         uri = '/contest/1234/race/12/paraglider/'
-        args = {'c': ['ru', 'de'], 'id': '1', 'race': '13'}
+        args = {'c': ['ru', 'de'], 'id': ['1'], 'race': ['13']}
         self.assertRaises(BadParametersError, parameters_from_request,
             (uri, args))
 

@@ -3,6 +3,7 @@ Resources for RESTful API.
 '''
 import os
 import re
+import json
 from string import Template
 
 from twisted.web import resource, server
@@ -85,7 +86,12 @@ class APIResource(resource.Resource):
         @rtype: C{Resource}
         """
         if path == '':
-            return self
+            if self.__class__.__name__ == 'APIResource':
+                # Return NoResource for / resource. Replace it with base
+                # resource which will show root page.
+                return resource.NoResource()
+            else:
+                return self
         for key in self.tree.keys():
             if re.search(key, path):
                 return self.tree[key]['leaf'](
@@ -96,8 +102,8 @@ class APIResource(resource.Resource):
         d = defer.Deferred()
         d.addCallback(parameters_from_request)
         d.addCallbacks(getattr(self.service, self.service_command['get']))
-        d.addCallbacks(self.resource_renderer,
-                       callbackArgs=[request])
+        d.addCallbacks(self.resource_renderer, self.handle_error_in_service,
+                       callbackArgs=[request], errbackArgs=[request])
         d.addCallbacks(self.write_request)
         d.callback((request.uri, request.args))
         return server.NOT_DONE_YET
@@ -106,8 +112,8 @@ class APIResource(resource.Resource):
         d = defer.Deferred()
         d.addCallback(parameters_from_request)
         d.addCallbacks(getattr(self.service, self.service_command['post']))
-        d.addCallbacks(self.resource_created,
-                       callbackArgs=[request], errbackArgs=[])
+        d.addCallbacks(self.resource_created, self.handle_error_in_service,
+                       callbackArgs=[request], errbackArgs=[request])
         d.addCallbacks(self.write_request)
         d.callback((request.uri, request.args))
         return server.NOT_DONE_YET
@@ -116,8 +122,8 @@ class APIResource(resource.Resource):
         d = defer.Deferred()
         d.addCallback(parameters_from_request)
         d.addCallbacks(getattr(self.service, self.service_command['put']))
-        d.addCallbacks(self.change_resource,
-                       callbackArgs=[request], errbackArgs=[])
+        d.addCallbacks(self.change_resource, self.handle_error_in_service,
+                       callbackArgs=[request], errbackArgs=[request])
         d.addCallbacks(self.write_request)
         d.callback((request.uri, request.args))
         return server.NOT_DONE_YET
@@ -131,8 +137,9 @@ class APIResource(resource.Resource):
             'application/json')
         req.setResponseCode(200)
         req.setHeader('Content-Type', content_type)
-        resurce_representation = self.read(res)
-        body = self.renderers[content_type](resurce_representation, self.name)
+        resource_representation = self.read(res)
+        body = self.renderers[content_type](resource_representation,
+            self.name)
         req.setHeader('Content-Length', bytes(len(body)))
         return req, body
 
@@ -159,6 +166,21 @@ class APIResource(resource.Resource):
         req.write(body)
         req.finish()
 
+    def handle_error_in_service(self, error, req):
+        body = dict()
+        err = error.trap(KeyError)
+        if err == KeyError:
+            req.setResponseCode(400)
+            body['error'] = 'KeyError'
+
+        body['message'] = error.getErrorMessage()
+        content_type = req.responseHeaders.getRawHeaders('content-type',
+            'application/json')
+        req.setHeader('Content-Type', content_type)
+        req.setHeader('Content-Length', bytes(len(body)))
+        body = json.dumps(body)
+        return req, body
+
 
 def parameters_from_request(req):
     '''
@@ -168,7 +190,12 @@ def parameters_from_request(req):
     '''
     uri, args = req
     assert isinstance(args, dict), "Wrong args has been passed."
-    result = args
+    result = dict()
+    for key in args.keys():
+        if len(args[key]) == 1:
+            result[key] = args[key][0]
+        else:
+            result[key] = args[key]
     def insert(key, value):
         '''
         Insert only unexistent or unequal to existent values for key.
@@ -213,7 +240,8 @@ class RaceResourceCollection(APIResource):
     '''
     Resource /contest/{id}/race
     '''
-    service_command = dict(get='get_races', post='create_new_race')
+    service_command = dict(get='get_contest_races',
+        post='create_new_race_for_contest')
     name = 'contest_race_collection'
 
 
@@ -229,13 +257,31 @@ class ParagliderResourceCollection(APIResource):
     '''
     Resource /contest/{id}/race/{id}/paraglider
     '''
-    service_command = dict(get='get_race_paragliders')
-    name = 'race_paragliders_collection'
+    service_command = dict(post='register_paraglider_on_contest')
+    name = 'get_race_paragliders'
 
 
 class ParagliderResource(APIResource):
     '''
-    Resource /contest/{id}/race/{id}/paraglider/{id}
+    Resource /contest/{id}/race/{id}/paraglider/{id} or
+    /contest/{id}/paraglider/{id}
     '''
-    service_command = dict(get='get_paraglider')
+    service_command = dict(put='change_paraglider')
     name = 'race_paraglider'
+
+
+class PersonResourceCollection(APIResource):
+    '''
+    /person resource
+    '''
+    service_command = dict(get='get_persons', post='create_new_person')
+    name = 'person_collection'
+
+
+class PersonResource(APIResource):
+    '''
+    /person/{id} resource
+    '''
+    isLeaf = 1
+    service_command = dict(get='get_person', put='change_person')
+    name = 'person'

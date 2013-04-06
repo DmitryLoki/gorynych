@@ -257,6 +257,36 @@ class ApplicationService(Service):
         return d
 
 
+    def get_contest_races(self, params):
+        '''
+        Return list of races for contests
+        @param params:
+        @type params:
+        @return:
+        @rtype:
+        '''
+
+
+    def get_race(self, params):
+        '''
+        Return info about concrete race.
+        @param params:
+        @type params:
+        @return:
+        @rtype:
+        '''
+
+
+    def change_race(self, params):
+        '''
+        Change race information.
+        @param params:
+        @type params:
+        @return:
+        @rtype:
+        '''
+
+
     def register_paraglider_on_contest(self, params):
         d = defer.succeed(params['contest_id'])
         d.addCallback(persistence.get_repository(contest.IContestRepository)
@@ -266,6 +296,26 @@ class ApplicationService(Service):
         d.addCallback(persistence.get_repository(contest.IContestRepository)                                                .save)
         d.addCallback(lambda _: None)
         return d
+
+
+    def get_race_paragliders(self, params):
+        '''
+        Return list with race paragliders.
+        @param params:
+        @type params:
+        @return:
+        @rtype:
+        '''
+
+
+    def change_paraglider(self, params):
+        '''
+        Change paraglider information either for race or contest.
+        @param params:
+        @type params:
+        @return:
+        @rtype:
+        '''
 
 
     def _change_aggregate(self, params, repo_interface, change_func,

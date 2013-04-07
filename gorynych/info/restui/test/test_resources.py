@@ -9,7 +9,8 @@ from twisted.web.resource import NoResource
 from twisted.python.failure import Failure
 
 from gorynych.info.restui.resources import (APIResource,
-    parameters_from_request, BadParametersError, json_renderer)
+    parameters_from_request, BadParametersError, json_renderer,
+    resource_tree)
 
 class SomeResource(APIResource):
     pass
@@ -37,8 +38,12 @@ class SimpleService(object):
 class APIResourceTest(unittest.TestCase):
     def setUp(self):
         self.tree_ = {
-            '\w+-\w+-3\w+': {'leaf': SimpleAPIResource, 'tree': 1}
-            , 'race': {'leaf': SomeResource, 'tree': 1}, }
+            '\w+-\w+-3\w+': {'leaf': 'SimpleAPIResource',
+                             'package': __import__('test_resources'),
+                             'tree': {}},
+            'race': {'leaf': 'SomeResource',
+                     'package': __import__('test_resources'),
+                     'tree': 1}, }
         self.api_resource = APIResource(self.tree_, 'service')
 
 
@@ -186,6 +191,16 @@ class JsonRendererTest(unittest.TestCase):
         self.assertEqual(result[0]['id'], '1')
         self.assertEqual(result[1]['id'], '2')
 
+
+class XMLTreeTest(unittest.TestCase):
+
+    def test(self):
+        tree = resource_tree()
+        self.assertIsInstance(tree, dict)
+        self.assertTrue(tree.has_key('contest'))
+        self.assertTrue(tree.has_key('person'))
+        ps = getattr(tree['person']['package'], tree['person']['leaf'])
+        self.assertEqual(ps.__name__, 'PersonResourceCollection')
 
 
 if __name__ == '__main__':

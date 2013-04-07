@@ -6,6 +6,8 @@ import re
 import json
 from string import Template
 
+import yaml
+
 from twisted.web import resource, server
 from twisted.internet import defer
 
@@ -15,6 +17,7 @@ class BadParametersError(Exception):
     '''
 
 JSON_TEMPLATES_DIR = 'json_templates'
+YAML_TREE_FILE = 'resources_tree.yaml'
 
 def load_json_templates(dir):
     result = dict()
@@ -61,6 +64,14 @@ def json_renderer(template_values, template_name,
                         " values.")
 
 
+
+def resource_tree(filename=os.path.join(os.path.dirname(__file__),
+                                YAML_TREE_FILE)):
+    result = yaml.load(open(filename, 'r'))
+    return result
+
+
+
 class APIResource(resource.Resource):
     '''
     Base API resource class.
@@ -94,8 +105,8 @@ class APIResource(resource.Resource):
                 return self
         for key in self.tree.keys():
             if re.search(key, path):
-                return self.tree[key]['leaf'](
-                                self.tree[key]['tree'], self.service)
+                return getattr(self.tree[key]['package'],
+                    self.tree[key]['leaf'])(self.tree[key]['tree'], self.service)
         return resource.NoResource()
 
     def render_GET(self, request):

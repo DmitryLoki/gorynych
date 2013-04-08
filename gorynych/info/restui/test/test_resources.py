@@ -2,6 +2,7 @@
 Test base resources and functions for CoreAPI.
 '''
 import unittest
+import mock
 
 from twisted.web.test.requesthelper import DummyChannel
 from twisted.web.server import Request
@@ -9,7 +10,7 @@ from twisted.web.resource import NoResource
 from twisted.python.failure import Failure
 
 from gorynych.info.restui.resources import (APIResource,
-    parameters_from_request, BadParametersError, json_renderer,
+     BadParametersError, json_renderer,
     resource_tree)
 
 class SomeResource(APIResource):
@@ -39,10 +40,13 @@ class APIResourceTest(unittest.TestCase):
     def setUp(self):
         self.tree_ = {
             '\w+-\w+-3\w+': {'leaf': 'SimpleAPIResource',
-                             'package': __import__('test_resources'),
+                             'package': __import__(
+                         'test_resources',
+                                 globals={"__name__": __name__}),
                              'tree': {}},
             'race': {'leaf': 'SomeResource',
-                     'package': __import__('test_resources'),
+                     'package': __import__('test_resources',
+                     globals={"__name__": __name__}),
                      'tree': 1}, }
         self.api_resource = APIResource(self.tree_, 'service')
 
@@ -131,39 +135,49 @@ class APIResourceMethodTest(unittest.TestCase):
 
 
 class RequestHandlingTest(unittest.TestCase):
+    def setUp(self):
+        self.api = SimpleAPIResource('hh', SimpleService())
+        self.req = mock.Mock()
+
+    def tearDown(self):
+        del self.api
+
     def test_parameters_from_url(self):
-        uri = '/contest/1234/race/12'
-        self.assertDictEqual(parameters_from_request((uri, {})),
+        self.req.uri = '/contest/1234/race/12'
+        self.req.args = {}
+        self.assertDictEqual(self.api.parameters_from_request(self.req),
                 {'contest': '1234', 'race': '12'})
 
     def test_url_end_with_collection(self):
-        uri = 'contest/1234/race/12/paragliders'
-        self.assertDictEqual(parameters_from_request((uri, {})),
+        self.req.uri = 'contest/1234/race/12/paragliders'
+        self.req.args = {}
+        self.assertDictEqual(self.api.parameters_from_request(self.req),
                 {'contest': '1234', 'race': '12'})
 
     def test_slash_skipping(self):
-        uri = '//contest/1234//race/12/'
-        self.assertDictEqual(parameters_from_request((uri, {})),
+        self.req.uri = '//contest/1234//race/12/'
+        self.req.args = {}
+        self.assertDictEqual(self.api.parameters_from_request(self.req),
                 {'contest': '1234', 'race': '12'})
 
     def test_parameters_from_args_and_url(self):
-        uri = '/contest/1234/race/12/paraglider/'
-        args = {'c': ['ru', 'de'], 'id': ['1']}
-        self.assertDictEqual(parameters_from_request((uri, args)),
+        self.req.uri = '/contest/1234/race/12/paraglider/'
+        self.req.args = {'c': ['ru', 'de'], 'id': ['1']}
+        self.assertDictEqual(self.api.parameters_from_request(self.req),
             {'contest': '1234', 'race': '12', 'c':['ru', 'de'], 'id': '1'})
 
 
     def test_duplicated_parameters_from_args_and_url(self):
-        uri = '/contest/1234/race/12/paraglider/'
-        args = {'c': ['ru', 'de'], 'id': ['1'], 'race': ['12']}
-        self.assertDictEqual(parameters_from_request((uri, args)),
+        self.req.uri = '/contest/1234/race/12/paraglider/'
+        self.req.args = {'c': ['ru', 'de'], 'id': ['1'], 'race': ['12']}
+        self.assertDictEqual(self.api.parameters_from_request(self.req),
             {'contest': '1234', 'race': '12', 'c':['ru', 'de'], 'id': '1'})
 
     def test_bad_duplicated_parameters_from_args_and_url(self):
-        uri = '/contest/1234/race/12/paraglider/'
-        args = {'c': ['ru', 'de'], 'id': ['1'], 'race': ['13']}
-        self.assertRaises(BadParametersError, parameters_from_request,
-            (uri, args))
+        self.req.uri = '/contest/1234/race/12/paraglider/'
+        self.req.args = {'c': ['ru', 'de'], 'id': ['1'], 'race': ['13']}
+        self.assertRaises(BadParametersError,
+            self.api.parameters_from_request, self.req)
 
 
 class JsonRendererTest(unittest.TestCase):
@@ -177,7 +191,7 @@ class JsonRendererTest(unittest.TestCase):
                         'contest_name': 'greeter'}, 'contest', self.template),
             '{"id": "hello", "name": "greeter"}')
         self.assertRaises(TypeError, json_renderer, 1, 'contest')
-        self.assertRaises(ValueError, json_renderer, dict(), 'hui')
+        self.assertRaises(ValueError, json_renderer, dict(), 'higs')
 
     def test_list_rendering(self):
         import json
@@ -192,7 +206,7 @@ class JsonRendererTest(unittest.TestCase):
         self.assertEqual(result[1]['id'], '2')
 
 
-class XMLTreeTest(unittest.TestCase):
+class YAMLTreeGenerationTest(unittest.TestCase):
 
     def test(self):
         tree = resource_tree()

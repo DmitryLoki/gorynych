@@ -111,32 +111,32 @@ class APIResource(resource.Resource):
 
     def render_GET(self, request):
         d = defer.Deferred()
-        d.addCallback(parameters_from_request)
+        d.addCallback(self.parameters_from_request)
         d.addCallbacks(getattr(self.service, self.service_command['get']))
         d.addCallbacks(self.resource_renderer, self.handle_error_in_service,
                        callbackArgs=[request], errbackArgs=[request])
         d.addCallbacks(self.write_request)
-        d.callback((request.uri, request.args))
+        d.callback(request)
         return server.NOT_DONE_YET
 
     def render_POST(self, request):
         d = defer.Deferred()
-        d.addCallback(parameters_from_request)
+        d.addCallback(self.parameters_from_request)
         d.addCallbacks(getattr(self.service, self.service_command['post']))
         d.addCallbacks(self.resource_created, self.handle_error_in_service,
                        callbackArgs=[request], errbackArgs=[request])
         d.addCallbacks(self.write_request)
-        d.callback((request.uri, request.args))
+        d.callback(request)
         return server.NOT_DONE_YET
 
     def render_PUT(self, request):
         d = defer.Deferred()
-        d.addCallback(parameters_from_request)
+        d.addCallback(self.parameters_from_request)
         d.addCallbacks(getattr(self.service, self.service_command['put']))
         d.addCallbacks(self.change_resource, self.handle_error_in_service,
                        callbackArgs=[request], errbackArgs=[request])
         d.addCallbacks(self.write_request)
-        d.callback((request.uri, request.args))
+        d.callback(request)
         return server.NOT_DONE_YET
 
     def resource_renderer(self, res, req):
@@ -193,41 +193,44 @@ class APIResource(resource.Resource):
         return req, body
 
 
-def parameters_from_request(req):
-    '''
-    Return parameters from request arguments and/or URL.
-    @param req: string which represent request.uri, and dict request.args
-    @type req: C{tuple}
-    '''
-    uri, args = req
-    assert isinstance(args, dict), "Wrong args has been passed."
-    result = dict()
-    for key in args.keys():
-        if len(args[key]) == 1:
-            result[key] = args[key][0]
-        else:
-            result[key] = args[key]
-    def insert(key, value):
+    def parameters_from_request(self, req):
         '''
-        Insert only unexistent or unequal to existent values for key.
+        Return parameters from request arguments and/or URL.
+        @param req: request
+        @type req: C{Request}
         '''
-        if result.has_key(key) and result[key] != value:
-            raise BadParametersError("Two different values for one parameter.")
-        else:
-            result[key] = value
-    path = uri.split('?')[0].split('/')
-    # remove '' elements from list
-    try:
-        while True:
-            index = path.index('')
-            path.pop(index)
-    except ValueError:
-        pass
-    for index, item in enumerate(path):
-        if index % 2:
-            insert(path[index - 1], path[index])
+        uri, args = req.uri, self._get_args(req.args)
+        result = dict()
+        for key in args.keys():
+            if len(args[key]) == 1:
+                result[key] = args[key][0]
+            else:
+                result[key] = args[key]
+        def insert(key, value):
+            '''
+            Insert only unexistent or unequal to existent values for key.
+            '''
+            if result.has_key(key) and result[key] != value:
+                raise BadParametersError("Two different values for one parameter.")
+            else:
+                result[key] = value
+        path = uri.split('?')[0].split('/')
+        # remove '' elements from list
+        try:
+            while True:
+                index = path.index('')
+                path.pop(index)
+        except ValueError:
+            pass
+        for index, item in enumerate(path):
+            if index % 2:
+                insert(path[index - 1], path[index])
 
-    return result
+        return result
+
+    def _get_args(self, args):
+        assert isinstance(args, dict), "Wrong args has been passed."
+        return args
 
 
 class ContestResourceCollection(APIResource):
@@ -237,6 +240,10 @@ class ContestResourceCollection(APIResource):
     allowedMethods = ["GET", "POST"]
     service_command = dict(post='create_new_contest', get='get_contests')
     name = 'contest_collection'
+
+    def _get_args(self, args):
+        args['hq_coords'] = args['hq_coords'].split(',')
+        return args
 
 
 class ContestResource(APIResource):

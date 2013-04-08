@@ -109,34 +109,36 @@ class APIResource(resource.Resource):
                     self.tree[key]['leaf'])(self.tree[key]['tree'], self.service)
         return resource.NoResource()
 
-    def render_GET(self, request):
+    def __render_method(self, request, method_func):
+        '''
+        This is generalization of render_METHOD functions. All of them do
+        the same job: call service command and render result accordingly
+        with the METHOD idea.
+        @param request: received request
+        @type request: C{Request}
+        @param method_func: METHOD-specific function.
+        @type method_func: C{str}
+        '''
         d = defer.Deferred()
         d.addCallback(self.parameters_from_request)
-        d.addCallbacks(getattr(self.service, self.service_command['get']))
-        d.addCallbacks(self.resource_renderer, self.handle_error_in_service,
-                       callbackArgs=[request], errbackArgs=[request])
+        d.addCallbacks(getattr(self.service, self.service_command[request
+            .method]))
+        d.addCallbacks(method_func, self.handle_error_in_service,
+            callbackArgs=[request], errbackArgs=[request])
         d.addCallbacks(self.write_request)
         d.callback(request)
+        return d
+
+    def render_GET(self, request):
+        self.__render_method(request, self.resource_renderer)
         return server.NOT_DONE_YET
 
     def render_POST(self, request):
-        d = defer.Deferred()
-        d.addCallback(self.parameters_from_request)
-        d.addCallbacks(getattr(self.service, self.service_command['post']))
-        d.addCallbacks(self.resource_created, self.handle_error_in_service,
-                       callbackArgs=[request], errbackArgs=[request])
-        d.addCallbacks(self.write_request)
-        d.callback(request)
+        self.__render_method(request, self.resource_created)
         return server.NOT_DONE_YET
 
     def render_PUT(self, request):
-        d = defer.Deferred()
-        d.addCallback(self.parameters_from_request)
-        d.addCallbacks(getattr(self.service, self.service_command['put']))
-        d.addCallbacks(self.change_resource, self.handle_error_in_service,
-                       callbackArgs=[request], errbackArgs=[request])
-        d.addCallbacks(self.write_request)
-        d.callback(request)
+        self.__render_method(request, self.change_resource)
         return server.NOT_DONE_YET
 
     def resource_renderer(self, res, req):
@@ -238,11 +240,11 @@ class ContestResourceCollection(APIResource):
     Resource /contest
     '''
     allowedMethods = ["GET", "POST"]
-    service_command = dict(post='create_new_contest', get='get_contests')
+    service_command = dict(POST='create_new_contest', GET='get_contests')
     name = 'contest_collection'
 
     def _get_args(self, args):
-        args['hq_coords'] = args['hq_coords'].split(',')
+        args['hq_coords'] = args['hq_coords'][0].split(',')
         return args
 
 
@@ -250,7 +252,7 @@ class ContestResource(APIResource):
     '''
     Resource /contest/{id}
     '''
-    service_command = dict(get='get_contest', put='change_contest')
+    service_command = dict(GET='get_contest', PUT='change_contest')
     name = 'contest'
 
 
@@ -258,8 +260,8 @@ class RaceResourceCollection(APIResource):
     '''
     Resource /contest/{id}/race
     '''
-    service_command = dict(get='get_contest_races',
-        post='create_new_race_for_contest')
+    service_command = dict(GET='get_contest_races',
+        POST='create_new_race_for_contest')
     name = 'contest_race_collection'
 
 
@@ -267,7 +269,7 @@ class RaceResource(APIResource):
     '''
     Resource /contest/{id}/race/{id}
     '''
-    service_command = dict(get='get_race', put='change_race')
+    service_command = dict(GET='get_race', PUT='change_race')
     name = 'contest_race'
 
 
@@ -275,7 +277,7 @@ class ParagliderResourceCollection(APIResource):
     '''
     Resource /contest/{id}/race/{id}/paraglider
     '''
-    service_command = dict(post='register_paraglider_on_contest')
+    service_command = dict(POST='register_paraglider_on_contest')
     name = 'get_race_paragliders'
 
 
@@ -284,7 +286,7 @@ class ParagliderResource(APIResource):
     Resource /contest/{id}/race/{id}/paraglider/{id} or
     /contest/{id}/paraglider/{id}
     '''
-    service_command = dict(put='change_paraglider')
+    service_command = dict(PUT='change_paraglider')
     name = 'race_paraglider'
 
 
@@ -292,7 +294,7 @@ class PersonResourceCollection(APIResource):
     '''
     /person resource
     '''
-    service_command = dict(get='get_persons', post='create_new_person')
+    service_command = dict(GET='get_persons', POST='create_new_person')
     name = 'person_collection'
 
 
@@ -301,5 +303,5 @@ class PersonResource(APIResource):
     /person/{id} resource
     '''
     isLeaf = 1
-    service_command = dict(get='get_person', put='change_person')
+    service_command = dict(GET='get_person', PUT='change_person')
     name = 'person'

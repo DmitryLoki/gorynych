@@ -19,8 +19,8 @@ class SomeResource(APIResource):
 
 class SimpleAPIResource(APIResource):
     name = 'SimpleAPIResource'
-    service_command = {'get': 'get_the_thing', 'post': 'post_the_thing',
-                       'put': 'put_the_thing'}
+    service_command = {'GET': 'get_the_thing', 'POST': 'post_the_thing',
+                       'PUT': 'put_the_thing'}
     allowedMethods = ["GET"]
     renderers = {'application/json': lambda x, y: '::'.join((x, y))}
 
@@ -204,6 +204,11 @@ class JsonRendererTest(unittest.TestCase):
         self.assertIsInstance(result[0], dict)
         self.assertEqual(result[0]['id'], '1')
         self.assertEqual(result[1]['id'], '2')
+
+    def test_real_person_rendering(self):
+        result = json_renderer({'person_id': '1', 'person_name': 'John'},
+            'person_collection')
+        self.assertEqual(result, '{"id": "1", "name": "John"}')
 
 
 class YAMLTreeGenerationTest(unittest.TestCase):

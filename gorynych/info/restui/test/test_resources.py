@@ -7,11 +7,11 @@ import mock
 from twisted.web.test.requesthelper import DummyChannel, DummyRequest
 from twisted.web.server import Request
 from twisted.web.resource import NoResource
-from twisted.python.failure import Failure
 
 from gorynych.info.restui.resources import (APIResource,
      BadParametersError, json_renderer,
     resource_tree)
+from gorynych.common.exceptions import NoAggregate
 
 class SomeResource(APIResource):
     pass
@@ -144,22 +144,29 @@ class RenderMethodTest(unittest.TestCase):
         req = DummyRequest([])
         service = SimpleService()
         ar = APIResource('hh', service)
-        ar.service_command['GET'] = 'get_the_thing'
-        def method_func(a, req):
-            print "First argument is ", a
-            print 'Second argument is ', req
-            return req, a
+
         def error_in_parameters_handling(req):
             raise ValueError("Boom")
-
         ar.parameters_from_request = error_in_parameters_handling
 
         req.setResponseCode = mock.Mock()
-        result = ar._render_method(req, method_func)
+        result = ar._render_method(req, 1)
         req.setResponseCode.assert_called_with(400)
 
+    def test_no_such_aggregate(self):
+        req = DummyRequest([])
+        service = SimpleService()
+        ar = APIResource('hh', service)
+        ar.service_command['GET'] = 'get_the_thing'
+        def no_aggregate(a):
+            raise NoAggregate("hoho")
+        req.setResponseCode = mock.Mock()
+        service.get_the_thing = no_aggregate
+        result = ar._render_method(req, 1)
+        req.setResponseCode.assert_called_with(404)
 
-class RequestHandlingTest(unittest.TestCase):
+
+class ParametersFromRequestTest(unittest.TestCase):
     def setUp(self):
         self.api = SimpleAPIResource('hh', SimpleService())
         self.req = mock.Mock()
@@ -171,36 +178,36 @@ class RequestHandlingTest(unittest.TestCase):
         self.req.uri = '/contest/1234/race/12'
         self.req.args = {}
         self.assertDictEqual(self.api.parameters_from_request(self.req),
-                {'contest': '1234', 'race': '12'})
+                {'contest_id': '1234', 'race_id': '12'})
 
     def test_url_end_with_collection(self):
         self.req.uri = 'contest/1234/race/12/paragliders'
         self.req.args = {}
         self.assertDictEqual(self.api.parameters_from_request(self.req),
-                {'contest': '1234', 'race': '12'})
+                {'contest_id': '1234', 'race_id': '12'})
 
     def test_slash_skipping(self):
         self.req.uri = '//contest/1234//race/12/'
         self.req.args = {}
         self.assertDictEqual(self.api.parameters_from_request(self.req),
-                {'contest': '1234', 'race': '12'})
+                {'contest_id': '1234', 'race_id': '12'})
 
     def test_parameters_from_args_and_url(self):
         self.req.uri = '/contest/1234/race/12/paraglider/'
         self.req.args = {'c': ['ru', 'de'], 'id': ['1']}
         self.assertDictEqual(self.api.parameters_from_request(self.req),
-            {'contest': '1234', 'race': '12', 'c':['ru', 'de'], 'id': '1'})
+            {'contest_id': '1234', 'race_id': '12', 'c':['ru', 'de'], 'id': '1'})
 
 
     def test_duplicated_parameters_from_args_and_url(self):
         self.req.uri = '/contest/1234/race/12/paraglider/'
-        self.req.args = {'c': ['ru', 'de'], 'id': ['1'], 'race': ['12']}
+        self.req.args = {'c': ['ru', 'de'], 'id': ['1'], 'race_id': ['12']}
         self.assertDictEqual(self.api.parameters_from_request(self.req),
-            {'contest': '1234', 'race': '12', 'c':['ru', 'de'], 'id': '1'})
+            {'contest_id': '1234', 'race_id': '12', 'c':['ru', 'de'], 'id': '1'})
 
     def test_bad_duplicated_parameters_from_args_and_url(self):
         self.req.uri = '/contest/1234/race/12/paraglider/'
-        self.req.args = {'c': ['ru', 'de'], 'id': ['1'], 'race': ['13']}
+        self.req.args = {'c': ['ru', 'de'], 'id': ['1'], 'race_id': ['13']}
         self.assertRaises(BadParametersError,
             self.api.parameters_from_request, self.req)
 

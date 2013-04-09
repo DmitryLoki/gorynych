@@ -12,6 +12,8 @@ from twisted.web import resource, server
 from twisted.internet import defer
 from twisted.web.error import UnsupportedMethod
 
+from gorynych.common.exceptions import NoAggregate
+
 class BadParametersError(Exception):
     '''
     Raised when bad parameters has been passed to the system.
@@ -150,7 +152,11 @@ class APIResource(resource.Resource):
         except ValueError as error:
             self._handle_error(request, 500, "Error while executing service "
                                  "command", repr(error))
-            defer.returnValue('HER')
+            defer.returnValue('')
+        except NoAggregate:
+            self._handle_error(request, 404, "No such resource",
+                "Aggregate wasn't found in repository.")
+            defer.returnValue('')
 
         # use service result as supposed
         request, body = yield resource_func(service_result, request)
@@ -237,6 +243,10 @@ class APIResource(resource.Resource):
         '''
         uri, args = req.uri, self._get_args(req.args)
         result = dict()
+        # mapping between uri path and parameters keys:
+        maps = {'contest': 'contest_id', 'person': 'person_id',
+                'race': 'race_id'}
+
         for key in args.keys():
             if len(args[key]) == 1:
                 result[key] = args[key][0]
@@ -246,6 +256,7 @@ class APIResource(resource.Resource):
             '''
             Insert only unexistent or unequal to existent values for key.
             '''
+            key = maps.get(key, key)
             if result.has_key(key) and result[key] != value:
                 raise BadParametersError("Two different values for one parameter.")
             else:

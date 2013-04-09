@@ -79,31 +79,34 @@ class TrackerService(Interface):
         '''
 
 def read_contest(cont):
-    return dict(title=cont.title, id=cont.id)
+    if cont:
+        return dict(title=cont.title, id=cont.id)
 
 def read_contest_list(cont_list):
-    result = []
-    for cont in cont_list:
-        result.append(dict(contest_id=cont.id, contest_title=cont.title,
-            start_time=cont.start_time, end_time=cont.end_time))
-    return result
+    if cont_list:
+        result = []
+        for cont in cont_list:
+            result.append(dict(contest_id=cont.id, contest_title=cont.title,
+                start_time=cont.start_time, end_time=cont.end_time))
+        return result
 
 def read_person(pers):
-    if not pers:
-        return {}
-    return dict(person_name=pers.name.full(), person_tracker=pers.tracker,
-        person_id=pers.id)
+    if pers:
+        return dict(person_name=pers.name.full(),
+            person_id=pers.id)
 
 
 def read_person_list(pers_list):
-    result = []
-    for pers in pers_list:
-        result.append(dict(person_id=pers.id, person_name=pers.name))
-    return result
+    if pers_list:
+        result = []
+        for pers in pers_list:
+            result.append(dict(person_id=pers.id, person_name=pers.name.full()))
+        return result
 
 
 def read_race(race):
-    return dict(type=race.task.type, title=race.title, id=race.id)
+    if race:
+        return dict(type=race.task.type, title=race.title, id=race.id)
 
 
 def read_paraglider_list(p_list):

@@ -45,8 +45,13 @@ class ApplicationServiceTestCase(unittest.TestCase):
     def setUp(self):
         self.cs = ApplicationService(mock.Mock())
         self.cs.startService()
+        self.repository = GoodRepository()
+        if not self.repository.is_store_empty():
+            self.repository.clean_store()
 
     def tearDown(self):
+        self.repository.clean_store()
+        del self.repository
         self.cs.stopService()
         del self.cs
         gc.collect()
@@ -56,10 +61,7 @@ class ApplicationServiceTestCase(unittest.TestCase):
 class ContestServiceTest(ApplicationServiceTestCase):
 
     def test_succes_contest_creation(self, patched):
-        repository = GoodRepository()
-        patched.return_value = repository
-        if not repository.is_store_empty():
-            repository.clean_store()
+        patched.return_value = self.repository
         d = self.cs.create_new_contest(dict(title='hoi', start_time=1,
             end_time=2, contest_place='Боливия', contest_country='RU',
             hq_coords=[12.3, 42.9]))
@@ -76,7 +78,7 @@ class ContestServiceTest(ApplicationServiceTestCase):
         new_cont = self.cs.change_contest(dict(id=cont1['id'],
             title='A', start_time=2, end_time=6)).result
         self.assertEqual(new_cont['title'], 'A')
-        self.assertEqual(repository.get_by_id(cont1['id']).title, 'A')
+        self.assertEqual(self.repository.get_by_id(cont1['id']).title, 'A')
 
 
     def test_bad_contest_saving(self, patched):
@@ -88,7 +90,7 @@ class ContestServiceTest(ApplicationServiceTestCase):
 
 
     def test_bad_contest_creation(self, patched):
-        patched.return_value = GoodRepository()
+        patched.return_value = self.repository
         d = defer.Deferred()
         d.addCallback(self.cs.create_new_contest)
         d.callback(dict(title='hoi', start_time=3, end_time=2,
@@ -97,22 +99,30 @@ class ContestServiceTest(ApplicationServiceTestCase):
         self.assertFailure(d, ValueError)
 
 
+    def test_read_contest(self, patched):
+        patched.return_value = self.repository
+        result = self.cs.get_contest('alla').result
+        self.assertIsNone(result)
+
+    def test_read_contests(self, patched):
+        patched.return_value = self.repository
+        result = self.cs.get_contests({'limit':100, 'offset':'2'}).result
+        self.assertIsNone(result)
+
+
 @mock.patch('gorynych.common.infrastructure.persistence.get_repository')
 class PersonServiceTest(ApplicationServiceTestCase):
 
     def test_create_person(self, patched):
-        repository = GoodRepository()
-        patched.return_value = repository
-        if not repository.is_store_empty():
-            repository.clean_store()
-        repository.is_store_empty()
+        patched.return_value = self.repository
 
         pers1 = self.cs.create_new_person(dict(name='Vasya', surname='Doe',
             country='QQ', email='john@example.com', reg_date='2012,12,21')
                                 ).result
         self.assertEqual(pers1['person_name'], 'Vasya Doe')
         self.assertDictEqual(pers1,
-                        read_person(repository.get_by_id(pers1['person_id'])))
+                        read_person(self.repository.get_by_id
+                            (pers1['person_id'])))
 
         pers2 = self.cs.get_person(pers1['person_id']).result
         self.assertDictEqual(pers1, pers2)
@@ -124,8 +134,22 @@ class PersonServiceTest(ApplicationServiceTestCase):
         new_pers = self.cs.change_person(dict(id=pers1['person_id'],
             name='Evlampyi')).result
         self.assertEqual(new_pers['person_name'], 'Evlampyi Doe')
-        self.assertEqual(repository.get_by_id(new_pers['person_id'])._name
-            .name, 'Evlampyi')
+        self.assertEqual(self.repository.get_by_id(new_pers['person_id'])
+        ._name.name, 'Evlampyi')
+
+    def test_read_person(self, patched):
+        patched.return_value = self.repository
+        result = self.cs.get_person('1').result
+        self.assertIsNone(result)
+
+
+    def test_read_persons(self, patched):
+        patched.return_value = self.repository
+        result = self.cs.get_persons().result
+        self.assertIsNone(result)
+
+        result = self.cs.get_persons({'limit':100, 'offset':'20'}).result
+        self.assertIsNone(result)
 
 
 class ContestParagliderRaceTest(unittest.TestCase):

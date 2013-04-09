@@ -1,1 +1,1 @@
-{"id": "$contest_id", "name": "$contest_name", "country": "$contest_country_code", "start_date": "$contest_start_date", "end_date": "$contest_end_date"}
+{"id": "$contest_id", "title": "$contest_title", "country": "$contest_country_code", "start_date": "$contest_start_date", "end_date": "$contest_end_date"}

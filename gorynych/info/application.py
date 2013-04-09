@@ -80,9 +80,11 @@ class TrackerService(Interface):
 
 def read_contest(cont):
     if cont:
-        return dict(contest_title=cont.title,
-                    contest_id=cont.id,
-                    contest_country_code=cont.country)
+        return dict(contest_title = cont.title,
+                    contest_id = cont.id,
+                    contest_country_code = cont.country,
+                    contest_start_date = cont.start_time,
+                    contest_end_date = cont.end_time)
 
 def read_contest_list(cont_list):
     if cont_list:

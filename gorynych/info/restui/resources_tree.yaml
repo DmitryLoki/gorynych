@@ -1,0 +1,36 @@
+package: &gorynych
+  !!python/module:gorynych.info.restui.resources
+aliases:
+  uuid: &uuid
+    '[a-z0-9]+-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+'
+
+contest:
+  leaf: ContestResourceCollection
+  package: *gorynych
+  tree:
+    *uuid:
+      leaf: ContestResource
+      package: *gorynych
+      tree:
+        paraglider: &paraglider
+          leaf: ParagliderResourceCollection
+          package: *gorynych
+          tree:
+            paraglider_id(replace this):
+              leaf: ParagliderResource
+              package: *gorynych
+        race:
+          leaf: RaceResourceCollection
+          package: *gorynych
+          tree:
+            *uuid:
+              leaf: RaceResource
+              package: *gorynych
+              tree: *paraglider
+person:
+  leaf: PersonResourceCollection
+  package: *gorynych
+  tree:
+    *uuid:
+      leaf: PersonResource
+      package: *gorynych

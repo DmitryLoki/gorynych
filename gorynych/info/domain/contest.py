@@ -149,6 +149,13 @@ class Contest(AggregateRoot):
                 result.append(self._participants[key])
         return result
 
+    @property
+    def country(self):
+        return self.address.country
+
+    @property
+    def place(self):
+        return self.address.place
 
     def register_paraglider(self, person_id, glider, contest_number):
         paraglider_before = deepcopy(self._participants.get(person_id))

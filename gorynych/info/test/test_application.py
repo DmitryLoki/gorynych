@@ -45,8 +45,13 @@ class ApplicationServiceTestCase(unittest.TestCase):
     def setUp(self):
         self.cs = ApplicationService(mock.Mock())
         self.cs.startService()
+        self.repository = GoodRepository()
+        if not self.repository.is_store_empty():
+            self.repository.clean_store()
 
     def tearDown(self):
+        self.repository.clean_store()
+        del self.repository
         self.cs.stopService()
         del self.cs
         gc.collect()
@@ -56,27 +61,26 @@ class ApplicationServiceTestCase(unittest.TestCase):
 class ContestServiceTest(ApplicationServiceTestCase):
 
     def test_succes_contest_creation(self, patched):
-        repository = GoodRepository()
-        patched.return_value = repository
-        if not repository.is_store_empty():
-            repository.clean_store()
+        patched.return_value = self.repository
         d = self.cs.create_new_contest(dict(title='hoi', start_time=1,
             end_time=2, contest_place='Боливия', contest_country='RU',
             hq_coords=[12.3, 42.9]))
         cont1 = d.result
-        self.assertEqual(cont1['title'], 'Hoi')
-        self.assertEqual(len(cont1['id']), 36)
+        self.assertEqual(cont1['contest_title'], 'Hoi')
+        self.assertEqual(len(cont1['contest_id']), 36)
 
-        cont2 = self.cs.get_contest(cont1['id']).result
+        cont2 = self.cs.get_contest({'contest_id': cont1['contest_id']}
+                ).result
         self.assertDictEqual(cont1, cont2)
 
         cont_list = self.cs.get_contests().result
-        self.assertEqual(cont2['id'], cont_list[0]['contest_id'])
+        self.assertEqual(cont2['contest_id'], cont_list[0]['contest_id'])
 
-        new_cont = self.cs.change_contest(dict(id=cont1['id'],
+        new_cont = self.cs.change_contest(dict(id=cont1['contest_id'],
             title='A', start_time=2, end_time=6)).result
-        self.assertEqual(new_cont['title'], 'A')
-        self.assertEqual(repository.get_by_id(cont1['id']).title, 'A')
+        self.assertEqual(new_cont['contest_title'], 'A')
+        self.assertEqual(self.repository.get_by_id(cont1['contest_id']
+                ).title, 'A')
 
 
     def test_bad_contest_saving(self, patched):
@@ -88,7 +92,7 @@ class ContestServiceTest(ApplicationServiceTestCase):
 
 
     def test_bad_contest_creation(self, patched):
-        patched.return_value = GoodRepository()
+        patched.return_value = self.repository
         d = defer.Deferred()
         d.addCallback(self.cs.create_new_contest)
         d.callback(dict(title='hoi', start_time=3, end_time=2,
@@ -97,24 +101,32 @@ class ContestServiceTest(ApplicationServiceTestCase):
         self.assertFailure(d, ValueError)
 
 
+    def test_read_contest(self, patched):
+        patched.return_value = self.repository
+        result = self.cs.get_contest({'contest_id':'cc'}).result
+        self.assertIsNone(result)
+
+    def test_read_contests(self, patched):
+        patched.return_value = self.repository
+        result = self.cs.get_contests({'limit':100, 'offset':'2'}).result
+        self.assertIsNone(result)
+
+
 @mock.patch('gorynych.common.infrastructure.persistence.get_repository')
 class PersonServiceTest(ApplicationServiceTestCase):
 
     def test_create_person(self, patched):
-        repository = GoodRepository()
-        patched.return_value = repository
-        if not repository.is_store_empty():
-            repository.clean_store()
-        repository.is_store_empty()
+        patched.return_value = self.repository
 
         pers1 = self.cs.create_new_person(dict(name='Vasya', surname='Doe',
             country='QQ', email='john@example.com', reg_date='2012,12,21')
                                 ).result
         self.assertEqual(pers1['person_name'], 'Vasya Doe')
         self.assertDictEqual(pers1,
-                        read_person(repository.get_by_id(pers1['person_id'])))
+                        read_person(self.repository.get_by_id
+                            (pers1['person_id'])))
 
-        pers2 = self.cs.get_person(pers1['person_id']).result
+        pers2 = self.cs.get_person({'person_id':pers1['person_id']}).result
         self.assertDictEqual(pers1, pers2)
 
         pers_list = self.cs.get_persons().result
@@ -124,8 +136,22 @@ class PersonServiceTest(ApplicationServiceTestCase):
         new_pers = self.cs.change_person(dict(id=pers1['person_id'],
             name='Evlampyi')).result
         self.assertEqual(new_pers['person_name'], 'Evlampyi Doe')
-        self.assertEqual(repository.get_by_id(new_pers['person_id'])._name
-            .name, 'Evlampyi')
+        self.assertEqual(self.repository.get_by_id(new_pers['person_id'])
+        ._name.name, 'Evlampyi')
+
+    def test_read_person(self, patched):
+        patched.return_value = self.repository
+        result = self.cs.get_person({'person_id':'1'}).result
+        self.assertIsNone(result)
+
+
+    def test_read_persons(self, patched):
+        patched.return_value = self.repository
+        result = self.cs.get_persons().result
+        self.assertIsNone(result)
+
+        result = self.cs.get_persons({'limit':100, 'offset':'20'}).result
+        self.assertIsNone(result)
 
 
 class ContestParagliderRaceTest(unittest.TestCase):
@@ -149,7 +175,7 @@ class ContestParagliderRaceTest(unittest.TestCase):
             p2 = self.aps.create_new_person(dict(name='John', surname='Doe',
                 country='QQ', email='john@example.com',
                 reg_date='2012,12,21')).result
-            return c['id'], p1['person_id'], p2['person_id']
+            return c['contest_id'], p1['person_id'], p2['person_id']
 
         self.cont_id, self.p1_id, self.p2_id = fixture()
         pers = self.repository.get_by_id(self.p1_id)
@@ -201,8 +227,10 @@ class ContestParagliderRaceTest(unittest.TestCase):
         race = self.aps.create_new_race_for_contest(dict(contest_id=self
                 .cont_id, race_type='speedrun', race_title='task 3',
             checkpoints=[ch1])).result
-        self.assertEqual(race['id'], self.repository.get_by_id(race['id']).id)
-        self.assertEqual(race['type'], 'speedrun')
+        self.assertEqual(race['race_id'], self.repository.get_by_id
+            (race['race_id'])
+        .id)
+        self.assertEqual(race['race_type'], 'speedrun')
 
 
 

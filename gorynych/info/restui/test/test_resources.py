@@ -3,11 +3,13 @@ Test base resources and functions for CoreAPI.
 '''
 from io import BytesIO
 from twisted.internet.address import IPv4Address
+from twisted.internet.defer import Deferred
 from twisted.internet.interfaces import ISSLTransport
 from twisted.trial import unittest
 import mock
+from twisted.web.http_headers import Headers
 
-from twisted.web.server import Request, Site
+from twisted.web.server import Request, Site, Session, NOT_DONE_YET
 from twisted.web.resource import NoResource, Resource
 from zope.interface import implementer
 

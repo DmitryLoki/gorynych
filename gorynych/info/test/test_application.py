@@ -66,19 +66,21 @@ class ContestServiceTest(ApplicationServiceTestCase):
             end_time=2, contest_place='Боливия', contest_country='RU',
             hq_coords=[12.3, 42.9]))
         cont1 = d.result
-        self.assertEqual(cont1['title'], 'Hoi')
-        self.assertEqual(len(cont1['id']), 36)
+        self.assertEqual(cont1['contest_title'], 'Hoi')
+        self.assertEqual(len(cont1['contest_id']), 36)
 
-        cont2 = self.cs.get_contest({'contest_id': cont1['id']}).result
+        cont2 = self.cs.get_contest({'contest_id': cont1['contest_id']}
+                ).result
         self.assertDictEqual(cont1, cont2)
 
         cont_list = self.cs.get_contests().result
-        self.assertEqual(cont2['id'], cont_list[0]['contest_id'])
+        self.assertEqual(cont2['contest_id'], cont_list[0]['contest_id'])
 
-        new_cont = self.cs.change_contest(dict(id=cont1['id'],
+        new_cont = self.cs.change_contest(dict(id=cont1['contest_id'],
             title='A', start_time=2, end_time=6)).result
-        self.assertEqual(new_cont['title'], 'A')
-        self.assertEqual(self.repository.get_by_id(cont1['id']).title, 'A')
+        self.assertEqual(new_cont['contest_title'], 'A')
+        self.assertEqual(self.repository.get_by_id(cont1['contest_id']
+                ).title, 'A')
 
 
     def test_bad_contest_saving(self, patched):
@@ -173,7 +175,7 @@ class ContestParagliderRaceTest(unittest.TestCase):
             p2 = self.aps.create_new_person(dict(name='John', surname='Doe',
                 country='QQ', email='john@example.com',
                 reg_date='2012,12,21')).result
-            return c['id'], p1['person_id'], p2['person_id']
+            return c['contest_id'], p1['person_id'], p2['person_id']
 
         self.cont_id, self.p1_id, self.p2_id = fixture()
         pers = self.repository.get_by_id(self.p1_id)
@@ -225,8 +227,10 @@ class ContestParagliderRaceTest(unittest.TestCase):
         race = self.aps.create_new_race_for_contest(dict(contest_id=self
                 .cont_id, race_type='speedrun', race_title='task 3',
             checkpoints=[ch1])).result
-        self.assertEqual(race['id'], self.repository.get_by_id(race['id']).id)
-        self.assertEqual(race['type'], 'speedrun')
+        self.assertEqual(race['race_id'], self.repository.get_by_id
+            (race['race_id'])
+        .id)
+        self.assertEqual(race['race_type'], 'speedrun')
 
 
 

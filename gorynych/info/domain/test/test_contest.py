@@ -39,6 +39,8 @@ class ContestFactoryTest(unittest.TestCase):
         cont = create_contest(contest.ContestID('ab'), 1, 2)
         self.assertIsInstance(cont.address, Address)
         self.assertEqual(cont.title, 'Hello World')
+        self.assertEqual(cont.country, 'RU')
+        self.assertEqual(cont.place, 'Yrupinsk')
         self.assertEquals((cont.start_time, cont.end_time), (1, 2))
         self.assertIsInstance(cont.event_publisher, mock.MagicMock)
         self.assertEqual(cont.id, contest.ContestID('ab'))

@@ -59,6 +59,7 @@ class ContestRESTAPITest(unittest.TestCase):
         '''
         Here I suppose that contest repository is empty.
         '''
+        self.skipTest("Not ready yet")
         r = requests.get(self.url)
         self.assertEqual(r.json(), {})
 
@@ -78,11 +79,12 @@ class ContestRESTAPITest(unittest.TestCase):
         print r.text
         self.assertEqual(r.status_code, 201)
         result = r.json()
-        self.assertEqual(result['title'], 'Best contest')
+        self.assertEqual(result['title'], u'Best Contest')
         cont_id = result['id']
         r2 = requests.get('/'.join((self.url, result['id'])))
-        self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['title'], 'Best contest')
+        print r2.text
+        self.assertEqual(r2.status_code, 200)
+        self.assertEqual(r2.json()['title'], 'Best Contest')
 
 
 if __name__ == '__main__':

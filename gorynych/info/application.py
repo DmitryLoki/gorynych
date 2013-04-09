@@ -80,14 +80,17 @@ class TrackerService(Interface):
 
 def read_contest(cont):
     if cont:
-        return dict(title=cont.title, id=cont.id)
+        return dict(contest_title=cont.title,
+                    contest_id=cont.id,
+                    contest_country_code=cont.country)
 
 def read_contest_list(cont_list):
     if cont_list:
         result = []
         for cont in cont_list:
             result.append(dict(contest_id=cont.id, contest_title=cont.title,
-                start_time=cont.start_time, end_time=cont.end_time))
+                contest_start_time=cont.start_time,
+                contest_end_time=cont.end_time))
         return result
 
 def read_person(pers):
@@ -106,7 +109,8 @@ def read_person_list(pers_list):
 
 def read_race(race):
     if race:
-        return dict(type=race.task.type, title=race.title, id=race.id)
+        return dict(race_type=race.task.type, race_title=race.title,
+            race_id=race.id)
 
 
 def read_paraglider_list(p_list):

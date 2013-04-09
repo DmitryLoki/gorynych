@@ -2,6 +2,8 @@
 Aggregate Person.
 '''
 import datetime
+import uuid
+
 from zope.interface.interfaces import Interface
 
 from gorynych.common.domain.model import IdentifierObject, AggregateRoot
@@ -16,15 +18,16 @@ ROLES = frozenset(['paraglider', 'organizator'])
 
 class PersonID(IdentifierObject):
     '''
-    Person identificator is a person e-mail address.
+    Person identificator is a uuid string.
     '''
     pass
 
 
 class Person(AggregateRoot):
 
-    def __init__(self, name, country, email, regdate):
-        self.id = email
+    def __init__(self, id, name, country, email, regdate):
+        self.id = id
+        self.email = email
         self._name = name
         self._country = country
         self.regdate = regdate
@@ -85,7 +88,8 @@ class PersonFactory(object):
     def __init__(self, event_publisher):
         self.event_publisher = event_publisher
 
-    def create_person(self, name, surname, country, email, year, month, day):
+    def create_person(self, name, surname, country, email, year=None,
+                      month=None, day=None):
         '''
         Create an instance of Person aggregate.
         @param name:
@@ -105,13 +109,17 @@ class PersonFactory(object):
         @return: a new person
         @rtype: Person
         '''
+        if not year and not month and not day:
+            today = datetime.date.today()
+            year, month, day = today.year, today.month, today.day
         year, month, day = int(year), int(month), int(day)
         if not MINYEAR <= year <= datetime.date.today().year:
             raise ValueError("Year is out of range %s-%s" %
                              (MINYEAR, datetime.date.today().year))
-        person = Person(Name(name, surname),
+        person = Person(PersonID(str(uuid.uuid4())),
+                        Name(name, surname),
                         Country(country),
-                        PersonID(email),
+                        email,
                         datetime.date(year, month, day))
         person.event_publisher = self.event_publisher
         return person

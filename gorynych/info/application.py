@@ -162,15 +162,15 @@ class ApplicationService(Service):
             read_contest_list)
 
 
-    def get_contest(self, id):
+    def get_contest(self, params):
         '''
         Return contest by id.
-        @param id:
-        @type id:
+        @param params:
+        @type params: C{dict}
         @return: dictionary with contest data
         @rtype: C{Deffered}
         '''
-        d = defer.succeed(id)
+        d = defer.succeed(params['contest_id'])
         d.addCallback(persistence.get_repository(contest.IContestRepository).
                                                 get_by_id)
         d.addCallback(read_contest)
@@ -221,8 +221,8 @@ class ApplicationService(Service):
         return d
 
 
-    def get_person(self, id):
-        d = defer.succeed(id)
+    def get_person(self, params):
+        d = defer.succeed(params['person_id'])
         d.addCallback(persistence.get_repository(person.IPersonRepository).
                                                 get_by_id)
         d.addCallback(read_person)

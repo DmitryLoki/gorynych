@@ -69,7 +69,7 @@ class ContestServiceTest(ApplicationServiceTestCase):
         self.assertEqual(cont1['title'], 'Hoi')
         self.assertEqual(len(cont1['id']), 36)
 
-        cont2 = self.cs.get_contest(cont1['id']).result
+        cont2 = self.cs.get_contest({'contest_id': cont1['id']}).result
         self.assertDictEqual(cont1, cont2)
 
         cont_list = self.cs.get_contests().result
@@ -101,7 +101,7 @@ class ContestServiceTest(ApplicationServiceTestCase):
 
     def test_read_contest(self, patched):
         patched.return_value = self.repository
-        result = self.cs.get_contest('alla').result
+        result = self.cs.get_contest({'contest_id':'cc'}).result
         self.assertIsNone(result)
 
     def test_read_contests(self, patched):
@@ -124,7 +124,7 @@ class PersonServiceTest(ApplicationServiceTestCase):
                         read_person(self.repository.get_by_id
                             (pers1['person_id'])))
 
-        pers2 = self.cs.get_person(pers1['person_id']).result
+        pers2 = self.cs.get_person({'person_id':pers1['person_id']}).result
         self.assertDictEqual(pers1, pers2)
 
         pers_list = self.cs.get_persons().result
@@ -139,7 +139,7 @@ class PersonServiceTest(ApplicationServiceTestCase):
 
     def test_read_person(self, patched):
         patched.return_value = self.repository
-        result = self.cs.get_person('1').result
+        result = self.cs.get_person({'person_id':'1'}).result
         self.assertIsNone(result)
 
 

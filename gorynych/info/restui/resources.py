@@ -10,6 +10,7 @@ import yaml
 
 from twisted.web import resource, server
 from twisted.internet import defer
+from twisted.web.error import UnsupportedMethod
 
 class BadParametersError(Exception):
     '''
@@ -43,6 +44,9 @@ def json_renderer(template_values, template_name,
         '''
         return template.substitute(value)
 
+    # render empty result
+    if not template_values:
+        return "{}"
     # get template from a dict
     template = templates_dict.get(template_name)
     if not template:
@@ -109,36 +113,67 @@ class APIResource(resource.Resource):
                     self.tree[key]['leaf'])(self.tree[key]['tree'], self.service)
         return resource.NoResource()
 
-    def __render_method(self, request, method_func):
-        '''
-        This is generalization of render_METHOD functions. All of them do
-        the same job: call service command and render result accordingly
-        with the METHOD idea.
-        @param request: received request
-        @type request: C{Request}
-        @param method_func: METHOD-specific function.
-        @type method_func: C{str}
-        '''
-        d = defer.Deferred()
-        d.addCallback(self.parameters_from_request)
-        d.addCallbacks(getattr(self.service, self.service_command[request
-            .method]))
-        d.addCallbacks(method_func, self.handle_error_in_service,
-            callbackArgs=[request], errbackArgs=[request])
-        d.addCallbacks(self.write_request)
-        d.callback(request)
-        return d
+
+    def render_HEAD(self, request):
+        return ''
+
+
+    @defer.inlineCallbacks
+    def _render_method(self, request, resource_func):
+        # get parameters from request
+        try:
+            request_params = self.parameters_from_request(request)
+        except Exception as error:
+            self._handle_error(request, 400, "Bad input parameters or URI",
+                repr(error))
+            defer.returnValue('')
+
+        # get service function which will handle request
+        try:
+            service_method = getattr(
+                self.service, self.service_command[request.method])
+        except KeyError:
+            if not request.method == 'HEAD':
+                allowed_methods = self.service_command.keys()
+                raise UnsupportedMethod(allowed_methods)
+            else:
+                # HEAD method must be supported accordingly to RFC2616 5.1.1
+                self.render_HEAD(request)
+                defer.returnValue('')
+        except AttributeError as error:
+            self._handle_error(request, 500, 'Attribute error', str(error))
+            defer.returnValue('')
+
+        # service will handle request
+        try:
+            service_result = yield service_method(request_params)
+        except ValueError as error:
+            self._handle_error(request, 500, "Error while executing service "
+                                 "command", repr(error))
+            defer.returnValue('HER')
+
+        # use service result as supposed
+        request, body = yield resource_func(service_result, request)
+        if not body:
+            defer.returnValue('')
+        self.write_request((request, body))
+
+    def _handle_error(self, request, response_code, error, message):
+        body = dict(error = str(error), message = str(message))
+        body = json.dumps(body)
+        request.setResponseCode(int(response_code))
+        self.write_request((request, body))
 
     def render_GET(self, request):
-        self.__render_method(request, self.resource_renderer)
+        self._render_method(request, self.resource_renderer)
         return server.NOT_DONE_YET
 
     def render_POST(self, request):
-        self.__render_method(request, self.resource_created)
+        self._render_method(request, self.resource_created)
         return server.NOT_DONE_YET
 
     def render_PUT(self, request):
-        self.__render_method(request, self.change_resource)
+        self._render_method(request, self.change_resource)
         return server.NOT_DONE_YET
 
     def resource_renderer(self, res, req):
@@ -149,11 +184,20 @@ class APIResource(resource.Resource):
         content_type = req.responseHeaders.getRawHeaders('content-type',
             'application/json')
         req.setResponseCode(200)
-        req.setHeader('Content-Type', content_type)
-        resource_representation = self.read(res)
-        body = self.renderers[content_type](resource_representation,
-            self.name)
-        req.setHeader('Content-Length', bytes(len(body)))
+        # will try to translate resource object into dictionary.
+        try:
+            resource_representation = self.read(res)
+        except Exception as error:
+            body = "Error %r in aggregate reading function." % error
+            return self._handle_error(req, 500, "ReadError", body), None
+
+        try:
+            body = self.renderers[content_type](resource_representation,
+                self.name)
+        except KeyError as error:
+            body = 'While rendering answer as %s. Error message is %r' % (
+                content_type, error)
+            return self._handle_error(req, 500, "KeyError", body), None
         return req, body
 
     def read(self, res):
@@ -176,30 +220,20 @@ class APIResource(resource.Resource):
         '''
         Receive request with body and write it back to channel.
         '''
+        req.setHeader('Content-Length', bytes(len(body)))
+        req.setHeader('Content-Type',
+            req.responseHeaders.getRawHeaders('content-type',
+                'application/json'))
         req.write(body)
         req.finish()
-
-    def handle_error_in_service(self, error, req):
-        body = dict()
-        err = error.trap(KeyError)
-        if err == KeyError:
-            req.setResponseCode(400)
-            body['error'] = 'KeyError'
-
-        body['message'] = error.getErrorMessage()
-        content_type = req.responseHeaders.getRawHeaders('content-type',
-            'application/json')
-        req.setHeader('Content-Type', content_type)
-        req.setHeader('Content-Length', bytes(len(body)))
-        body = json.dumps(body)
-        return req, body
-
+        return req
 
     def parameters_from_request(self, req):
         '''
         Return parameters from request arguments and/or URL.
         @param req: request
         @type req: C{Request}
+        @raise BadParametersError
         '''
         uri, args = req.uri, self._get_args(req.args)
         result = dict()
@@ -244,7 +278,8 @@ class ContestResourceCollection(APIResource):
     name = 'contest_collection'
 
     def _get_args(self, args):
-        args['hq_coords'] = args['hq_coords'][0].split(',')
+        if args.has_key('hq_coords'):
+            args['hq_coords'] = args['hq_coords'][0].split(',')
         return args
 
 

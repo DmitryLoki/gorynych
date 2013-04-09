@@ -1,10 +1,10 @@
 '''
 Test base resources and functions for CoreAPI.
 '''
-import unittest
+from twisted.trial import unittest
 import mock
 
-from twisted.web.test.requesthelper import DummyChannel
+from twisted.web.test.requesthelper import DummyChannel, DummyRequest
 from twisted.web.server import Request
 from twisted.web.resource import NoResource
 from twisted.python.failure import Failure
@@ -73,19 +73,16 @@ class APIResourceTest(unittest.TestCase):
         self.assertIsInstance(self.api_resource.getChild('axe2-fsb3-42a', 1),
             NoResource)
 
-    def test_handle_error_in_service(self):
+    def test_handle_error(self):
         import json
         request = Request(DummyChannel(), 1)
         request.gotLength(0)
-        req, msg = self.api_resource.handle_error_in_service(Failure(KeyError
-            ("foo")), request)
-        self.assertIsInstance(msg, str)
-        msg = json.loads(msg)
-        self.assertEqual(msg['message'], u"'foo'")
-        self.assertEqual(msg['error'], "KeyError")
-        self.assertEqual(req.code, 400)
-        self.assertEqual(req.responseHeaders.getRawHeaders('content-type'),
-                        ['application/json'])
+        self.api_resource.write_request = mock.Mock()
+        result = self.api_resource._handle_error(request,
+            500, 'Error', 'Big mistake')
+        request.setResponseCode(500)
+        body = json.dumps({'error': 'Error', 'message': 'Big mistake'})
+        self.api_resource.write_request.assert_called_with((request, body))
 
 
 class APIResourceMethodTest(unittest.TestCase):
@@ -108,10 +105,18 @@ class APIResourceMethodTest(unittest.TestCase):
         result, body = self.api.resource_renderer('res', req)
         self.assertEqual(result.code, 200)
         self.assertEqual(body, 'res::SimpleAPIResource')
-        self.assertEqual(result.responseHeaders.getRawHeaders
-            ('content-type')[0], 'application/json')
-        self.assertEqual(result.responseHeaders.getRawHeaders
-            ('content-length')[0], '22')
+
+    def test_error_in_read_function(self):
+        req = Request(DummyChannel(), 1)
+        req.setResponseCode(200)
+        def error_function(a):
+            raise Exception("boom")
+        self.api.read = error_function
+        self.api._handle_error = mock.Mock()
+        result, body = self.api.resource_renderer('res', req)
+        self.api._handle_error.assert_called_with(req, 500, "ReadError",
+            "Error %r in aggregate reading function." % Exception('boom'))
+
 
     def test_good_get(self):
         req = self._get_req()
@@ -132,6 +137,26 @@ class APIResourceMethodTest(unittest.TestCase):
         self.assertEqual(req.code, 200)
         self.assertEqual(req.transport.getvalue().splitlines()[-1],
             'The thing is {}::SimpleAPIResource')
+
+
+class RenderMethodTest(unittest.TestCase):
+    def test_error_in_parameters(self):
+        req = DummyRequest([])
+        service = SimpleService()
+        ar = APIResource('hh', service)
+        ar.service_command['GET'] = 'get_the_thing'
+        def method_func(a, req):
+            print "First argument is ", a
+            print 'Second argument is ', req
+            return req, a
+        def error_in_parameters_handling(req):
+            raise ValueError("Boom")
+
+        ar.parameters_from_request = error_in_parameters_handling
+
+        req.setResponseCode = mock.Mock()
+        result = ar._render_method(req, method_func)
+        req.setResponseCode.assert_called_with(400)
 
 
 class RequestHandlingTest(unittest.TestCase):
@@ -191,7 +216,7 @@ class JsonRendererTest(unittest.TestCase):
                         'contest_name': 'greeter'}, 'contest', self.template),
             '{"id": "hello", "name": "greeter"}')
         self.assertRaises(TypeError, json_renderer, 1, 'contest')
-        self.assertRaises(ValueError, json_renderer, dict(), 'higs')
+        self.assertRaises(ValueError, json_renderer, {'a':1}, 'higs')
 
     def test_list_rendering(self):
         import json
@@ -209,6 +234,9 @@ class JsonRendererTest(unittest.TestCase):
         result = json_renderer({'person_id': '1', 'person_name': 'John'},
             'person_collection')
         self.assertEqual(result, '{"id": "1", "name": "John"}')
+
+    def test_render_empty_response(self):
+        self.assertEqual(json_renderer(None, 'haha'), '{}')
 
 
 class YAMLTreeGenerationTest(unittest.TestCase):

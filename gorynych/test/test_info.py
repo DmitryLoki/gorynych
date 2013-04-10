@@ -60,7 +60,7 @@ class ContestRESTAPITest(unittest.TestCase):
         '''
         Here I suppose that contest repository is empty.
         '''
-#        self.skipTest("I'm lazy and don't want to clean repository.")
+        self.skipTest("I'm lazy and don't want to clean repository.")
         r = requests.get(self.url)
         self.assertEqual(r.json(), {})
 
@@ -72,7 +72,6 @@ class ContestRESTAPITest(unittest.TestCase):
         self.assertEqual(r.status_code, 404)
 
     def test_2_create_contest(self):
-#        self.skipTest("Not ready yet")
         params = dict(title='Best contest', start_time=1, end_time=10,
             place = 'La France', country='ru',
             hq_coords='43.3,23.1')

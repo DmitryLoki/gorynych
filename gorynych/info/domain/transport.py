@@ -1,6 +1,7 @@
 '''
 Transport Aggregate.
 '''
+from zope.interface.interfaces import Interface
 from gorynych.common.domain.model import IdentifierObject, AggregateRoot
 
 
@@ -11,7 +12,13 @@ TYPES = frozenset(['bus', 'car', 'helicopter'])
 class TransportID(IdentifierObject):
     pass
 
-
+class ITransportRepository(Interface):
+    def get_by_id(transport_id): # @NoSelf
+        '''
+        '''
+    def save(obj): # @NoSelf
+        '''
+        '''
 class Transport(AggregateRoot):
     def __init__(self, id, type, title, description=None):
         self.id = id
@@ -34,3 +41,5 @@ class TransportFactory(object):
         if not type in TYPES:
             raise ValueError("Unknown transport type.")
         return Transport(id, type, title, description)
+
+

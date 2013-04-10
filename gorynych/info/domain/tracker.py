@@ -9,10 +9,10 @@ from gorynych.common.domain.model import AggregateRoot, DomainEvent, IdentifierO
 DEVICE_TYPES = ['tr203']
 
 class ITrackerRepository(Interface):
-    def get_by_id(id):
+    def get_by_id(tracker_id): # @NoSelf
         '''
         '''
-    def save(obj):
+    def save(value): # @NoSelf
         '''
         '''
 

@@ -16,7 +16,7 @@ from gorynych.info.domain.person import IPersonRepository
 
 
 class IContestRepository(Interface):
-    def get_by_id(id):
+    def get_by_id(id): # @NoSelf
         '''
 
         @param id:
@@ -25,7 +25,7 @@ class IContestRepository(Interface):
         @rtype:
         '''
 
-    def save(obj):
+    def save(obj): # @NoSelf
         '''
 
         @param obj:

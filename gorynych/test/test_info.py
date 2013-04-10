@@ -1,6 +1,7 @@
 '''
 Tests for info context.
 '''
+import json
 import requests
 
 import unittest
@@ -54,12 +55,12 @@ class RESTAPITest(unittest.TestCase):
 
 
 class ContestRESTAPITest(unittest.TestCase):
-    url = 'http://localhost:8080/contest'
+    url = 'http://localhost:8085/contest/'
     def test_1_get_no_contests(self):
         '''
         Here I suppose that contest repository is empty.
         '''
-        self.skipTest("I'm lazy and don't want to clean repository.")
+#        self.skipTest("I'm lazy and don't want to clean repository.")
         r = requests.get(self.url)
         self.assertEqual(r.json(), {})
 
@@ -73,18 +74,24 @@ class ContestRESTAPITest(unittest.TestCase):
     def test_2_create_contest(self):
 #        self.skipTest("Not ready yet")
         params = dict(title='Best contest', start_time=1, end_time=10,
-            contest_place = 'La France', contest_country='ru',
+            place = 'La France', country='ru',
             hq_coords='43.3,23.1')
         r = requests.post(self.url, data=params)
-        print r.text
         self.assertEqual(r.status_code, 201)
         result = r.json()
         self.assertEqual(result['title'], u'Best Contest')
-        cont_id = result['id']
+        self.cont_id = result['id']
         r2 = requests.get('/'.join((self.url, result['id'])))
-        print r2.text
         self.assertEqual(r2.status_code, 200)
         self.assertEqual(r2.json()['title'], 'Best Contest')
+
+    def test_3_change_contest(self):
+        r = requests.get(self.url)
+        cont_id = r.json()[0]["id"]
+        params = json.dumps(dict(title='besT Contest changed  ', id=cont_id))
+        r2 = requests.put(self.url + cont_id, data=params)
+        result = r2.json()
+        self.assertEqual(result['title'], 'Best Contest Changed')
 
 
 if __name__ == '__main__':

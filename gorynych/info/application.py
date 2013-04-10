@@ -146,7 +146,7 @@ class ApplicationService(Service):
         cont = self.contest_factory.create_contest(id,
             params['title'],
             params['start_time'], params['end_time'],
-            params['contest_place'], params['contest_country'],
+            params['place'], params['country'],
             params['hq_coords'])
 
         d = defer.succeed(cont)
@@ -211,6 +211,9 @@ class ApplicationService(Service):
                 setattr(cont, param, params[param])
             return cont
 
+        if params.has_key('contest_id'):
+            params['id'] = params['contest_id']
+            del params['contest_id']
         return self._change_aggregate(params, contest.IContestRepository,
             change, read_contest)
 
@@ -251,6 +254,9 @@ class ApplicationService(Service):
             if params.get('country'):
                 pers.country = params['country']
             return pers
+        if params.has_key('person_id'):
+            params['id'] = params['person_id']
+            del params['person_id']
         return self._change_aggregate(params, person.IPersonRepository,
             change, read_person)
 
@@ -331,7 +337,7 @@ class ApplicationService(Service):
                           read_func):
         id = params.get('id')
         if not id:
-            raise ValueError("No contest id has been received.")
+            raise ValueError("Aggregate's id hasn't been received.")
         del params['id']
 
         d = defer.succeed(id)

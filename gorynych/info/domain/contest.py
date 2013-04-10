@@ -50,11 +50,11 @@ class ContestFactory(object):
         address = Address(contest_place, contest_country, hq_coords)
         if not int(start_time) <  int(end_time):
             raise ValueError("Start time must be less then end time.")
-        title = title.strip().title()
         if not isinstance(id, ContestID):
             id = ContestID(id)
 
-        contest = Contest(id, title, start_time, end_time, address)
+        contest = Contest(id, start_time, end_time, address)
+        contest.title = title
         if self.event_publisher:
             contest.event_publisher = self.event_publisher
         return contest
@@ -72,9 +72,9 @@ class ParagliderRegisteredOnContest(DomainEvent):
 
 class Contest(AggregateRoot):
 
-    def __init__(self, id, title, start_time, end_time, address):
+    def __init__(self, id, start_time, end_time, address):
         self.id = id
-        self.title = title
+        self._title = ''
         self._start_time = start_time
         self._end_time = end_time
         self.address = address
@@ -156,6 +156,16 @@ class Contest(AggregateRoot):
     @property
     def place(self):
         return self.address.place
+
+    @property
+    def title(self):
+        return self._title
+
+    @title.setter
+    def title(self, value):
+        self._title = value.strip().title()
+
+
 
     def register_paraglider(self, person_id, glider, contest_number):
         paraglider_before = deepcopy(self._participants.get(person_id))

@@ -63,7 +63,7 @@ class ContestServiceTest(ApplicationServiceTestCase):
     def test_succes_contest_creation(self, patched):
         patched.return_value = self.repository
         d = self.cs.create_new_contest(dict(title='hoi', start_time=1,
-            end_time=2, contest_place='Боливия', contest_country='RU',
+            end_time=2, place='Боливия', country='RU',
             hq_coords=[12.3, 42.9]))
         cont1 = d.result
         self.assertEqual(cont1['contest_title'], 'Hoi')
@@ -76,7 +76,7 @@ class ContestServiceTest(ApplicationServiceTestCase):
         cont_list = self.cs.get_contests().result
         self.assertEqual(cont2['contest_id'], cont_list[0]['contest_id'])
 
-        new_cont = self.cs.change_contest(dict(id=cont1['contest_id'],
+        new_cont = self.cs.change_contest(dict(contest_id=cont1['contest_id'],
             title='A', start_time=2, end_time=6)).result
         self.assertEqual(new_cont['contest_title'], 'A')
         self.assertEqual(self.repository.get_by_id(cont1['contest_id']
@@ -86,7 +86,7 @@ class ContestServiceTest(ApplicationServiceTestCase):
     def test_bad_contest_saving(self, patched):
         patched.return_value = BadContestRepository()
         d = self.cs.create_new_contest(dict(title='hoi', start_time=3,
-            end_time=5, contest_place='Боливия', contest_country='RU',
+            end_time=5, place='Боливия', country='RU',
             hq_coords=[12.3, 42.9]))
         self.assertFailure(d, IndentationError)
 
@@ -96,7 +96,7 @@ class ContestServiceTest(ApplicationServiceTestCase):
         d = defer.Deferred()
         d.addCallback(self.cs.create_new_contest)
         d.callback(dict(title='hoi', start_time=3, end_time=2,
-            contest_place='Боливия', contest_country='RU',
+            place='Боливия', country='RU',
             hq_coords=[12.3, 42.9]))
         self.assertFailure(d, ValueError)
 
@@ -133,7 +133,7 @@ class PersonServiceTest(ApplicationServiceTestCase):
         self.assertIsInstance(pers_list, list)
         self.assertEqual(pers1['person_id'], pers_list[0]['person_id'])
 
-        new_pers = self.cs.change_person(dict(id=pers1['person_id'],
+        new_pers = self.cs.change_person(dict(person_id=pers1['person_id'],
             name='Evlampyi')).result
         self.assertEqual(new_pers['person_name'], 'Evlampyi Doe')
         self.assertEqual(self.repository.get_by_id(new_pers['person_id'])
@@ -167,7 +167,7 @@ class ContestParagliderRaceTest(unittest.TestCase):
         def fixture(patched):
             patched.return_value = self.repository
             c = self.aps.create_new_contest(dict(title='hoi', start_time=1,
-                end_time=2, contest_place='Боливия', contest_country='RU',
+                end_time=2, place='Боливия', country='RU',
                 hq_coords=[12.3, 42.9])).result
             p1 = self.aps.create_new_person(dict(name='Vasya', surname='Doe',
                 country='QQ', email='vas@example.com',

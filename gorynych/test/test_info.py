@@ -55,12 +55,12 @@ class RESTAPITest(unittest.TestCase):
 
 
 class ContestRESTAPITest(unittest.TestCase):
-    url = 'http://localhost:8080/contest/'
+    url = 'http://localhost:8085/contest/'
     def test_1_get_no_contests(self):
         '''
         Here I suppose that contest repository is empty.
         '''
-        self.skipTest("I'm lazy and don't want to clean repository.")
+#        self.skipTest("I'm lazy and don't want to clean repository.")
         r = requests.get(self.url)
         self.assertEqual(r.json(), {})
 

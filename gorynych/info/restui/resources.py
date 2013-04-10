@@ -240,18 +240,31 @@ class APIResource(resource.Resource):
         @param req: request
         @type req: C{Request}
         @raise BadParametersError
+        @raise: ValueError("Bad JSON received") on PUT request with bad json.
         '''
-        uri, args = req.uri, self._get_args(req.args)
-        result = dict()
-        # mapping between uri path and parameters keys:
+        # Mapping between uri path and parameters keys because I don't want
+        # to se in result {'contest': some_id} but want to see
+        # {'contest_id': some_id}.
         maps = {'contest': 'contest_id', 'person': 'person_id',
                 'race': 'race_id'}
 
-        for key in args.keys():
-            if len(args[key]) == 1:
-                result[key] = args[key][0]
-            else:
-                result[key] = args[key]
+        result = dict()
+        if req.method == "PUT":
+            content = req.content.read()
+            try:
+                args = json.loads(content)
+            except ValueError as error:
+                raise ValueError("Bad JSON: %r " % error)
+        else:
+            args = req.args
+            # If args[key] list has only one value make args[key] just a value
+            # not a list.
+            for key in args.keys():
+                if len(args[key]) == 1:
+                    args[key] = args[key][0]
+
+        result = self._get_args(args)
+
         def insert(key, value):
             '''
             Insert only unexistent or unequal to existent values for key.
@@ -261,14 +274,16 @@ class APIResource(resource.Resource):
                 raise BadParametersError("Two different values for one parameter.")
             else:
                 result[key] = value
-        path = uri.split('?')[0].split('/')
-        # remove '' elements from list
+        # We already have arguments in args so we don't need them in uri.
+        path = req.uri.split('?')[0].split('/')
+        # Remove '' elements from the path list.
         try:
             while True:
                 index = path.index('')
                 path.pop(index)
         except ValueError:
             pass
+        # Create parameters from path this way: path/id = {'path':'id'}.
         for index, item in enumerate(path):
             if index % 2:
                 insert(path[index - 1], path[index])
@@ -290,7 +305,7 @@ class ContestResourceCollection(APIResource):
 
     def _get_args(self, args):
         if args.has_key('hq_coords'):
-            args['hq_coords'] = args['hq_coords'][0].split(',')
+            args['hq_coords'] = args['hq_coords'].split(',')
         return args
 
 

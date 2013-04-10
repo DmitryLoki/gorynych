@@ -432,6 +432,14 @@ class ParametersFromRequestTest(unittest.TestCase):
         self.assertRaises(BadParametersError,
             self.api.parameters_from_request, self.req)
 
+    def test_put_parameters(self):
+        self.req.uri = '/contest/1234/race/12/paraglider/'
+        self.req.content.read = mock.Mock()
+        self.req.content.read.return_value = '{"a":1, "b":"2"}'
+        self.req.method = "PUT"
+        self.assertDictEqual(self.api.parameters_from_request(self.req),
+        {'contest_id': '1234', 'race_id': '12', 'a':1, 'b':'2'})
+
 
 class JsonRendererTest(unittest.TestCase):
     def setUp(self):

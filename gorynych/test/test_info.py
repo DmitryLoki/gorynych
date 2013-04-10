@@ -92,6 +92,9 @@ class ContestRESTAPITest(unittest.TestCase):
         r2 = requests.put(self.url + cont_id, data=params)
         result = r2.json()
         self.assertEqual(result['title'], 'Best Contest Changed')
+        bad_params = json.dumps({'place': 'Paris'})
+        r3 = requests.put(self.url + cont_id, data=bad_params)
+        self.assertEqual(r3.status_code, 500)
 
 
 if __name__ == '__main__':

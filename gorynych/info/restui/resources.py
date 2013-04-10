@@ -149,7 +149,7 @@ class APIResource(resource.Resource):
         # service will handle request
         try:
             service_result = yield service_method(request_params)
-        except ValueError as error:
+        except Exception as error:
             self._handle_error(request, 500, "Error while executing service "
                                  "command", repr(error))
             defer.returnValue('')

@@ -76,7 +76,7 @@ class ContestServiceTest(ApplicationServiceTestCase):
         cont_list = self.cs.get_contests().result
         self.assertEqual(cont2['contest_id'], cont_list[0]['contest_id'])
 
-        new_cont = self.cs.change_contest(dict(id=cont1['contest_id'],
+        new_cont = self.cs.change_contest(dict(contest_id=cont1['contest_id'],
             title='A', start_time=2, end_time=6)).result
         self.assertEqual(new_cont['contest_title'], 'A')
         self.assertEqual(self.repository.get_by_id(cont1['contest_id']
@@ -133,7 +133,7 @@ class PersonServiceTest(ApplicationServiceTestCase):
         self.assertIsInstance(pers_list, list)
         self.assertEqual(pers1['person_id'], pers_list[0]['person_id'])
 
-        new_pers = self.cs.change_person(dict(id=pers1['person_id'],
+        new_pers = self.cs.change_person(dict(person_id=pers1['person_id'],
             name='Evlampyi')).result
         self.assertEqual(new_pers['person_name'], 'Evlampyi Doe')
         self.assertEqual(self.repository.get_by_id(new_pers['person_id'])

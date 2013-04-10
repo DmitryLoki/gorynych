@@ -194,7 +194,7 @@ class Contest(AggregateRoot):
                 paragliders.add(key)
         all_contest_numbers_uniq = len(paragliders) == len(contest_numbers)
 
-        end_after_start = self.start_time < self.end_time
+        end_after_start = int(self.start_time) < int(self.end_time)
         return all_contest_numbers_uniq and end_after_start
 
     def _rollback_register_paraglider(self, paraglider_before, person_id):

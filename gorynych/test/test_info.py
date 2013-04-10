@@ -13,7 +13,7 @@ class RESTAPITest(unittest.TestCase):
     '''
     REST API must be started and running before tests.
     '''
-    url = 'http://localhost:8080'
+    url = 'http://localhost:8085'
 #    skip = 'Not ready yet.'
 
 #    @classmethod
@@ -88,7 +88,7 @@ class ContestRESTAPITest(unittest.TestCase):
     def test_3_change_contest(self):
         r = requests.get(self.url)
         cont_id = r.json()[0]["id"]
-        params = json.dumps(dict(title='besT Contest changed  ', id=cont_id))
+        params = json.dumps(dict(title='besT Contest changed  ', end_time=15))
         r2 = requests.put(self.url + cont_id, data=params)
         result = r2.json()
         self.assertEqual(result['title'], 'Best Contest Changed')

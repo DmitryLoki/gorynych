@@ -77,7 +77,7 @@ class ContestServiceTest(ApplicationServiceTestCase):
         self.assertEqual(cont2['contest_id'], cont_list[0]['contest_id'])
 
         new_cont = self.cs.change_contest(dict(contest_id=cont1['contest_id'],
-            title='A', start_time=2, end_time=6)).result
+            title='A', start_time=2, end_time='6')).result
         self.assertEqual(new_cont['contest_title'], 'A')
         self.assertEqual(self.repository.get_by_id(cont1['contest_id']
                 ).title, 'A')

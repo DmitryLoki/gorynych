@@ -140,6 +140,11 @@ class ContestTest(unittest.TestCase):
         self.assertEqual((cont.start_time, cont.end_time), (10, 16))
         self.assertRaises(ValueError, cont.change_times, '10', '8')
 
+    def test_change_title(self):
+        cont = create_contest('cont1', 1, '15')
+        cont.title = '  hello moOn  '
+        self.assertEqual(cont.title, 'Hello Moon')
+
 
 class ContestTestWithRegisteredParagliders(unittest.TestCase):
 

@@ -146,7 +146,7 @@ class ApplicationService(Service):
         cont = self.contest_factory.create_contest(id,
             params['title'],
             params['start_time'], params['end_time'],
-            params['contest_place'], params['contest_country'],
+            params['place'], params['country'],
             params['hq_coords'])
 
         d = defer.succeed(cont)

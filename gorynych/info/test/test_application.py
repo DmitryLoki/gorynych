@@ -63,7 +63,7 @@ class ContestServiceTest(ApplicationServiceTestCase):
     def test_succes_contest_creation(self, patched):
         patched.return_value = self.repository
         d = self.cs.create_new_contest(dict(title='hoi', start_time=1,
-            end_time=2, contest_place='Боливия', contest_country='RU',
+            end_time=2, place='Боливия', country='RU',
             hq_coords=[12.3, 42.9]))
         cont1 = d.result
         self.assertEqual(cont1['contest_title'], 'Hoi')
@@ -86,7 +86,7 @@ class ContestServiceTest(ApplicationServiceTestCase):
     def test_bad_contest_saving(self, patched):
         patched.return_value = BadContestRepository()
         d = self.cs.create_new_contest(dict(title='hoi', start_time=3,
-            end_time=5, contest_place='Боливия', contest_country='RU',
+            end_time=5, place='Боливия', country='RU',
             hq_coords=[12.3, 42.9]))
         self.assertFailure(d, IndentationError)
 
@@ -96,7 +96,7 @@ class ContestServiceTest(ApplicationServiceTestCase):
         d = defer.Deferred()
         d.addCallback(self.cs.create_new_contest)
         d.callback(dict(title='hoi', start_time=3, end_time=2,
-            contest_place='Боливия', contest_country='RU',
+            place='Боливия', country='RU',
             hq_coords=[12.3, 42.9]))
         self.assertFailure(d, ValueError)
 
@@ -167,7 +167,7 @@ class ContestParagliderRaceTest(unittest.TestCase):
         def fixture(patched):
             patched.return_value = self.repository
             c = self.aps.create_new_contest(dict(title='hoi', start_time=1,
-                end_time=2, contest_place='Боливия', contest_country='RU',
+                end_time=2, place='Боливия', country='RU',
                 hq_coords=[12.3, 42.9])).result
             p1 = self.aps.create_new_person(dict(name='Vasya', surname='Doe',
                 country='QQ', email='vas@example.com',

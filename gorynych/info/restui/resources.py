@@ -230,7 +230,7 @@ class APIResource(resource.Resource):
         req.setHeader('Content-Type',
             req.responseHeaders.getRawHeaders('content-type',
                 'application/json'))
-        req.write(body)
+        req.write(bytes(body))
         req.finish()
         return req
 

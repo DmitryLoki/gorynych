@@ -192,11 +192,15 @@ class ContestParagliderRaceTest(unittest.TestCase):
     @mock.patch('gorynych.common.infrastructure.persistence.get_repository')
     def test_register_paraglider(self, patched):
         patched.return_value = self.repository
-        self.aps.register_paraglider_on_contest(dict(
+        result = self.aps.register_paraglider_on_contest(dict(
             contest_id=self.cont_id, glider='gin', contest_number='1',
-            person_id=self.p1_id))
+            person_id=self.p1_id)).result
         cont = self.repository.get_by_id(self.cont_id)
         self.assertEqual(len(cont.paragliders), 1)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result['glider'], 'gin')
+        self.assertEqual(result['contest_number'], 1)
+        self.assertTrue(result.has_key('person_id'))
 
         self.aps.register_paraglider_on_contest(dict(
             contest_id=self.cont_id, glider='gin', contest_number='1',

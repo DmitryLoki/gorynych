@@ -50,11 +50,11 @@ class ContestFactory(object):
         address = Address(contest_place, contest_country, hq_coords)
         if not int(start_time) <  int(end_time):
             raise ValueError("Start time must be less then end time.")
-        title = title.strip().title()
         if not isinstance(id, ContestID):
             id = ContestID(id)
 
-        contest = Contest(id, title, start_time, end_time, address)
+        contest = Contest(id, start_time, end_time, address)
+        contest.title = title
         if self.event_publisher:
             contest.event_publisher = self.event_publisher
         return contest
@@ -72,9 +72,9 @@ class ParagliderRegisteredOnContest(DomainEvent):
 
 class Contest(AggregateRoot):
 
-    def __init__(self, id, title, start_time, end_time, address):
+    def __init__(self, id, start_time, end_time, address):
         self.id = id
-        self.title = title
+        self._title = ''
         self._start_time = start_time
         self._end_time = end_time
         self.address = address
@@ -149,6 +149,41 @@ class Contest(AggregateRoot):
                 result.append(self._participants[key])
         return result
 
+    @property
+    def country(self):
+        return self.address.country
+
+    @country.setter
+    def country(self, value):
+        self.address = Address(self.place, Country(value),
+            self.address.coordinates)
+
+    @property
+    def place(self):
+        return self.address.place
+
+    @place.setter
+    def place(self, value):
+        self.address = Address(value, self.address.country,
+            self.address.coordinates)
+
+    @property
+    def hq_coords(self):
+        return self.address.coordinates
+
+    @hq_coords.setter
+    def hq_coords(self, value):
+        self.address = Address(self.place, self.country, value)
+
+    @property
+    def title(self):
+        return self._title
+
+    @title.setter
+    def title(self, value):
+        self._title = value.strip().title()
+
+
 
     def register_paraglider(self, person_id, glider, contest_number):
         paraglider_before = deepcopy(self._participants.get(person_id))
@@ -177,7 +212,7 @@ class Contest(AggregateRoot):
                 paragliders.add(key)
         all_contest_numbers_uniq = len(paragliders) == len(contest_numbers)
 
-        end_after_start = self.start_time < self.end_time
+        end_after_start = int(self.start_time) < int(self.end_time)
         return all_contest_numbers_uniq and end_after_start
 
     def _rollback_register_paraglider(self, paraglider_before, person_id):

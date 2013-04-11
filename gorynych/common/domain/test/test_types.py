@@ -39,10 +39,19 @@ class AddressTest(unittest.TestCase):
                                                                   -180.01))
 
     def test_coordinates(self):
-        types.Address('ss', 'de', (-89.999999, -180))
+        a1 = types.Address('ss', 'de', (-89.999999, -180))
+        self.assertEqual(a1.coordinates, (-89.999999, -180))
         types.Address('ss', 'de', (-89.999999, 180))
         types.Address('ss', 'de', (89.999999, 180))
         types.Address('ss', 'de', (89.999999, -180))
+
+    def test_country(self):
+        a = types.Address('ss', 'de', (0,0))
+        self.assertEqual(a.country, 'DE')
+
+    def test_place(self):
+        a = types.Address('ss', 'de', (0,0))
+        self.assertEqual(a.place, 'Ss')
 
 
 class CheckpointTest(unittest.TestCase):

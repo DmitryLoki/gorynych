@@ -39,6 +39,8 @@ class ContestFactoryTest(unittest.TestCase):
         cont = create_contest(contest.ContestID('ab'), 1, 2)
         self.assertIsInstance(cont.address, Address)
         self.assertEqual(cont.title, 'Hello World')
+        self.assertEqual(cont.country, 'RU')
+        self.assertEqual(cont.place, 'Yrupinsk')
         self.assertEquals((cont.start_time, cont.end_time), (1, 2))
         self.assertIsInstance(cont.event_publisher, mock.MagicMock)
         self.assertEqual(cont.id, contest.ContestID('ab'))
@@ -137,6 +139,20 @@ class ContestTest(unittest.TestCase):
         cont.change_times('10', '16')
         self.assertEqual((cont.start_time, cont.end_time), (10, 16))
         self.assertRaises(ValueError, cont.change_times, '10', '8')
+
+    def test_change_title(self):
+        cont = create_contest('cont1', 1, '15')
+        cont.title = '  hello moOn  '
+        self.assertEqual(cont.title, 'Hello Moon')
+
+    def test_change_address(self):
+        cont = create_contest('con1', 1, '15')
+        cont.place = 'Severodvinsk'
+        self.assertEqual(cont.place, 'Severodvinsk')
+        cont.country = 'tw'
+        self.assertEqual(cont.country, 'TW')
+        cont.hq_coords = (15, 0)
+        self.assertEqual(cont.hq_coords, (15, 0))
 
 
 class ContestTestWithRegisteredParagliders(unittest.TestCase):

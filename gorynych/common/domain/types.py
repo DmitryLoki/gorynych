@@ -42,7 +42,7 @@ class Country(ValueObject):
         if code:
             self._code = code[:2].upper()
         else:
-            raise ValueError("Country can't be set with null code.")
+            raise ValueError("Country can't be set without code.")
 
     def code(self):
         return self._code
@@ -51,14 +51,26 @@ class Country(ValueObject):
 class Address(ValueObject):
 
     def __init__(self, place, country, coordinates):
-        self.place = place.strip().capitalize()
+        self._place = place.strip().capitalize()
         if not isinstance(country, Country):
             country = Country(country)
-        self.country = country.code()
+        self._country = country
         self.lat = float(coordinates[0])
         self.lon = float(coordinates[1])
         if not (-90 < self.lat < 90 and -180 <= self.lon <= 180):
             raise ValueError("Coordinates not in their range or format.")
+
+    @property
+    def country(self):
+        return self._country.code()
+
+    @property
+    def coordinates(self):
+        return self.lat, self.lon
+
+    @property
+    def place(self):
+        return self._place
 
 
 class Checkpoint(ValueObject):

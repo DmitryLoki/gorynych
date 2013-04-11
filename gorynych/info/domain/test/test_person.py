@@ -8,9 +8,9 @@ from gorynych.info.domain.tracker import TrackerID
 from gorynych.info.domain.contest import ContestID
 
 def create_person(name='John', surname='Doe',
-                  country='UA', email='johndoe@example.com', reg_year=2012,
-                  reg_month=4,
-                  reg_day=1, event_publisher=None):
+                  country='UA', email='johndoe@example.com', reg_year=None,
+                  reg_month=None,
+                  reg_day=None, event_publisher=None):
     if not event_publisher:
         event_publisher = mock.MagicMock()
     factory = person.PersonFactory(event_publisher)
@@ -27,10 +27,21 @@ class PersonFactoryTest(unittest.TestCase):
 
         self.assertEqual(pers.name.full(), 'Harold Herzen')
         self.assertEqual(pers.country, 'DE')
-        self.assertEqual(pers.id, 'boss@gmail.com')
+        self.assertEqual(len(pers.id), 36)
+        self.assertEqual(pers.email, 'boss@gmail.com')
         self.assertEqual(pers.regdate, datetime.date(2012, 11, 30))
         self.assertIsInstance(pers.event_publisher, mock.MagicMock)
 
+
+    def test_good_init_without_regdate(self):
+        self.assertEqual(person.MINYEAR, 2012)
+        pers = create_person('Harold', 'Herzen', 'DE', 'boss@gmail.com')
+
+        self.assertEqual(pers.name.full(), 'Harold Herzen')
+        self.assertEqual(pers.country, 'DE')
+        self.assertEqual(len(pers.id), 36)
+        self.assertEqual(pers.regdate, datetime.date.today())
+        self.assertIsInstance(pers.event_publisher, mock.MagicMock)
 
     def test_bad_init(self):
         self.assertRaises(ValueError, create_person, 'Harold', 'Herzen',

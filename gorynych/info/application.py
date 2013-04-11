@@ -79,31 +79,40 @@ class TrackerService(Interface):
         '''
 
 def read_contest(cont):
-    return dict(title=cont.title, id=cont.id)
+    if cont:
+        return dict(contest_title = cont.title,
+                    contest_id = cont.id,
+                    contest_country_code = cont.country,
+                    contest_start_date = cont.start_time,
+                    contest_end_date = cont.end_time)
 
 def read_contest_list(cont_list):
-    result = []
-    for cont in cont_list:
-        result.append(dict(contest_id=cont.id, contest_title=cont.title,
-            start_time=cont.start_time, end_time=cont.end_time))
-    return result
+    if cont_list:
+        result = []
+        for cont in cont_list:
+            result.append(dict(contest_id=cont.id, contest_title=cont.title,
+                contest_start_time=cont.start_time,
+                contest_end_time=cont.end_time))
+        return result
 
 def read_person(pers):
-    if not pers:
-        return {}
-    return dict(person_name=pers.name.full(), person_tracker=pers.tracker,
-        person_id=pers.id)
+    if pers:
+        return dict(person_name=pers.name.full(),
+            person_id=pers.id)
 
 
 def read_person_list(pers_list):
-    result = []
-    for pers in pers_list:
-        result.append(dict(person_id=pers.id, person_name=pers.name))
-    return result
+    if pers_list:
+        result = []
+        for pers in pers_list:
+            result.append(dict(person_id=pers.id, person_name=pers.name.full()))
+        return result
 
 
 def read_race(race):
-    return dict(type=race.task.type, title=race.title, id=race.id)
+    if race:
+        return dict(race_type=race.task.type, race_title=race.title,
+            race_id=race.id)
 
 
 def read_paraglider_list(p_list):
@@ -137,7 +146,7 @@ class ApplicationService(Service):
         cont = self.contest_factory.create_contest(id,
             params['title'],
             params['start_time'], params['end_time'],
-            params['contest_place'], params['contest_country'],
+            params['place'], params['country'],
             params['hq_coords'])
 
         d = defer.succeed(cont)
@@ -159,15 +168,15 @@ class ApplicationService(Service):
             read_contest_list)
 
 
-    def get_contest(self, id):
+    def get_contest(self, params):
         '''
         Return contest by id.
-        @param id:
-        @type id:
+        @param params:
+        @type params: C{dict}
         @return: dictionary with contest data
         @rtype: C{Deffered}
         '''
-        d = defer.succeed(id)
+        d = defer.succeed(params['contest_id'])
         d.addCallback(persistence.get_repository(contest.IContestRepository).
                                                 get_by_id)
         d.addCallback(read_contest)
@@ -202,6 +211,9 @@ class ApplicationService(Service):
                 setattr(cont, param, params[param])
             return cont
 
+        if params.has_key('contest_id'):
+            params['id'] = params['contest_id']
+            del params['contest_id']
         return self._change_aggregate(params, contest.IContestRepository,
             change, read_contest)
 
@@ -218,8 +230,8 @@ class ApplicationService(Service):
         return d
 
 
-    def get_person(self, id):
-        d = defer.succeed(id)
+    def get_person(self, params):
+        d = defer.succeed(params['person_id'])
         d.addCallback(persistence.get_repository(person.IPersonRepository).
                                                 get_by_id)
         d.addCallback(read_person)
@@ -242,6 +254,9 @@ class ApplicationService(Service):
             if params.get('country'):
                 pers.country = params['country']
             return pers
+        if params.has_key('person_id'):
+            params['id'] = params['person_id']
+            del params['person_id']
         return self._change_aggregate(params, person.IPersonRepository,
             change, read_person)
 
@@ -257,6 +272,36 @@ class ApplicationService(Service):
         return d
 
 
+    def get_contest_races(self, params):
+        '''
+        Return list of races for contests
+        @param params:
+        @type params:
+        @return:
+        @rtype:
+        '''
+
+
+    def get_race(self, params):
+        '''
+        Return info about concrete race.
+        @param params:
+        @type params:
+        @return:
+        @rtype:
+        '''
+
+
+    def change_race(self, params):
+        '''
+        Change race information.
+        @param params:
+        @type params:
+        @return:
+        @rtype:
+        '''
+
+
     def register_paraglider_on_contest(self, params):
         d = defer.succeed(params['contest_id'])
         d.addCallback(persistence.get_repository(contest.IContestRepository)
@@ -268,11 +313,31 @@ class ApplicationService(Service):
         return d
 
 
+    def get_race_paragliders(self, params):
+        '''
+        Return list with race paragliders.
+        @param params:
+        @type params:
+        @return:
+        @rtype:
+        '''
+
+
+    def change_paraglider(self, params):
+        '''
+        Change paraglider information either for race or contest.
+        @param params:
+        @type params:
+        @return:
+        @rtype:
+        '''
+
+
     def _change_aggregate(self, params, repo_interface, change_func,
                           read_func):
         id = params.get('id')
         if not id:
-            raise ValueError("No contest id has been received.")
+            raise ValueError("Aggregate's id hasn't been received.")
         del params['id']
 
         d = defer.succeed(id)

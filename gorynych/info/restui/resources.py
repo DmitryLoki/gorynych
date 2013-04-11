@@ -94,7 +94,7 @@ class APIResource(resource.Resource):
 
     def getChild(self, path, request):
         """
-        Dinamically return new child.
+        Dynamically return new child.
         @param path:
         @type path:
         @param request:
@@ -111,8 +111,11 @@ class APIResource(resource.Resource):
                 return self
         for key in self.tree.keys():
             if re.search(key, path):
-                return getattr(self.tree[key]['package'],
-                    self.tree[key]['leaf'])(self.tree[key]['tree'], self.service)
+                res = getattr(self.tree[key]['package'],self.tree[key]['leaf'])
+                res_tree = self.tree[key].get('tree')
+                if not res_tree:
+                    res.isLeaf = 1
+                return res(res_tree, self.service)
         return resource.NoResource()
 
 
@@ -363,6 +366,5 @@ class PersonResource(APIResource):
     '''
     /person/{id} resource
     '''
-    isLeaf = 1
     service_command = dict(GET='get_person', PUT='change_person')
     name = 'person'

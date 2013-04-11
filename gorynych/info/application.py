@@ -98,7 +98,7 @@ def read_contest_list(cont_list):
 def read_person(pers):
     if pers:
         return dict(person_name=pers.name.full(),
-            person_id=pers.id)
+            person_id=pers.id, person_country=pers.country)
 
 
 def read_person_list(pers_list):

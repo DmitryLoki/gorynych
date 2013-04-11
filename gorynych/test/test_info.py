@@ -62,9 +62,10 @@ class ContestRESTAPITest(unittest.TestCase):
         '''
         self.skipTest("I'm lazy and don't want to clean repository.")
         r = requests.get(self.url)
+        self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json(), {})
 
-    def test_1_get_empty_contest(self):
+    def test_1_get_fake_contest(self):
         '''
         Here I suppose that there is no resource with such id.
         '''
@@ -94,6 +95,46 @@ class ContestRESTAPITest(unittest.TestCase):
         result = r2.json()
         self.assertEqual(result['title'], 'Best Contest Changed')
         self.assertEqual(result['country'], 'MC')
+
+
+class PersonAPITest(unittest.TestCase):
+    url = 'http://localhost:8085/person/'
+    def test_1_get_no_persons(self):
+        self.skipTest("I'm lazy and don't want to clean repository.")
+        r = requests.get(self.url)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json(), {})
+
+    def test_1_get_fake_person(self):
+        r = requests.get(self.url+'/1-1-1-1')
+        self.assertEqual(r.status_code, 404)
+
+    def test_2_create_person(self):
+        params = dict(name='Vasylyi', surname='Doe', country='SS',
+            email='vasya@example.com', reg_date='2012,12,12')
+        r = requests.post(self.url, data=params)
+        result = r.json()
+        self.assertEqual(r.status_code, 201)
+        r2 = requests.get(self.url+result['id'])
+        self.assertEqual(r2.json()['id'], result['id'])
+
+    def test_3_get_person(self):
+        r = requests.get(self.url)
+        p_id = r.json()[0]['id']
+        r2 = requests.get(self.url + p_id)
+        self.assertEqual(r2.status_code, 200)
+        self.assertEqual(r2.json()['id'], p_id)
+
+    def test_3_change_person(self):
+        r = requests.get(self.url)
+        p_id = r.json()[0]['id']
+        params = json.dumps(dict(name="Juan", surname="CarlOs",
+            country="MEXICO!"))
+        r2 = requests.put(self.url + p_id, data=params)
+        result = r2.json()
+        self.assertEqual(r2.status_code, 200)
+        self.assertEqual(result['name'], 'Juan Carlos')
+        self.assertEqual(result['country'], 'ME')
 
 
 if __name__ == '__main__':

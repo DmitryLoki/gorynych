@@ -268,7 +268,10 @@ class APIResourceTest(unittest.TestCase):
             'race': {'leaf': 'SomeResource',
                      'package': __import__('test_resources',
                      globals={"__name__": __name__}),
-                     'tree': 1}, }
+                     'tree': 1},
+            'no_tree': {'leaf': 'SomeResource',
+                 'package': __import__('test_resources',
+                     globals={"__name__": __name__})}}
         self.api_resource = APIResource(self.tree_, 'service')
 
 
@@ -287,6 +290,11 @@ class APIResourceTest(unittest.TestCase):
         self.assertEqual(some_result.service, 'service')
 
         self.assertIsInstance(some_result.getChild('', 1), SomeResource)
+
+    def test_get_child_without_tree(self):
+        some_result = self.api_resource.getChild('no_tree', 'hi')
+        self.assertIsInstance(some_result, SomeResource)
+        self.assertTrue(some_result.isLeaf)
 
     def test_regexp_child(self):
         self.assertIsInstance(self.api_resource.getChild('axe2-fsb3-32a', 1),

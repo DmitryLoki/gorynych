@@ -145,6 +145,15 @@ class ContestTest(unittest.TestCase):
         cont.title = '  hello moOn  '
         self.assertEqual(cont.title, 'Hello Moon')
 
+    def test_change_address(self):
+        cont = create_contest('con1', 1, '15')
+        cont.place = 'Severodvinsk'
+        self.assertEqual(cont.place, 'Severodvinsk')
+        cont.country = 'tw'
+        self.assertEqual(cont.country, 'TW')
+        cont.hq_coords = (15, 0)
+        self.assertEqual(cont.hq_coords, (15, 0))
+
 
 class ContestTestWithRegisteredParagliders(unittest.TestCase):
 

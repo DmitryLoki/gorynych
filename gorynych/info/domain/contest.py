@@ -153,9 +153,27 @@ class Contest(AggregateRoot):
     def country(self):
         return self.address.country
 
+    @country.setter
+    def country(self, value):
+        self.address = Address(self.place, Country(value),
+            self.address.coordinates)
+
     @property
     def place(self):
         return self.address.place
+
+    @place.setter
+    def place(self, value):
+        self.address = Address(value, self.address.country,
+            self.address.coordinates)
+
+    @property
+    def hq_coords(self):
+        return self.address.coordinates
+
+    @hq_coords.setter
+    def hq_coords(self, value):
+        self.address = Address(self.place, self.country, value)
 
     @property
     def title(self):

@@ -87,13 +87,13 @@ class ContestRESTAPITest(unittest.TestCase):
     def test_3_change_contest(self):
         r = requests.get(self.url)
         cont_id = r.json()[0]["id"]
-        params = json.dumps(dict(title='besT Contest changed  ', end_time=15))
+        params = json.dumps(dict(title='besT Contest changed  ',
+            start_time=11, end_time=15, place='Paris', country='mc',
+            coords='42.3,11.3'))
         r2 = requests.put(self.url + cont_id, data=params)
         result = r2.json()
         self.assertEqual(result['title'], 'Best Contest Changed')
-        bad_params = json.dumps({'place': 'Paris'})
-        r3 = requests.put(self.url + cont_id, data=bad_params)
-        self.assertEqual(r3.status_code, 500)
+        self.assertEqual(result['country'], 'MC')
 
 
 if __name__ == '__main__':

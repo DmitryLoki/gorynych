@@ -354,6 +354,24 @@ class ApplicationService(Service):
         @return:
         @rtype:
         '''
+        def change(cont):
+            allowed_changes = ['glider', 'contest_number']
+            for item in allowed_changes:
+                if params.has_key(item):
+                    cont.change_participant_data(person_id, **params)
+            return cont
+
+        person_id = params['person_id']
+        del params['person_id'] # yes, this is necessary
+
+        d = defer.succeed(params['contest_id'])
+        d.addCallback(persistence.get_repository(contest.IContestRepository)
+            .get_by_id)
+        d.addCallback(change)
+        d.addCallback(persistence.get_repository(contest.IContestRepository)
+            .save)
+        d.addCallback(read_contest_paraglider, person_id)
+        return d
 
 
     def _change_aggregate(self, params, repo_interface, change_func,

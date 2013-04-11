@@ -12,11 +12,11 @@ contest:
       leaf: ContestResource
       package: *gorynych
       tree:
-        paraglider: &paraglider
+        paraglider:
           leaf: ContestParagliderResourceCollection
           package: *gorynych
           tree:
-            paraglider_id(replace this):
+            *uuid:
               leaf: ContestParagliderResource
               package: *gorynych
         race:
@@ -26,7 +26,6 @@ contest:
             *uuid:
               leaf: RaceResource
               package: *gorynych
-              tree: *paraglider
 person:
   leaf: PersonResourceCollection
   package: *gorynych

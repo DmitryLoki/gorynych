@@ -249,7 +249,7 @@ class APIResource(resource.Resource):
         # to se in result {'contest': some_id} but want to see
         # {'contest_id': some_id}.
         maps = {'contest': 'contest_id', 'person': 'person_id',
-                'race': 'race_id'}
+                'race': 'race_id', 'paraglider': 'person_id'}
 
         result = dict()
         if req.method == "PUT":
@@ -352,7 +352,7 @@ class ContestParagliderResource(APIResource):
     /contest/{id}/paraglider/{id}
     '''
     service_command = dict(PUT='change_paraglider')
-    name = 'race_paraglider'
+    name = 'contest_paraglider_collection'
 
 
 class PersonResourceCollection(APIResource):

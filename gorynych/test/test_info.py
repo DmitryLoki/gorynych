@@ -27,7 +27,7 @@ class ContestRESTAPITest(unittest.TestCase):
         '''
         Here I suppose that contest repository is empty.
         '''
-        self.skipTest("I'm lazy and don't want to clean repository.")
+#        self.skipTest("I'm lazy and don't want to clean repository.")
         r = requests.get(self.url)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json(), {})
@@ -121,6 +121,15 @@ class ParaglidersTest(unittest.TestCase):
         result = r.json()
         return result['id']
 
+    def _find_contest_with_paraglider(self):
+        contest_list = requests.get(self.url + '/contest')
+        for cont in contest_list.json():
+            r = requests.get('/'.join((self.url, 'contest', cont['id'],
+                'paraglider')))
+            paragliders_list = r.json()
+            if paragliders_list:
+                return cont['id'], paragliders_list[0]['person_id']
+
     def test_1_register_paragliders(self):
         try:
             cont_id = self._create_contest()
@@ -149,6 +158,19 @@ class ParaglidersTest(unittest.TestCase):
         self.assertTrue(result2.has_key('glider'))
         self.assertTrue(result2.has_key('contest_number'))
         self.assertTrue(result2.has_key('person_id'))
+
+    def test_2_change_paraglider(self):
+        cont_id, p_id = self._find_contest_with_paraglider()
+        if not cont_id and not p_id:
+            raise unittest.SkipTest("Can't test without contest and "
+                                    "paraglider.")
+        params = json.dumps(dict(glider='marlboro', contest_number='13'))
+        r = requests.put('/'.join((self.url, 'contest', cont_id,
+                                   'paraglider', p_id)), data=params)
+        self.assertEqual(r.status_code, 200)
+        result = r.json()
+        self.assertEqual(result['contest_number'], '13')
+        self.assertEqual(result['glider'], 'marlboro')
 
 
 

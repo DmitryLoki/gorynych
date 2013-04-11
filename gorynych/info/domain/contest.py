@@ -189,7 +189,6 @@ class Contest(AggregateRoot):
         self._title = value.strip().title()
 
 
-
     def register_paraglider(self, person_id, glider, contest_number):
         paraglider_before = deepcopy(self._participants.get(person_id))
 

@@ -143,10 +143,15 @@ class Contest(AggregateRoot):
 
     @property
     def paragliders(self):
-        result = []
+        '''
+        Registered paragliders.
+        @return: list with zero or more L{Person}.
+        @rtype: C{dict}
+        '''
+        result = dict()
         for key in self._participants.keys():
             if self._participants[key]['role'] == 'paraglider':
-                result.append(self._participants[key])
+                result[key] = self._participants[key]
         return result
 
     @property
@@ -182,7 +187,6 @@ class Contest(AggregateRoot):
     @title.setter
     def title(self, value):
         self._title = value.strip().title()
-
 
 
     def register_paraglider(self, person_id, glider, contest_number):

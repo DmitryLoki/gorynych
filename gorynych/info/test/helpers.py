@@ -53,15 +53,15 @@ class BaseRepository(object):
 
 class PickleContestRepository(BaseRepository):
     implements(IContestRepository)
-    def find_the_same(self, obj, obj_list):
-        for item in obj_list:
-            c1 = item.title == obj.title
-            c2 = item.start_time == obj.start_time
-            c3 = item.end_time == obj.end_time
-            c4 = item.country == obj.country
-            c5 = item.place == obj.place
-            if c1 and c2 and c3 and c4 and c5:
-                return item
+#    def find_the_same(self, obj, obj_list):
+#        for item in obj_list:
+#            c1 = item.title == obj.title
+#            c2 = item.start_time == obj.start_time
+#            c3 = item.end_time == obj.end_time
+#            c4 = item.country == obj.country
+#            c5 = item.place == obj.place
+#            if c1 and c2 and c3 and c4 and c5:
+#                return item
 
 class PickleRaceRepository(BaseRepository):
     implements(IRaceRepository)

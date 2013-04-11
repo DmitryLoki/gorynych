@@ -118,6 +118,23 @@ def read_race(race):
 def read_paraglider_list(p_list):
     pass
 
+def read_contest_paraglider(cont, par_id):
+    if cont and par_id and cont.paragliders:
+        result = dict()
+        result['person_id'] = par_id
+        result['contest_number'] = cont.paragliders[par_id]['contest_number']
+        result['glider'] = cont.paragliders[par_id]['glider']
+        return result
+
+def read_contest_paraglider_list(p_dicts):
+    if p_dicts:
+        result = []
+        for person_id in p_dicts:
+            result.append(dict(person_id=person_id,
+                glider=p_dicts[person_id]['glider'],
+                contest_number=str(p_dicts[person_id]['contest_number'])))
+        return result
+
 
 class ApplicationService(Service):
 
@@ -309,11 +326,11 @@ class ApplicationService(Service):
         d.addCallback(lambda cont: cont.register_paraglider(
             params['person_id'], params['glider'], params['contest_number']))
         d.addCallback(persistence.get_repository(contest.IContestRepository)                                                .save)
-        d.addCallback(lambda _: None)
+        d.addCallback(read_contest_paraglider, params['person_id'])
         return d
 
 
-    def get_race_paragliders(self, params):
+    def get_contest_paragliders(self, params):
         '''
         Return list with race paragliders.
         @param params:
@@ -321,6 +338,12 @@ class ApplicationService(Service):
         @return:
         @rtype:
         '''
+        d = defer.succeed(params['contest_id'])
+        d.addCallback(persistence.get_repository(contest.IContestRepository).
+            get_by_id)
+        d.addCallback(lambda cont: cont.paragliders)
+        d.addCallback(read_contest_paraglider_list)
+        return d
 
 
     def change_paraglider(self, params):
@@ -331,6 +354,24 @@ class ApplicationService(Service):
         @return:
         @rtype:
         '''
+        def change(cont):
+            allowed_changes = ['glider', 'contest_number']
+            for item in allowed_changes:
+                if params.has_key(item):
+                    cont.change_participant_data(person_id, **params)
+            return cont
+
+        person_id = params['person_id']
+        del params['person_id'] # yes, this is necessary
+
+        d = defer.succeed(params['contest_id'])
+        d.addCallback(persistence.get_repository(contest.IContestRepository)
+            .get_by_id)
+        d.addCallback(change)
+        d.addCallback(persistence.get_repository(contest.IContestRepository)
+            .save)
+        d.addCallback(read_contest_paraglider, person_id)
+        return d
 
 
     def _change_aggregate(self, params, repo_interface, change_func,

@@ -205,19 +205,23 @@ class ContestParagliderRaceTest(unittest.TestCase):
         self.aps.register_paraglider_on_contest(dict(
             contest_id=self.cont_id, glider='gin', contest_number='1',
             person_id=self.p1_id))
-        self.assertEqual(len(cont.paragliders), 1, "Paraglider is duplicated"
-                                                   " on registration.")
+        self.assertEqual(len(cont.paragliders), 1)
 
         d = self.aps.register_paraglider_on_contest(dict(
             contest_id=self.cont_id, glider='gin', contest_number='1',
             person_id=self.p2_id))
-        self.assertFailure(d, ValueError)
+        self.assertFailure(d, ValueError, "Contest numbers are not uniq!")
 
         self.aps.register_paraglider_on_contest(dict(
             contest_id=self.cont_id, glider='gin', contest_number='2',
             person_id=self.p2_id))
         self.assertEqual(len(cont.paragliders), 2, "Can't register another "
                                                    "paraglider.")
+
+        paragliders_list = self.aps.get_contest_paragliders(dict
+            (contest_id=self.cont_id)).result
+        self.assertTrue({'person_id': self.p1_id, 'glider': 'gin',
+                         'contest_number': '1'} in paragliders_list)
 
 
     @mock.patch('gorynych.common.infrastructure.persistence.get_repository')

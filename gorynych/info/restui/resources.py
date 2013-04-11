@@ -337,16 +337,16 @@ class RaceResource(APIResource):
     name = 'contest_race'
 
 
-class ParagliderResourceCollection(APIResource):
+class ContestParagliderResourceCollection(APIResource):
     '''
     Resource /contest/{id}/race/{id}/paraglider
     '''
     service_command = dict(POST='register_paraglider_on_contest',
-        GET='get_race_paragliders')
-    name = 'race_paraglider_collection'
+        GET='get_contest_paragliders')
+    name = 'contest_paraglider_collection'
 
 
-class ParagliderResource(APIResource):
+class ContestParagliderResource(APIResource):
     '''
     Resource /contest/{id}/race/{id}/paraglider/{id} or
     /contest/{id}/paraglider/{id}

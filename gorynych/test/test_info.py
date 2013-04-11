@@ -121,7 +121,7 @@ class ParaglidersTest(unittest.TestCase):
         result = r.json()
         return result['id']
 
-    def test_register_paragliders(self):
+    def test_1_register_paragliders(self):
         try:
             cont_id = self._create_contest()
             pers_id = self._create_persons()
@@ -134,12 +134,21 @@ class ParaglidersTest(unittest.TestCase):
             contest_number='666')
         r = requests.post('/'.join((self.url, 'contest', cont_id,
                                     'paraglider')), data=params)
-        print r.text
         self.assertEqual(r.status_code, 201)
         result = r.json()
         self.assertEqual(result['person_id'], pers_id)
         self.assertEqual(result['glider'], 'garlem')
         self.assertEqual(result['contest_number'], '666')
+
+        # test get paragliders. it's supposed to be in separate testcase,
+        # but I'm lazy to know how to store this cont_id.
+        r2 = requests.get('/'.join((self.url, 'contest', cont_id,
+                                    'paraglider')))
+        self.assertEqual(r2.status_code, 200)
+        result2 = r2.json()[0]
+        self.assertTrue(result2.has_key('glider'))
+        self.assertTrue(result2.has_key('contest_number'))
+        self.assertTrue(result2.has_key('person_id'))
 
 
 

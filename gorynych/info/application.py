@@ -126,6 +126,16 @@ def read_contest_paraglider(cont, par_id):
         result['glider'] = cont.paragliders[par_id]['glider']
         return result
 
+def read_contest_paraglider_list(p_dicts):
+    if p_dicts:
+        result = []
+        for person_id in p_dicts:
+            result.append(dict(person_id=person_id,
+                glider=p_dicts[person_id]['glider'],
+                contest_number=str(p_dicts[person_id]['contest_number'])))
+        return result
+
+
 class ApplicationService(Service):
 
     def __init__(self, event_publisher=None):
@@ -320,7 +330,7 @@ class ApplicationService(Service):
         return d
 
 
-    def get_race_paragliders(self, params):
+    def get_contest_paragliders(self, params):
         '''
         Return list with race paragliders.
         @param params:
@@ -328,6 +338,12 @@ class ApplicationService(Service):
         @return:
         @rtype:
         '''
+        d = defer.succeed(params['contest_id'])
+        d.addCallback(persistence.get_repository(contest.IContestRepository).
+            get_by_id)
+        d.addCallback(lambda cont: cont.paragliders)
+        d.addCallback(read_contest_paraglider_list)
+        return d
 
 
     def change_paraglider(self, params):

@@ -5,6 +5,7 @@ from twisted.application import internet, service
 from twisted.web import server
 
 from gorynych.info.application import ApplicationService
+from gorynych.common.infrastructure.messaging import DomainEventsPublisher
 from gorynych.info.restui import resources
 from gorynych.info.domain.contest import IContestRepository
 from gorynych.info.domain.race import IRaceRepository
@@ -24,7 +25,7 @@ persistence.register_repository(IPersonRepository, PicklePersonRepository
 application = service.Application('Gorynych Info System')
 
 
-app_service = ApplicationService()
+app_service = ApplicationService(DomainEventsPublisher())
 s_collection = service.IServiceCollection(application)
 
 app_service.setServiceParent(s_collection)

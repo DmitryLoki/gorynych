@@ -154,6 +154,7 @@ class PersonServiceTest(ApplicationServiceTestCase):
         self.assertIsNone(result)
 
 
+@mock.patch('gorynych.common.infrastructure.persistence.get_repository')
 class ContestParagliderRaceTest(unittest.TestCase):
     def setUp(self):
         from gorynych.info.domain.tracker import TrackerID
@@ -189,25 +190,27 @@ class ContestParagliderRaceTest(unittest.TestCase):
         gc.collect()
 
 
-    @mock.patch('gorynych.common.infrastructure.persistence.get_repository')
     def test_register_paraglider(self, patched):
         patched.return_value = self.repository
-        self.aps.register_paraglider_on_contest(dict(
+        result = self.aps.register_paraglider_on_contest(dict(
             contest_id=self.cont_id, glider='gin', contest_number='1',
-            person_id=self.p1_id))
+            person_id=self.p1_id)).result
         cont = self.repository.get_by_id(self.cont_id)
         self.assertEqual(len(cont.paragliders), 1)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result['glider'], 'gin')
+        self.assertEqual(result['contest_number'], 1)
+        self.assertTrue(result.has_key('person_id'))
 
         self.aps.register_paraglider_on_contest(dict(
             contest_id=self.cont_id, glider='gin', contest_number='1',
             person_id=self.p1_id))
-        self.assertEqual(len(cont.paragliders), 1, "Paraglider is duplicated"
-                                                   " on registration.")
+        self.assertEqual(len(cont.paragliders), 1)
 
         d = self.aps.register_paraglider_on_contest(dict(
             contest_id=self.cont_id, glider='gin', contest_number='1',
             person_id=self.p2_id))
-        self.assertFailure(d, ValueError)
+        self.assertFailure(d, ValueError, "Contest numbers are not uniq!")
 
         self.aps.register_paraglider_on_contest(dict(
             contest_id=self.cont_id, glider='gin', contest_number='2',
@@ -215,8 +218,39 @@ class ContestParagliderRaceTest(unittest.TestCase):
         self.assertEqual(len(cont.paragliders), 2, "Can't register another "
                                                    "paraglider.")
 
+        paragliders_list = self.aps.get_contest_paragliders(dict
+            (contest_id=self.cont_id)).result
+        self.assertTrue({'person_id': self.p1_id, 'glider': 'gin',
+                         'contest_number': '1'} in paragliders_list)
 
-    @mock.patch('gorynych.common.infrastructure.persistence.get_repository')
+    def test_change_paraglider(self, patched):
+        patched.return_value = self.repository
+        try:
+            self.aps.register_paraglider_on_contest(dict(
+                contest_id=self.cont_id, glider='gin', contest_number='1',
+                person_id=self.p1_id))
+        except Exception:
+            raise unittest.SkipTest("Paraglider need to be registered for "
+                                    "this test.")
+        result = self.aps.change_paraglider(dict(contest_id=self.cont_id,
+            person_id=self.p1_id, glider='very cool glider',
+            contest_number='1986')).result
+
+        # Check is everything correct in persistence store.
+        cont = self.repository.get_by_id(self.cont_id)
+        paraglider = cont.paragliders[self.p1_id]
+        self.assertEqual(paraglider['glider'], 'very',
+            "Paraglider wasn't changed correctly.")
+        self.assertEqual(paraglider['contest_number'], 1986,
+            "Paraglider wasn't changed correctly.")
+
+        # Check correct return.
+        self.assertEqual(result['glider'], 'very',
+            "Paraglider wasn't returned correctly.")
+        self.assertEqual(result['contest_number'], 1986,
+            "Paraglider wasn't returned correctly.")
+
+
     def test_create_new_race(self, patched):
         patched.return_value = self.repository
         self.aps.register_paraglider_on_contest(dict(

@@ -4,6 +4,7 @@ Contest Aggregate.
 import uuid
 from copy import deepcopy
 
+import pytz
 from zope.interface.interfaces import Interface
 
 from gorynych.common.domain.model import IdentifierObject, AggregateRoot
@@ -46,15 +47,17 @@ class ContestFactory(object):
         self.event_publisher = event_publisher
 
     def create_contest(self, id, title, start_time, end_time,
-                       contest_place, contest_country, hq_coords):
+                       contest_place, contest_country, hq_coords, timezone):
         address = Address(contest_place, contest_country, hq_coords)
         if not int(start_time) <  int(end_time):
             raise ValueError("Start time must be less then end time.")
         if not isinstance(id, ContestID):
             id = ContestID(id)
-
+        if not timezone in pytz.all_timezones_set:
+            raise pytz.exceptions.UnknownTimeZoneError("Wrong timezone.")
         contest = Contest(id, start_time, end_time, address)
         contest.title = title
+        contest.timezone = timezone
         if self.event_publisher:
             contest.event_publisher = self.event_publisher
         return contest
@@ -75,11 +78,33 @@ class Contest(AggregateRoot):
     def __init__(self, id, start_time, end_time, address):
         self.id = id
         self._title = ''
+        self._timezone = ''
         self._start_time = start_time
         self._end_time = end_time
         self.address = address
         self._participants = dict()
         self.race_ids = list()
+
+    @property
+    def timezone(self):
+        '''
+        @return: full name of time zone in which contest take place (
+        Europe/Moscow).
+        @rtype: C{str}
+        '''
+        return self._timezone
+
+    @timezone.setter
+    def timezone(self, value):
+        '''
+        This is a blocking function! It read a file in usual blocking mode
+        and it's better to wrap result in maybeDeferred.
+
+        @param value: time zone full name
+        @type value: C{str}
+        '''
+        if value in pytz.all_timezones_set:
+            self._timezone = value
 
     @property
     def start_time(self):

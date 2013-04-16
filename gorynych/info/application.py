@@ -164,7 +164,7 @@ class ApplicationService(Service):
             params['title'],
             params['start_time'], params['end_time'],
             params['place'], params['country'],
-            params['hq_coords'])
+            params['hq_coords'], params['timezone'])
 
         d = defer.succeed(cont)
         d.addCallback(persistence.get_repository(contest.IContestRepository)

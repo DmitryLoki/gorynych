@@ -4,8 +4,8 @@ import gc
 import mock
 
 from shapely.geometry import Point
+from pytz.exceptions import UnknownTimeZoneError
 
-from zope.interface import implements
 from twisted.trial import unittest
 from twisted.internet import defer
 
@@ -64,10 +64,15 @@ class ContestServiceTest(ApplicationServiceTestCase):
         patched.return_value = self.repository
         d = self.cs.create_new_contest(dict(title='hoi', start_time=1,
             end_time=2, place='Боливия', country='RU',
-            hq_coords=[12.3, 42.9]))
+            hq_coords=[12.3, 42.9], timezone='Europe/Moscow'))
         cont1 = d.result
-        self.assertEqual(cont1['contest_title'], 'Hoi')
-        self.assertEqual(len(cont1['contest_id']), 36)
+        self.assertEqual(cont1['contest_title'], 'Hoi', "Bad return")
+        self.assertEqual(len(cont1['contest_id']), 36, "Bad return")
+        saved_result = self.repository.get_by_id(cont1['contest_id'])
+        self.assertEqual(saved_result.title, 'Hoi',
+                         "Bad contest storing.")
+        self.assertEqual(saved_result.timezone, 'Europe/Moscow',
+                         "Bad contest storing.")
 
         cont2 = self.cs.get_contest({'contest_id': cont1['contest_id']}
                 ).result
@@ -77,7 +82,11 @@ class ContestServiceTest(ApplicationServiceTestCase):
         self.assertEqual(cont2['contest_id'], cont_list[0]['contest_id'])
 
         new_cont = self.cs.change_contest(dict(contest_id=cont1['contest_id'],
-            title='A', start_time=2, end_time='6')).result
+            title='A', start_time=2, end_time='6',
+            timezone='Canada/Eastern')).result
+        saved_result = self.repository.get_by_id(cont1['contest_id'])
+        self.assertEqual(saved_result.timezone, 'Canada/Eastern',
+                         "Timezone hasn't been changed.")
         self.assertEqual(new_cont['contest_title'], 'A')
         self.assertEqual(self.repository.get_by_id(cont1['contest_id']
                 ).title, 'A')
@@ -87,18 +96,28 @@ class ContestServiceTest(ApplicationServiceTestCase):
         patched.return_value = BadContestRepository()
         d = self.cs.create_new_contest(dict(title='hoi', start_time=3,
             end_time=5, place='Боливия', country='RU',
-            hq_coords=[12.3, 42.9]))
+            hq_coords=[12.3, 42.9], timezone='Europe/Moscow'))
         self.assertFailure(d, IndentationError)
 
 
-    def test_bad_contest_creation(self, patched):
+    def test_wront_times_in_contest_creation(self, patched):
         patched.return_value = self.repository
         d = defer.Deferred()
         d.addCallback(self.cs.create_new_contest)
         d.callback(dict(title='hoi', start_time=3, end_time=2,
             place='Боливия', country='RU',
-            hq_coords=[12.3, 42.9]))
-        self.assertFailure(d, ValueError)
+            hq_coords=[12.3, 42.9], timezone='1'))
+        self.assertFailure(d, ValueError, "Time invariants wasn't checked.")
+
+    def test_wront_timezone_in_contest_creation(self, patched):
+        patched.return_value = self.repository
+        d = defer.Deferred()
+        d.addCallback(self.cs.create_new_contest)
+        d.callback(dict(title='hoi', start_time=1, end_time=2,
+                        place='Боливия', country='RU',
+                        hq_coords=[12.3, 42.9], timezone='1'))
+        self.assertFailure(d, UnknownTimeZoneError,
+                           "Time invariants wasn't checked.")
 
 
     def test_read_contest(self, patched):
@@ -169,7 +188,7 @@ class ContestParagliderRaceTest(unittest.TestCase):
             patched.return_value = self.repository
             c = self.aps.create_new_contest(dict(title='hoi', start_time=1,
                 end_time=2, place='Боливия', country='RU',
-                hq_coords=[12.3, 42.9])).result
+                hq_coords=[12.3, 42.9], timezone='Europe/Moscow')).result
             p1 = self.aps.create_new_person(dict(name='Vasya', surname='Doe',
                 country='QQ', email='vas@example.com',
                 reg_date='2012,12,21')).result

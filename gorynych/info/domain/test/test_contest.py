@@ -9,10 +9,11 @@ from gorynych.info.domain.tracker import TrackerID
 from gorynych.info.domain.race import RaceID
 
 def create_contest(id, start_time, end_time, title='  Hello world  ',
-                   place='Yrupinsk', country='rU', coords=(45.23, -23.22)):
+                   place='Yrupinsk', country='rU', coords=(45.23, -23.22),
+                   timezone='Europe/Moscow'):
     factory = contest.ContestFactory(mock.MagicMock())
     cont = factory.create_contest(id, title, start_time, end_time, place,
-        country, coords)
+        country, coords, timezone)
     return cont
 
 
@@ -40,6 +41,7 @@ class ContestFactoryTest(unittest.TestCase):
         self.assertIsInstance(cont.address, Address)
         self.assertEqual(cont.title, 'Hello World')
         self.assertEqual(cont.country, 'RU')
+        self.assertEqual(cont.timezone, 'Europe/Moscow')
         self.assertEqual(cont.place, 'Yrupinsk')
         self.assertEquals((cont.start_time, cont.end_time), (1, 2))
         self.assertIsInstance(cont.event_publisher, mock.MagicMock)

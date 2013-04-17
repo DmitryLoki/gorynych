@@ -78,61 +78,69 @@ class TrackerService(Interface):
         @rtype:
         '''
 
+
 def read_contest(cont):
     if cont:
-        return dict(contest_title = cont.title,
-                    contest_id = cont.id,
-                    contest_country_code = cont.country,
-                    contest_start_date = cont.start_time,
-                    contest_end_date = cont.end_time)
+        return dict(contest_title=cont.title,
+                    contest_id=cont.id,
+                    contest_country_code=cont.country,
+                    contest_start_date=cont.start_time,
+                    contest_end_date=cont.end_time)
+
 
 def read_contest_list(cont_list):
     if cont_list:
         result = []
         for cont in cont_list:
-            result.append(dict(contest_id=cont.id, contest_title=cont.title,
-                contest_start_time=cont.start_time,
-                contest_end_time=cont.end_time))
+            result.append(dict(contest_id=cont.id,
+                               contest_title=cont.title,
+                               contest_start_time=cont.start_time,
+                               contest_end_time=cont.end_time))
         return result
+
 
 def read_person(pers):
     if pers:
         return dict(person_name=pers.name.full(),
-            person_id=pers.id, person_country=pers.country)
+                    person_id=pers.id,
+                    person_country=pers.country)
 
 
 def read_person_list(pers_list):
     if pers_list:
         result = []
         for pers in pers_list:
-            result.append(dict(person_id=pers.id, person_name=pers.name.full()))
+            result.append(dict(person_id=pers.id,
+                               person_name=pers.name.full()))
         return result
 
 
 def read_race(race):
     if race:
-        return dict(race_type=race.task.type, race_title=race.title,
-            race_id=race.id)
+        return dict(race_type=race.task.type,
+                    race_title=race.title,
+                    race_id=race.id)
 
 
 def read_paraglider_list(p_list):
     pass
 
+
 def read_contest_paraglider(cont, par_id):
     if cont and par_id and cont.paragliders:
-        result = dict()
-        result['person_id'] = par_id
-        result['contest_number'] = cont.paragliders[par_id]['contest_number']
-        result['glider'] = cont.paragliders[par_id]['glider']
-        return result
+        return dict(person_id=par_id,
+                    contest_number=cont.paragliders[par_id]['contest_number'],
+                    glider=cont.paragliders[par_id]['glider'])
+
 
 def read_contest_paraglider_list(p_dicts):
     if p_dicts:
         result = []
         for person_id in p_dicts:
             result.append(dict(person_id=person_id,
-                glider=p_dicts[person_id]['glider'],
-                contest_number=str(p_dicts[person_id]['contest_number'])))
+                               glider=p_dicts[person_id]['glider'],
+                               contest_number=str(p_dicts[person_id][
+                                   'contest_number'])))
         return result
 
 
@@ -142,13 +150,12 @@ class ApplicationService(Service):
         self.event_publisher = event_publisher
 
     def startService(self):
-        self.contest_factory = contest.ContestFactory(self.event_publisher)
         Service.startService(self)
 
     def stopService(self):
         Service.stopService(self)
 
-
+############## Contest Service part #############
     def create_new_contest(self, params):
         '''
         Create totally new contest, save it to repository and return dict
@@ -160,18 +167,19 @@ class ApplicationService(Service):
         @rtype: C{dict}
         '''
         id = contest.ContestID(str(uuid.uuid4()))
-        cont = self.contest_factory.create_contest(id,
-            params['title'],
-            params['start_time'], params['end_time'],
-            params['place'], params['country'],
-            params['hq_coords'], params['timezone'])
-
+        contest_factory = contest.ContestFactory(self.event_publisher)
+        cont = contest_factory.create_contest(id, params['title'],
+                                              params['start_time'],
+                                              params['end_time'],
+                                              params['place'],
+                                              params['country'],
+                                              params['hq_coords'],
+                                              params['timezone'])
         d = defer.succeed(cont)
         d.addCallback(persistence.get_repository(contest.IContestRepository)
                                             .save)
         d.addCallback(read_contest)
         return d
-
 
     def get_contests(self, params=None):
         '''
@@ -182,8 +190,7 @@ class ApplicationService(Service):
         @rtype:
         '''
         return self._get_list_of_smth(params, contest.IContestRepository,
-            read_contest_list)
-
+                                      read_contest_list)
 
     def get_contest(self, params):
         '''
@@ -195,10 +202,9 @@ class ApplicationService(Service):
         '''
         d = defer.succeed(params['contest_id'])
         d.addCallback(persistence.get_repository(contest.IContestRepository).
-                                                get_by_id)
+        get_by_id)
         d.addCallback(read_contest)
         return d
-
 
     def change_contest(self, params):
         '''
@@ -234,91 +240,6 @@ class ApplicationService(Service):
         return self._change_aggregate(params, contest.IContestRepository,
             change, read_contest)
 
-
-    def create_new_person(self, params):
-        factory = person.PersonFactory(self.event_publisher)
-        year, month, day = params['reg_date'].split(',')
-        pers = factory.create_person(params['name'], params['surname'],
-            params['country'], params['email'], year, month, day)
-        d = defer.succeed(pers)
-        d.addCallback(persistence.get_repository(person.IPersonRepository).
-                                                save)
-        d.addCallback(read_person)
-        return d
-
-
-    def get_person(self, params):
-        d = defer.succeed(params['person_id'])
-        d.addCallback(persistence.get_repository(person.IPersonRepository).
-                                                get_by_id)
-        d.addCallback(read_person)
-        return d
-
-
-    def get_persons(self, params=None):
-        return self._get_list_of_smth(params, person.IPersonRepository,
-            read_person_list)
-
-
-    def change_person(self, params):
-        def change(pers, params):
-            new_name = dict()
-            if params.get('name'):
-                new_name['name'] = params['name']
-            if params.get('surname'):
-                new_name['surname'] = params['surname']
-            pers.name = new_name
-            if params.get('country'):
-                pers.country = params['country']
-            return pers
-        if params.has_key('person_id'):
-            params['id'] = params['person_id']
-            del params['person_id']
-        return self._change_aggregate(params, person.IPersonRepository,
-            change, read_person)
-
-
-    def create_new_race_for_contest(self, params):
-        d = defer.succeed(params['contest_id'])
-        d.addCallback(persistence.get_repository(contest.IContestRepository)
-                        .get_by_id)
-        d.addCallback(lambda cont: cont.new_race(params['race_type'],
-            params['checkpoints'], params['race_title']))
-        d.addCallback(persistence.get_repository(race.IRaceRepository).save)
-        d.addCallback(read_race)
-        return d
-
-
-    def get_contest_races(self, params):
-        '''
-        Return list of races for contests
-        @param params:
-        @type params:
-        @return:
-        @rtype:
-        '''
-
-
-    def get_race(self, params):
-        '''
-        Return info about concrete race.
-        @param params:
-        @type params:
-        @return:
-        @rtype:
-        '''
-
-
-    def change_race(self, params):
-        '''
-        Change race information.
-        @param params:
-        @type params:
-        @return:
-        @rtype:
-        '''
-
-
     def register_paraglider_on_contest(self, params):
         d = defer.succeed(params['contest_id'])
         d.addCallback(persistence.get_repository(contest.IContestRepository)
@@ -328,7 +249,6 @@ class ApplicationService(Service):
         d.addCallback(persistence.get_repository(contest.IContestRepository)                                                .save)
         d.addCallback(read_contest_paraglider, params['person_id'])
         return d
-
 
     def get_contest_paragliders(self, params):
         '''
@@ -344,7 +264,6 @@ class ApplicationService(Service):
         d.addCallback(lambda cont: cont.paragliders)
         d.addCallback(read_contest_paraglider_list)
         return d
-
 
     def change_paraglider(self, params):
         '''
@@ -374,6 +293,86 @@ class ApplicationService(Service):
         return d
 
 
+############## Person Service part ##############
+    def create_new_person(self, params):
+        factory = person.PersonFactory(self.event_publisher)
+        year, month, day = params['reg_date'].split(',')
+        pers = factory.create_person(params['name'], params['surname'],
+            params['country'], params['email'], year, month, day)
+        d = defer.succeed(pers)
+        d.addCallback(persistence.get_repository(person.IPersonRepository).
+                                                save)
+        d.addCallback(read_person)
+        return d
+
+    def get_person(self, params):
+        d = defer.succeed(params['person_id'])
+        d.addCallback(persistence.get_repository(person.IPersonRepository).
+                                                get_by_id)
+        d.addCallback(read_person)
+        return d
+
+    def get_persons(self, params=None):
+        return self._get_list_of_smth(params, person.IPersonRepository,
+            read_person_list)
+
+    def change_person(self, params):
+        def change(pers, params):
+            new_name = dict()
+            if params.get('name'):
+                new_name['name'] = params['name']
+            if params.get('surname'):
+                new_name['surname'] = params['surname']
+            pers.name = new_name
+            if params.get('country'):
+                pers.country = params['country']
+            return pers
+        if params.has_key('person_id'):
+            params['id'] = params['person_id']
+            del params['person_id']
+        return self._change_aggregate(params, person.IPersonRepository,
+            change, read_person)
+
+############## Race Service part ################
+    def create_new_race_for_contest(self, params):
+        d = defer.succeed(params['contest_id'])
+        d.addCallback(persistence.get_repository(contest.IContestRepository)
+        .get_by_id)
+        d.addCallback(lambda cont: cont.new_race(params['race_type'],
+                                                 params['checkpoints'],
+                                                 params['race_title']))
+        d.addCallback(persistence.get_repository(race.IRaceRepository).save)
+        d.addCallback(read_race)
+        return d
+
+    def get_contest_races(self, params):
+        '''
+        Return list of races for contests
+        @param params:
+        @type params:
+        @return:
+        @rtype:
+        '''
+
+    def get_race(self, params):
+        '''
+        Return info about concrete race.
+        @param params:
+        @type params:
+        @return:
+        @rtype:
+        '''
+
+    def change_race(self, params):
+        '''
+        Change race information.
+        @param params:
+        @type params:
+        @return:
+        @rtype:
+        '''
+
+############## common methods ###################
     def _change_aggregate(self, params, repo_interface, change_func,
                           read_func):
         id = params.get('id')
@@ -399,8 +398,6 @@ class ApplicationService(Service):
 
         d = defer.succeed(limit)
         d.addCallback(persistence.get_repository(repo_interface).get_list,
-            offset)
+                      offset)
         d.addCallback(read_func)
         return d
-
-

@@ -13,7 +13,7 @@ from twisted.web.server import Request, Site, Session, NOT_DONE_YET
 from twisted.web.resource import NoResource, Resource
 from zope.interface import implementer
 
-from gorynych.info.restui.resources import (APIResource,
+from gorynych.info.restui.base_resource import (APIResource,
      BadParametersError, json_renderer,
     resource_tree)
 from gorynych.common.exceptions import NoAggregate
@@ -262,15 +262,15 @@ class APIResourceTest(unittest.TestCase):
         self.tree_ = {
             '\w+-\w+-3\w+': {'leaf': 'SimpleAPIResource',
                              'package': __import__(
-                         'test_resources',
+                         'test_base_resource',
                                  globals={"__name__": __name__}),
                              'tree': {}},
             'race': {'leaf': 'SomeResource',
-                     'package': __import__('test_resources',
+                     'package': __import__('test_base_resource',
                      globals={"__name__": __name__}),
                      'tree': 1},
             'no_tree': {'leaf': 'SomeResource',
-                 'package': __import__('test_resources',
+                 'package': __import__('test_base_resource',
                      globals={"__name__": __name__})}}
         self.api_resource = APIResource(self.tree_, 'service')
 
@@ -367,7 +367,7 @@ class APIResourceMethodTest(unittest.TestCase):
             'The thing is {}::SimpleAPIResource')
 
     def test_good_put(self):
-        self.skipTest("I'm not sure what I want here.")
+        self.skipTest("I'm not sure what am I want here.")
         req = self._get_req()
         req.requestReceived('PUT', '/simple', 'HTTP/1.1')
         self.assertEqual(req.code, 200)

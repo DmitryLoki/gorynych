@@ -200,14 +200,13 @@ class ApplicationService(Service):
         '''
 
         def change(cont):
-            allowed_changes = ['glider', 'contest_number']
-            for item in allowed_changes:
-                if params.has_key(item):
-                    cont.change_participant_data(person_id, **params)
+            if params.has_key('glider'):
+                cont.change_participant_data(params['person_id'],
+                                             glider=params['glider'])
+            if params.has_key('contest_number'):
+                cont.change_participant_data(params['person_id'],
+                                     contest_number=params['contest_number'])
             return cont
-
-        person_id = params['person_id']
-        del params['person_id'] # yes, this is necessary
 
         d = self._get_aggregate(params['contest_id'],
                                 contest.IContestRepository)

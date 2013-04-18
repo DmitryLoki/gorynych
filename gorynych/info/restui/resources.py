@@ -16,7 +16,7 @@ class ContestResourceCollection(APIResource):
             args['hq_coords'] = args['hq_coords'].split(',')
         return args
 
-    def read_POST(self, cont):
+    def read_POST(self, cont, request_params=None):
         if cont:
             return dict(contest_title=cont.title,
                         contest_id=cont.id,
@@ -24,7 +24,7 @@ class ContestResourceCollection(APIResource):
                         contest_start_date=cont.start_time,
                         contest_end_date=cont.end_time)
 
-    def read_GET(self, cont_list):
+    def read_GET(self, cont_list, request_params=None):
         if cont_list:
             result = []
             for cont in cont_list:
@@ -43,7 +43,7 @@ class ContestResource(APIResource):
                            PUT='change_contest')
     name = 'contest'
 
-    def read_GET(self, cont):
+    def read_GET(self, cont, request_params=None):
         if cont:
             return dict(contest_title=cont.title,
                         contest_id=cont.id,
@@ -51,7 +51,7 @@ class ContestResource(APIResource):
                         contest_start_date=cont.start_time,
                         contest_end_date=cont.end_time)
 
-    def read_PUT(self, cont):
+    def read_PUT(self, cont, request_params=None):
         if cont:
             return dict(contest_title=cont.title,
                         contest_id=cont.id,
@@ -68,7 +68,7 @@ class ContestRaceResourceCollection(APIResource):
                            POST='create_new_race_for_contest')
     name = 'contest_race_collection'
 
-    def read_POST(self, race):
+    def read_POST(self, race, request_params=None):
         if race:
             return dict(race_type=race.task.type,
                         race_title=race.title,
@@ -76,7 +76,7 @@ class ContestRaceResourceCollection(APIResource):
                         race_start_time=race.start_time,
                         race_end_time=race.end_time)
 
-    def read_GET(self, race):
+    def read_GET(self, race, request_params=None):
         return self.read_POST(race)
 
 
@@ -97,13 +97,14 @@ class ContestParagliderResourceCollection(APIResource):
                            GET='get_contest_paragliders')
     name = 'contest_paraglider_collection'
 
-    def read_POST(self, cont, par_id):
+    def read_POST(self, cont, request_params):
+        par_id = request_params.get('person_id')
         if cont and par_id and cont.paragliders:
             return dict(person_id=par_id,
                     contest_number=cont.paragliders[par_id]['contest_number'],
                     glider=cont.paragliders[par_id]['glider'])
 
-    def read_GET(self, p_dicts):
+    def read_GET(self, p_dicts, request_params=None):
         if p_dicts:
             result = []
             for person_id in p_dicts:
@@ -122,7 +123,9 @@ class ContestParagliderResource(APIResource):
     service_command = dict(PUT='change_paraglider')
     name = 'contest_paraglider_collection'
 
-    def read_PUT(self, cont, par_id):
+    def read_PUT(self, cont, request_params):
+        print "REQUEST PARAMS ", request_params
+        par_id = request_params.get('person_id')
         if cont and par_id and cont.paragliders:
             return dict(person_id=par_id,
                     contest_number=cont.paragliders[par_id]['contest_number'],
@@ -137,7 +140,7 @@ class PersonResourceCollection(APIResource):
                            POST='create_new_person')
     name = 'person_collection'
 
-    def read_GET(self, pers_list):
+    def read_GET(self, pers_list, request_params=None):
         if pers_list:
             result = []
             for pers in pers_list:
@@ -145,7 +148,7 @@ class PersonResourceCollection(APIResource):
                                    person_name=pers.name.full()))
             return result
 
-    def read_POST(self, pers):
+    def read_POST(self, pers, request_params=None):
         if pers:
             return dict(person_name=pers.name.full(),
                         person_id=pers.id,
@@ -160,11 +163,11 @@ class PersonResource(APIResource):
                            PUT='change_person')
     name = 'person'
 
-    def read_PUT(self, pers):
+    def read_PUT(self, pers, request_params=None):
         if pers:
             return dict(person_name=pers.name.full(),
                         person_id=pers.id,
                         person_country=pers.country)
 
-    def read_GET(self, pers):
+    def read_GET(self, pers, request_params=None):
         return self.read_PUT(pers)

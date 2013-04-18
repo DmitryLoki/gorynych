@@ -122,7 +122,18 @@ class APIResource(resource.Resource):
 
 
     @defer.inlineCallbacks
-    def _render_method(self, request, resource_func):
+    def _render_method(self, request, method_func):
+        '''
+        Other render_METHOD methods delegate their work to this method.
+        Most of the work is doing here.
+        @param request: request passed to resource.
+        @type request: L{Request}
+        @param method_func: function which handle METHOD action (create,
+        change, delete etc)
+        @type method_func:
+        @return: deferred which wraps result or '' string.
+        @rtype: C{Deferred}
+        '''
         # get parameters from request
         try:
             request_params = self.parameters_from_request(request)
@@ -160,7 +171,8 @@ class APIResource(resource.Resource):
             defer.returnValue('')
 
         # use service result as supposed
-        request, body = yield resource_func(service_result, request)
+        request, body = yield method_func(service_result, request,
+                                          request_params)
         if not body:
             defer.returnValue('')
         self.write_request((request, body))
@@ -183,7 +195,7 @@ class APIResource(resource.Resource):
         self._render_method(request, self.change_resource)
         return server.NOT_DONE_YET
 
-    def resource_renderer(self, res, req):
+    def resource_renderer(self, res, req, request_params=None):
         '''
         Receive result from Application Service and represent it as http
         entity.
@@ -193,9 +205,10 @@ class APIResource(resource.Resource):
         req.setResponseCode(200)
         # will try to translate resource object into dictionary.
         try:
-            resource_representation = self.read(res)
+            resource_representation = getattr(self, '_'.join(('read',
+                                          req.method)))(res, request_params)
         except Exception as error:
-            body = "Error %r in aggregate reading function." % error
+            body = "Error %r in resource reading function." % error
             return self._handle_error(req, 500, "ReadError", body), None
 
         try:
@@ -210,17 +223,17 @@ class APIResource(resource.Resource):
     def read(self, res):
         return res
 
-    def resource_created(self, res, req):
+    def resource_created(self, res, req, request_params):
         '''
         Handle situation when new resource has been created.
         @type req: L{twisted.web.server.Request}
         '''
-        req, body = self.resource_renderer(res, req)
+        req, body = self.resource_renderer(res, req, request_params)
         req.setResponseCode(201)
         return req, body
 
-    def change_resource(self, res, req):
-        req, body = self.resource_renderer(res, req)
+    def change_resource(self, res, req, request_params):
+        req, body = self.resource_renderer(res, req, request_params)
         return req, body
 
     def write_request(self, (req, body)):

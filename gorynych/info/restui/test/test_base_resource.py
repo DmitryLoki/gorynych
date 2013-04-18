@@ -242,8 +242,17 @@ class SimpleAPIResource(APIResource):
     name = 'SimpleAPIResource'
     service_command = {'GET': 'get_the_thing', 'POST': 'post_the_thing',
                        'PUT': 'put_the_thing'}
-    allowedMethods = ["GET"]
     renderers = {'application/json': lambda x, y: '::'.join((x, y))}
+
+    def read_GET(self, res, params):
+        return res
+
+    def read_POST(self, res, params):
+        return self.read_GET(res, params)
+
+    def read_PUT(self, res, params):
+        return self.read_GET(res, params)
+
 
 
 class SimpleService(object):
@@ -336,6 +345,7 @@ class APIResourceMethodTest(unittest.TestCase):
 
     def test_resource_renderer(self):
         req = Request(DummyChannel(), 1)
+        req.method = 'GET'
         result, body = self.api.resource_renderer('res', req)
         self.assertEqual(result.code, 200)
         self.assertEqual(body, 'res::SimpleAPIResource')
@@ -343,13 +353,14 @@ class APIResourceMethodTest(unittest.TestCase):
     def test_error_in_read_function(self):
         req = Request(DummyChannel(), 1)
         req.setResponseCode(200)
-        def error_function(a):
+        req.method = 'GET'
+        def error_function(a, b):
             raise Exception("boom")
-        self.api.read = error_function
+        self.api.read_GET = error_function
         self.api._handle_error = mock.Mock()
         result, body = self.api.resource_renderer('res', req)
         self.api._handle_error.assert_called_with(req, 500, "ReadError",
-            "Error %r in aggregate reading function." % Exception('boom'))
+            "Error %r in resource reading function." % Exception('boom'))
 
 
     def test_good_get(self):

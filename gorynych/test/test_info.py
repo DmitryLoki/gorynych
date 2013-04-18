@@ -7,8 +7,6 @@ import requests
 import unittest
 
 
-
-
 class RESTAPITest(unittest.TestCase):
     '''
     REST API must be started and running before tests.
@@ -27,7 +25,7 @@ class ContestRESTAPITest(unittest.TestCase):
         '''
         Here I suppose that contest repository is empty.
         '''
-        self.skipTest("I'm lazy and don't want to clean repository.")
+        # self.skipTest("I'm lazy and don't want to clean repository.")
         r = requests.get(self.url)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json(), {})

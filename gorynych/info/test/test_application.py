@@ -9,7 +9,7 @@ from pytz.exceptions import UnknownTimeZoneError
 from twisted.trial import unittest
 from twisted.internet import defer
 
-from gorynych.info.application import ApplicationService, read_person
+from gorynych.info.application import ApplicationService
 from gorynych.common.domain.types import Checkpoint
 
 
@@ -66,30 +66,30 @@ class ContestServiceTest(ApplicationServiceTestCase):
             end_time=2, place='Боливия', country='RU',
             hq_coords=[12.3, 42.9], timezone='Europe/Moscow'))
         cont1 = d.result
-        self.assertEqual(cont1['contest_title'], 'Hoi', "Bad return")
-        self.assertEqual(len(cont1['contest_id']), 36, "Bad return")
-        saved_result = self.repository.get_by_id(cont1['contest_id'])
+        self.assertEqual(cont1.title, 'Hoi', "Bad return")
+        self.assertEqual(len(cont1.id), 36, "Bad return")
+
+        saved_result = self.repository.get_by_id(cont1.id)
         self.assertEqual(saved_result.title, 'Hoi',
                          "Bad contest storing.")
         self.assertEqual(saved_result.timezone, 'Europe/Moscow',
                          "Bad contest storing.")
 
-        cont2 = self.cs.get_contest({'contest_id': cont1['contest_id']}
-                ).result
-        self.assertDictEqual(cont1, cont2)
+        cont2 = self.cs.get_contest({'contest_id': cont1.id}).result
+        self.assertEqual(cont1, cont2)
 
         cont_list = self.cs.get_contests().result
-        self.assertEqual(cont2['contest_id'], cont_list[0]['contest_id'])
+        self.assertEqual(cont2.id, cont_list[0].id)
 
-        new_cont = self.cs.change_contest(dict(contest_id=cont1['contest_id'],
+        new_cont = self.cs.change_contest(dict(contest_id=cont1.id,
             title='A', start_time=2, end_time='6',
             timezone='Canada/Eastern')).result
-        saved_result = self.repository.get_by_id(cont1['contest_id'])
+        saved_result = self.repository.get_by_id(cont1.id)
         self.assertEqual(saved_result.timezone, 'Canada/Eastern',
                          "Timezone hasn't been changed.")
-        self.assertEqual(new_cont['contest_title'], 'A')
-        self.assertEqual(self.repository.get_by_id(cont1['contest_id']
-                ).title, 'A')
+        self.assertEqual(new_cont.id, cont1.id, "ID has been chanding during"
+                                                " contest edit.")
+        self.assertEqual(self.repository.get_by_id(cont1.id).title, 'A')
 
 
     def test_bad_contest_saving(self, patched):
@@ -140,22 +140,20 @@ class PersonServiceTest(ApplicationServiceTestCase):
         pers1 = self.cs.create_new_person(dict(name='Vasya', surname='Doe',
             country='QQ', email='john@example.com', reg_date='2012,12,21')
                                 ).result
-        self.assertEqual(pers1['person_name'], 'Vasya Doe')
-        self.assertDictEqual(pers1,
-                        read_person(self.repository.get_by_id
-                            (pers1['person_id'])))
+        self.assertEqual(pers1.name.full(), 'Vasya Doe')
+        self.assertEqual(pers1, self.repository.get_by_id(pers1.id))
 
-        pers2 = self.cs.get_person({'person_id':pers1['person_id']}).result
-        self.assertDictEqual(pers1, pers2)
+        pers2 = self.cs.get_person({'person_id': pers1.id}).result
+        self.assertEqual(pers1, pers2)
 
         pers_list = self.cs.get_persons().result
         self.assertIsInstance(pers_list, list)
-        self.assertEqual(pers1['person_id'], pers_list[0]['person_id'])
+        self.assertEqual(pers1.id, pers_list[0].id)
 
-        new_pers = self.cs.change_person(dict(person_id=pers1['person_id'],
+        new_pers = self.cs.change_person(dict(person_id=pers1.id,
             name='Evlampyi')).result
-        self.assertEqual(new_pers['person_name'], 'Evlampyi Doe')
-        self.assertEqual(self.repository.get_by_id(new_pers['person_id'])
+        self.assertEqual(new_pers.name.full(), 'Evlampyi Doe')
+        self.assertEqual(self.repository.get_by_id(new_pers.id)
         ._name.name, 'Evlampyi')
 
     def test_read_person(self, patched):
@@ -195,7 +193,7 @@ class ContestParagliderRaceTest(unittest.TestCase):
             p2 = self.aps.create_new_person(dict(name='John', surname='Doe',
                 country='QQ', email='john@example.com',
                 reg_date='2012,12,21')).result
-            return c['contest_id'], p1['person_id'], p2['person_id']
+            return c.id, p1.id, p2.id
 
         self.cont_id, self.p1_id, self.p2_id = fixture()
         pers = self.repository.get_by_id(self.p1_id)
@@ -214,12 +212,12 @@ class ContestParagliderRaceTest(unittest.TestCase):
         result = self.aps.register_paraglider_on_contest(dict(
             contest_id=self.cont_id, glider='gin', contest_number='1',
             person_id=self.p1_id)).result
+        paraglider = result.paragliders[self.p1_id]
         cont = self.repository.get_by_id(self.cont_id)
         self.assertEqual(len(cont.paragliders), 1)
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result['glider'], 'gin')
-        self.assertEqual(result['contest_number'], 1)
-        self.assertTrue(result.has_key('person_id'))
+
+        self.assertEqual(paraglider['glider'], 'gin')
+        self.assertEqual(paraglider['contest_number'], 1)
 
         self.aps.register_paraglider_on_contest(dict(
             contest_id=self.cont_id, glider='gin', contest_number='1',
@@ -239,8 +237,10 @@ class ContestParagliderRaceTest(unittest.TestCase):
 
         paragliders_list = self.aps.get_contest_paragliders(dict
             (contest_id=self.cont_id)).result
-        self.assertTrue({'person_id': self.p1_id, 'glider': 'gin',
-                         'contest_number': '1'} in paragliders_list)
+        self.assertDictContainsSubset({'glider': 'gin', 'contest_number': 1},
+             paragliders_list[self.p1_id])
+        # self.assertTrue({'person_id': self.p1_id, 'glider': 'gin',
+        #                  'contest_number': '1'} in paragliders_list)
 
     def test_change_paraglider(self, patched):
         patched.return_value = self.repository
@@ -264,9 +264,10 @@ class ContestParagliderRaceTest(unittest.TestCase):
             "Paraglider wasn't changed correctly.")
 
         # Check correct return.
-        self.assertEqual(result['glider'], 'very',
+        self.assertEqual(result.paragliders[self.p1_id]['glider'], 'very',
             "Paraglider wasn't returned correctly.")
-        self.assertEqual(result['contest_number'], 1986,
+        self.assertEqual(result.paragliders[self.p1_id]['contest_number'],
+                         1986,
             "Paraglider wasn't returned correctly.")
 
 
@@ -286,10 +287,8 @@ class ContestParagliderRaceTest(unittest.TestCase):
                                                  race_type='speedrun',
                                                  race_title='task 3',
                                                  checkpoints=[ch1])).result
-        self.assertEqual(race['race_id'], self.repository.get_by_id
-            (race['race_id'])
-        .id)
-        self.assertEqual(race['race_type'], 'speedrun')
+        self.assertEqual(race.id, self.repository.get_by_id(race.id).id)
+        self.assertEqual(race.type, 'speedrun')
 
     def test_get_contest_races(self, patched):
         patched.return_value = self.repository

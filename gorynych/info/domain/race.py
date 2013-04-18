@@ -69,6 +69,10 @@ class Race(AggregateRoot):
         self._timezone = pytz.utc
 
     @property
+    def type(self):
+        return self.task.type
+
+    @property
     def start_time(self):
         '''
         Time on which race begun.

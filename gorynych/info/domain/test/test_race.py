@@ -29,7 +29,7 @@ class RaceTest(unittest.TestCase):
     def tearDown(self):
         del self.race
 
-    def test_race(self):
+    def test_race_module(self):
         self.assertIsInstance(race.RACETASKS['speedrun'](), race.SpeedRunTask)
         self.assertIsInstance(race.RACETASKS['racetogoal'](),
             race.RaceToGoalTask)

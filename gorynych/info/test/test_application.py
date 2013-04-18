@@ -272,18 +272,50 @@ class ContestParagliderRaceTest(unittest.TestCase):
 
     def test_create_new_race(self, patched):
         patched.return_value = self.repository
-        self.aps.register_paraglider_on_contest(dict(
-            contest_id=self.cont_id, glider='gin', contest_number='1',
-            person_id=self.p1_id))
-        ch1 = Checkpoint('A', Point(0.1, 2), radius=400)
+        try:
+            self.aps.register_paraglider_on_contest(dict(
+                contest_id=self.cont_id, glider='gin', contest_number='1',
+                person_id=self.p1_id))
+        except:
+            raise unittest.SkipTest("Paraglider need to be registered.")
 
-        race = self.aps.create_new_race_for_contest(dict(contest_id=self
-                .cont_id, race_type='speedrun', race_title='task 3',
-            checkpoints=[ch1])).result
+        ch1 = Checkpoint('A', Point(0.1, 2), radius=400, times=(1, 2))
+
+        race = self.aps.create_new_race_for_contest(
+                                            dict(contest_id=self.cont_id,
+                                                 race_type='speedrun',
+                                                 race_title='task 3',
+                                                 checkpoints=[ch1])).result
         self.assertEqual(race['race_id'], self.repository.get_by_id
             (race['race_id'])
         .id)
         self.assertEqual(race['race_type'], 'speedrun')
+
+    def test_get_contest_races(self, patched):
+        patched.return_value = self.repository
+        try:
+            self.aps.register_paraglider_on_contest(dict(
+                contest_id=self.cont_id, glider='gin', contest_number='1',
+                person_id=self.p1_id))
+            self.aps.register_paraglider_on_contest(dict(
+                contest_id=self.cont_id, glider='mantra', contest_number='4',
+                person_id=self.p2_id))
+            ch1 = Checkpoint('A', Point(0.1, 2), radius=400, times=(1, 2))
+            self.aps.create_new_race_for_contest(dict(contest_id=self.cont_id,
+                                                      race_type='speedrun',
+                                                      race_title='task 3',
+                                                      checkpoints=[ch1]))
+            self.aps.create_new_race_for_contest(dict(contest_id=self.cont_id,
+                                                      race_type='speedrun',
+                                                      race_title='task 4',
+                                                      checkpoints=[ch1]))
+        except Exception:
+            raise unittest.SkipTest("Race is needed for this test.")
+        races = self.aps.get_contest_races(dict(contest_id=self.cont_id))\
+            .result
+        self.assertIsInstance(races, list)
+        self.assertEqual(len(races), 2)
+        self.assertEqual(races[0].type, 'speedrun')
 
 
 

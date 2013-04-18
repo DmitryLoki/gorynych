@@ -111,7 +111,8 @@ class ContestTest(unittest.TestCase):
         ch4 = Checkpoint('g10', Point(2, 2), 'goal', (None, 8), 3)
         race = cont.new_race('Speed Run', [ch1, ch2, ch3, ch4], 'task 4')
 
-        self.assertEqual(race.task.type, 'speedrun')
+        ### test Race aggregate ###
+        self.assertEqual(race.type, 'speedrun')
         self.assertEqual(race.checkpoints, [ch1, ch2, ch3, ch4])
         self.assertEqual(race.title, 'Task 4')
         self.assertTupleEqual((1, 15), race.timelimits)
@@ -119,6 +120,7 @@ class ContestTest(unittest.TestCase):
         self.assertTupleEqual((race.start_time, race.end_time), (2, 8))
         self.assertEqual(race.timezone, cont.timezone)
 
+        ### test Contest aggregate ###
         self.assertEqual(len(cont.race_ids), 1)
         self.assertIsInstance(cont.race_ids[0], RaceID)
 

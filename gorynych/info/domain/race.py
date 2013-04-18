@@ -2,11 +2,14 @@
 Aggregate Race.
 '''
 from copy import deepcopy
+import pytz
+import decimal
 
 from zope.interface.interfaces import Interface
 
 from gorynych.common.domain.model import AggregateRoot, IdentifierObject, ValueObject, DomainEvent
 from gorynych.common.domain.types import Checkpoint
+from gorynych.common.exceptions import BadCheckpoint
 
 
 class RaceTask(ValueObject):
@@ -39,6 +42,10 @@ class RaceID(IdentifierObject):
 
 
 class CheckpointsAreAddedToRace(DomainEvent):
+    '''
+    Notify other systems (such as processor) about checkpoints change.
+    @todo: think about more explicit name for this event.
+    '''
     def __init__(self, id, checkpoints):
         self.checkpoints = checkpoints
         DomainEvent.__init__(self, id)
@@ -57,6 +64,46 @@ class Race(AggregateRoot):
         self.title = ''
         self.timelimits = ()
         self.paragliders = dict()
+        self._start_time = decimal.Decimal('infinity')
+        self._end_time = 1
+        self._timezone = pytz.utc
+
+    @property
+    def start_time(self):
+        '''
+        Time on which race begun.
+        @return: Epoch time in seconds.
+        @rtype: C{int}
+        '''
+        return self._start_time
+
+    @property
+    def end_time(self):
+        '''
+        Time when race is ended
+        @return: Epoch time in seconds.
+        @rtype: C{int}
+        '''
+        return self._end_time
+
+    @property
+    def timezone(self):
+        '''
+        Race timezone
+        @return: string like 'Europe/Moscow'
+        @rtype: str
+        '''
+        return self._timezone
+
+    @timezone.setter
+    def timezone(self, value):
+        '''
+        Set race timezone.
+        @param value: string with time zone like 'Europe/Moscow'
+        @type value: str
+        '''
+        if value in pytz.common_timezones_set:
+            self._timezone = value
 
     @property
     def checkpoints(self):
@@ -64,6 +111,12 @@ class Race(AggregateRoot):
 
     @checkpoints.setter
     def checkpoints(self, checkpoints):
+        '''
+        Replace race checkpoints with a new list. Publish L{
+        CheckpointsAreAddedToRace} event with race id and checkpoints list.
+        @param checkpoints: list of L{Checlpoint} instances.
+        @type checkpoints: C{list}
+        '''
         old_checkpoints = deepcopy(self._checkpoints)
         self._checkpoints = checkpoints
         if not self._invariants_are_correct():
@@ -74,6 +127,8 @@ class Race(AggregateRoot):
         except (TypeError, ValueError) as e:
             self._rollback_set_checkpoints(old_checkpoints)
             raise e
+        self._get_times_from_checkpoints(self._checkpoints)
+        # Notify other systems about checkpoints changing.
         self.event_publisher.publish(CheckpointsAreAddedToRace(self.id,
                                                                 checkpoints))
 
@@ -85,6 +140,20 @@ class Race(AggregateRoot):
 
     def _rollback_set_checkpoints(self, old_checkpoints):
         self._checkpoints = old_checkpoints
+
+    def _get_times_from_checkpoints(self, checkpoints):
+        start_time = self._start_time
+        end_time = self._end_time
+        for point in checkpoints:
+            if point.start_time and point.start_time < start_time:
+                start_time = point.start_time
+            if point.end_time and point.end_time > end_time:
+                end_time = point.end_time
+        if start_time < end_time:
+            self._start_time = start_time
+            self._end_time = end_time
+        else:
+            raise BadCheckpoint("Wrong or absent times in checkpoints.")
 
 
 class IRaceRepository(Interface):

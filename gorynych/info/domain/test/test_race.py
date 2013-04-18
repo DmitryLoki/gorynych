@@ -6,6 +6,7 @@ from shapely.geometry import Point
 
 from gorynych.info.domain import race
 from gorynych.common.domain.types import Checkpoint
+from gorynych.common.exceptions import BadCheckpoint
 
 
 def create_race():
@@ -75,6 +76,21 @@ class RaceTest(unittest.TestCase):
         self.assertEqual(self.race._checkpoints, good_checkpoints)
         self.race.event_publisher.publish.assert_called_once_with(
             race.CheckpointsAreAddedToRace(self.race.id, good_checkpoints))
+
+    def test_get_times_from_checkpoints(self):
+        ch1 = mock.Mock()
+        ch1.start_time, ch1.end_time = 2, 5
+        ch2 = mock.Mock()
+        ch2.start_time, ch2.end_time = 4, None
+        self.race._get_times_from_checkpoints([ch1, ch2])
+        self.assertTupleEqual((self.race.start_time, self.race.end_time),
+                              (2, 5))
+
+    def test_get_times_from_checkpoints_bad_case(self):
+        ch2 = mock.Mock()
+        ch2.start_time, ch2.end_time = 4, None
+        self.assertRaises(BadCheckpoint,
+                          self.race._get_times_from_checkpoints, [ch2])
 
 
 class RaceTaskTest(unittest.TestCase):

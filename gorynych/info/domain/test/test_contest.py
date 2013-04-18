@@ -115,6 +115,7 @@ class ContestTest(unittest.TestCase):
         self.assertEqual(race.title, 'Task 4')
         self.assertTupleEqual((1, 15), race.timelimits)
         self.assertEqual(race.event_publisher, cont.event_publisher)
+        self.assertTupleEqual((race.start_time, race.end_time), (2, 8))
 
         self.assertEqual(len(cont.race_ids), 1)
         self.assertIsInstance(cont.race_ids[0], RaceID)

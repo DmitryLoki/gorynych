@@ -110,12 +110,14 @@ class ContestTest(unittest.TestCase):
         ch3 = Checkpoint('B02', Point(1, 2), 'es', radius=3)
         ch4 = Checkpoint('g10', Point(2, 2), 'goal', (None, 8), 3)
         race = cont.new_race('Speed Run', [ch1, ch2, ch3, ch4], 'task 4')
+
         self.assertEqual(race.task.type, 'speedrun')
         self.assertEqual(race.checkpoints, [ch1, ch2, ch3, ch4])
         self.assertEqual(race.title, 'Task 4')
         self.assertTupleEqual((1, 15), race.timelimits)
         self.assertEqual(race.event_publisher, cont.event_publisher)
         self.assertTupleEqual((race.start_time, race.end_time), (2, 8))
+        self.assertEqual(race.timezone, cont.timezone)
 
         self.assertEqual(len(cont.race_ids), 1)
         self.assertIsInstance(cont.race_ids[0], RaceID)

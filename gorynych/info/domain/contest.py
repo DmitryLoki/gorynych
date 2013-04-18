@@ -270,11 +270,12 @@ class Contest(AggregateRoot):
 
         race.title = race_title.strip().title()
         race.timelimits = (self.start_time, self.end_time)
+        race.timezone = self.timezone
         # Here Race is created and we start to fill it with useful
         # information.
+        # TODO: the same for transport and organizers.
         race = self._fill_race_with_paragliders(race)
         race.checkpoints = checkpoints
-        # TODO: the same for transport and organizers.
         self.race_ids.append(race_id)
         return race
 

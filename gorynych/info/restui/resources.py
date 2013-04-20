@@ -71,21 +71,30 @@ class ContestRaceResourceCollection(APIResource):
     name = 'contest_race_collection'
 
     def _get_args(self, args):
-        args['checkpoints'] = json.loads(args['checkpoints'])
-        for i, item in enumerate(args['checkpoints']):
-            args['checkpoints'][i] = types.checkpoint_from_geojson(item)
+        if args.has_key('checkpoints'):
+            args['checkpoints'] = json.loads(args['checkpoints'])
+            for i, item in enumerate(args['checkpoints']):
+                args['checkpoints'][i] = types.checkpoint_from_geojson(item)
         return args
 
     def read_POST(self, race, request_params=None):
         if race:
-            return dict(race_type=race.task.type,
+            return dict(race_type=race.type,
                         race_title=race.title,
                         race_id=race.id,
                         race_start_time=race.start_time,
                         race_end_time=race.end_time)
 
-    def read_GET(self, race, request_params=None):
-        return self.read_POST(race)
+    def read_GET(self, race_list, request_params=None):
+        result = []
+        if race_list:
+            for race in race_list:
+                result.append(dict(race_id=race.id,
+                                   race_title=race.title,
+                                   race_start_time=race.start_time,
+                                   race_end_time=race.end_time,
+                                   race_type=race.type))
+        return result
 
 
 class ContestRaceResource(APIResource):

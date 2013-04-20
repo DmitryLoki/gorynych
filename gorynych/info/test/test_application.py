@@ -1,5 +1,6 @@
 # coding=utf-8
 import gc
+from copy import deepcopy
 
 import mock
 
@@ -25,7 +26,8 @@ class GoodRepository:
         self.store[obj.id] = obj
         return obj
     def get_by_id(self, id):
-        return self.store.get(id)
+        result = deepcopy(self.store.get(id))
+        return result
     def get_list(self, limit=None, offset=0):
         results = self.store.values()
         if offset >= len(results):
@@ -64,10 +66,12 @@ class ContestServiceTest(ApplicationServiceTestCase):
 
     def test_succes_contest_creation(self, patched):
         patched.return_value = self.repository
-        d = self.cs.create_new_contest(dict(title='hoi', start_time=1,
-            end_time=2, place='Боливия', country='RU',
-            hq_coords=[12.3, 42.9], timezone='Europe/Moscow'))
-        cont1 = d.result
+        cont1 = self.cs.create_new_contest(
+            dict(title='hoi', start_time=1,
+                 end_time=2, place='Боливия',
+                 country='RU',
+                 hq_coords=[12.3, 42.9],
+                 timezone='Europe/Moscow')).result
         self.assertEqual(cont1.title, 'Hoi', "Bad return")
         self.assertEqual(len(cont1.id), 36, "Bad return")
 
@@ -78,7 +82,8 @@ class ContestServiceTest(ApplicationServiceTestCase):
                          "Bad contest storing.")
 
         cont2 = self.cs.get_contest({'contest_id': cont1.id}).result
-        self.assertEqual(cont1, cont2)
+        self.assertEqual(cont1.hq_coords, cont2.hq_coords)
+        self.assertEqual(cont1.title, cont2.title)
 
         cont_list = self.cs.get_contests().result
         self.assertEqual(cont2.id, cont_list[0].id)
@@ -203,6 +208,7 @@ class ContestParagliderRaceTest(unittest.TestCase):
         self.repository.save(pers)
 
     def tearDown(self):
+        self.repository.clean_store()
         del self.repository
         self.aps.stopService()
         del self.aps
@@ -235,6 +241,7 @@ class ContestParagliderRaceTest(unittest.TestCase):
         self.aps.register_paraglider_on_contest(dict(
             contest_id=self.cont_id, glider='gin', contest_number='2',
             person_id=self.p2_id))
+        cont = self.repository.get_by_id(self.cont_id)
         self.assertEqual(len(cont.paragliders), 2, "Can't register another "
                                                    "paraglider.")
 
@@ -242,8 +249,6 @@ class ContestParagliderRaceTest(unittest.TestCase):
             (contest_id=self.cont_id)).result
         self.assertDictContainsSubset({'glider': 'gin', 'contest_number': 1},
              paragliders_list[self.p1_id])
-        # self.assertTrue({'person_id': self.p1_id, 'glider': 'gin',
-        #                  'contest_number': '1'} in paragliders_list)
 
     def test_change_paraglider(self, patched):
         patched.return_value = self.repository
@@ -274,7 +279,7 @@ class ContestParagliderRaceTest(unittest.TestCase):
             "Paraglider wasn't returned correctly.")
 
 
-    def test_create_new_race(self, patched):
+    def test_create_new_race_for_contest(self, patched):
         patched.return_value = self.repository
         try:
             self.aps.register_paraglider_on_contest(dict(
@@ -302,10 +307,12 @@ class ContestParagliderRaceTest(unittest.TestCase):
         expected_call_list.append(mock.call(domain.contest.IContestRepository))
         expected_call_list.append(mock.call(domain.person.IPersonRepository))
         expected_call_list.append(mock.call(domain.race.IRaceRepository))
+        expected_call_list.append(mock.call(domain.contest.IContestRepository))
         self.assertTrue(expected_call_list == patched.mock_calls)
         # Check contest
         saved_contest = self.repository.get_by_id(self.cont_id)
-        self.assertEqual(saved_contest.race_ids[0], race.id)
+        self.assertEqual(saved_contest.race_ids[0], race.id,
+                         "Race hasn't been saved.")
 
 
     def test_get_contest_races(self, patched):
@@ -333,6 +340,11 @@ class ContestParagliderRaceTest(unittest.TestCase):
         self.assertIsInstance(races, list)
         self.assertEqual(len(races), 2)
         self.assertEqual(races[0].type, 'speedrun')
+        saved_contest = self.repository.get_by_id(self.cont_id)
+        self.assertEqual(len(saved_contest.race_ids), 2)
+
+        race1 = self.repository.get_by_id(races[0].id)
+        race2 = self.repository.get_by_id(races[1].id)
 
 
 

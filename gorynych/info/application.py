@@ -179,7 +179,8 @@ class ApplicationService(Service):
         d = self._get_aggregate(params['contest_id'],
                                 contest.IContestRepository)
         d.addCallback(lambda cont: cont.register_paraglider(
-            params['person_id'], params['glider'], params['contest_number']))
+            params['person_id'], params['glider'],
+            params['contest_number']))
         d.addCallback(
             persistence.get_repository(contest.IContestRepository).save)
         return d
@@ -261,14 +262,16 @@ class ApplicationService(Service):
                                       change)
 
     ############## Race Service part ################
+    @defer.inlineCallbacks
     def create_new_race_for_contest(self, params):
-        d = self._get_aggregate(params['contest_id'],
+        cont = yield self._get_aggregate(params['contest_id'],
                                 contest.IContestRepository)
-        d.addCallback(lambda cont: cont.new_race(params['race_type'],
-                                                 params['checkpoints'],
-                                                 params['title']))
-        d.addCallback(persistence.get_repository(race.IRaceRepository).save)
-        return d
+        r = yield cont.new_race(params['race_type'], params['checkpoints'],
+                      params['title'])
+        yield persistence.get_repository(race.IRaceRepository).save(r)
+        yield persistence.get_repository(contest.IContestRepository).save(
+            cont)
+        defer.returnValue(r)
 
     def get_contest_races(self, params):
         '''

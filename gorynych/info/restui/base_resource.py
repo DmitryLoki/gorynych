@@ -199,6 +199,8 @@ class APIResource(resource.Resource):
         '''
         Receive result from Application Service and represent it as http
         entity.
+        @param res: return from ApplicationService.
+        @type res: list or instance of AggregateRoot subclass
         '''
         content_type = req.responseHeaders.getRawHeaders('content-type',
             'application/json')

@@ -83,6 +83,10 @@ class Person(AggregateRoot):
         except KeyError:
             pass
 
+    # TODO: do aggregate root comparison
+    def __eq__(self, other):
+        return self.name.full() == other.name.full() and self.email == other.email
+
 
 class PersonFactory(object):
     def __init__(self, event_publisher):

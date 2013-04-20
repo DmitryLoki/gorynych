@@ -9,6 +9,7 @@ from gorynych.common.infrastructure.messaging import DomainEventsPublisher
 __author__ = 'Boris Tsema'
 
 
+# TODO: implement comparison by properties
 class ValueObject(object):
     '''
     Base class for value objects.

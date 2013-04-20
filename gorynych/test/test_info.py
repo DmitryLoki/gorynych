@@ -185,7 +185,7 @@ class ParaglidersTest(unittest.TestCase):
 
 
 class ContestRaceTest(unittest.TestCase):
-    def test_create_race(self):
+    def test_1_create_race(self):
         try:
             c_id = create_contest()
             p_id = create_persons()
@@ -200,11 +200,20 @@ class ContestRaceTest(unittest.TestCase):
             ch_list[i] = item.__geo_interface__
         params = dict(title="Task 8", race_type='opendistance', bearing=12,
                       checkpoints=json.dumps(ch_list))
-        r = requests.post('/'.join((URL, 'contest', c_id, 'race')), data=params)
+        r = requests.post('/'.join((URL, 'contest', c_id, 'race')),
+                         data=params)
         self.assertEqual(r.status_code, 201)
         self.assertDictContainsSubset({'type':'opendistance',
                                        'title':'Task 8', 'start_time': '2',
                                        'end_time': '8'}, r.json())
+
+        # Assume that races has been successfully created.
+        r = requests.get('/'.join((URL, 'contest', c_id, 'race')))
+        self.assertEqual(r.status_code, 200)
+        self.assertIsInstance(r.json(), list)
+        self.assertDictContainsSubset({'type':'opendistance',
+                                       'title':'Task 8', 'start_time': '2',
+                                       'end_time': '8'}, r.json()[0])
 
 
 if __name__ == '__main__':

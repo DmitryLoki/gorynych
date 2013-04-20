@@ -94,6 +94,11 @@ class PersonTest(unittest.TestCase):
         self.person.country = 'RUSSIA!'
         self.assertEqual(self.person.country, 'RU')
 
+    def test_equality(self):
+        p1 = create_person()
+        p2 = create_person()
+        self.assertEqual(p1, p2)
+
 
 if __name__ == '__main__':
     unittest.main()

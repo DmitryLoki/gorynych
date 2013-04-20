@@ -51,7 +51,6 @@ class RaceTest(unittest.TestCase):
         self.race.paragliders = dict()
         self.assertFalse(self.race._invariants_are_correct())
 
-
     def test_set_checkpoints(self):
         # make race happy with it's invariants:
         self.race.paragliders[1] = 2
@@ -60,7 +59,6 @@ class RaceTest(unittest.TestCase):
         self.race.checkpoints = good_checkpoints
         self.race.event_publisher.publish.assert_called_once_with(
             race.CheckpointsAreAddedToRace(self.race.id, good_checkpoints))
-
 
     def test_rollback_checkpoints(self):
         # make race happy with it's invariants:

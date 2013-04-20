@@ -105,6 +105,24 @@ class ContestRaceResource(APIResource):
                            PUT='change_contest_race')
     name = 'contest_race'
 
+    def read_GET(self, (cont, r), request_params=None):
+        result = dict()
+        if cont and r:
+            result['contest_title'] = cont.title
+            result['country'] = cont.country
+            result['place'] = cont.place
+            result['timezone'] = cont.timezone
+            result['race_title'] = r.title
+            result['race_type'] = r.type
+            result['start_time'] = r.start_time
+            result['end_time'] = r.end_time
+            result['bearing'] = r.bearing
+            checkpoints = {'type': 'FeatureCollection', 'features': []}
+            for ch in r.checkpoints:
+                checkpoints['features'].append(ch.__geo_interface__)
+            result['checkpoints'] = json.dumps(checkpoints)
+            return result
+
 
 class ContestParagliderResourceCollection(APIResource):
     '''

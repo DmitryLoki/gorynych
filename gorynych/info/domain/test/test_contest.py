@@ -119,6 +119,7 @@ class ContestTest(unittest.TestCase):
         self.assertEqual(race.event_publisher, cont.event_publisher)
         self.assertTupleEqual((race.start_time, race.end_time), (2, 8))
         self.assertEqual(race.timezone, cont.timezone)
+        self.assertIsNone(race.bearing)
 
         ### test Contest aggregate ###
         self.assertEqual(len(cont.race_ids), 1)

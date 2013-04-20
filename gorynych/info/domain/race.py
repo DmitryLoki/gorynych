@@ -73,6 +73,15 @@ class Race(AggregateRoot):
         return self.task.type
 
     @property
+    def bearing(self):
+        result = None
+        try:
+            result = self.task.bearing
+        except AttributeError:
+            pass
+        return result
+
+    @property
     def start_time(self):
         '''
         Time on which race begun.

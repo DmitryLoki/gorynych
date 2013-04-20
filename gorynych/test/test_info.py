@@ -185,7 +185,7 @@ class ParaglidersTest(unittest.TestCase):
 
 
 class ContestRaceTest(unittest.TestCase):
-    def test_1_create_race(self):
+    def test_create_and_read_race(self):
         try:
             c_id = create_contest()
             p_id = create_persons()
@@ -202,6 +202,7 @@ class ContestRaceTest(unittest.TestCase):
                       checkpoints=json.dumps(ch_list))
         r = requests.post('/'.join((URL, 'contest', c_id, 'race')),
                          data=params)
+        race_id = r.json()['id']
         self.assertEqual(r.status_code, 201)
         self.assertDictContainsSubset({'type':'opendistance',
                                        'title':'Task 8', 'start_time': '2',
@@ -214,6 +215,14 @@ class ContestRaceTest(unittest.TestCase):
         self.assertDictContainsSubset({'type':'opendistance',
                                        'title':'Task 8', 'start_time': '2',
                                        'end_time': '8'}, r.json()[0])
+
+        r = requests.get('/'.join((URL, 'contest', c_id, 'race', race_id)))
+        result = r.json()
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(result['checkpoints']['features'],
+                         json.loads(json.dumps(ch_list)))
+        self.assertEqual(result['race_title'], 'Task 8')
+        self.assertEqual(result['timezone'], 'Europe/Paris')
 
 
 if __name__ == '__main__':

@@ -288,6 +288,7 @@ class ApplicationService(Service):
         d.addCallback(defer.gatherResults, consumeErrors=True)
         return d
 
+    @defer.inlineCallbacks
     def get_contest_race(self, params):
         '''
         Return info about race in contest and about corresponding contest.
@@ -296,6 +297,11 @@ class ApplicationService(Service):
         @return:
         @rtype:
         '''
+        r = yield self._get_aggregate(params['race_id'],
+                                      race.IRaceRepository)
+        c = yield self._get_aggregate(params['contest_id'],
+                                      contest.IContestRepository)
+        defer.returnValue((c, r))
 
     def change_contest_race(self, params):
         '''

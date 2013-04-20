@@ -11,7 +11,7 @@ from gorynych.common.domain.model import IdentifierObject, AggregateRoot
 from gorynych.common.domain.model import ValueObject, DomainEvent
 from gorynych.common.domain.types import Address, Name, Country
 from gorynych.common.infrastructure import persistence
-from gorynych.info.domain.tracker import TrackerID
+# from gorynych.info.domain.tracker import TrackerID
 from gorynych.info.domain.race import RaceID, Race, RACETASKS
 from gorynych.info.domain.person import IPersonRepository
 
@@ -284,7 +284,7 @@ class Contest(AggregateRoot):
             if self._participants[key]['role'] == 'paraglider':
                 person = persistence.get_repository(IPersonRepository
                                                     ).get_by_id(key)
-                if person and person.tracker:
+                if person: # TODO: do this later: and person.tracker:
                     race.paragliders[
                       self._participants[key]['contest_number']] = Paraglider(
                         key,
@@ -318,7 +318,8 @@ class Contest(AggregateRoot):
 class Paraglider(ValueObject):
 
     def __init__(self, person_id, name, country, glider, contest_number,
-                 tracker_id):
+                 tracker_id=None):
+        # TODO: remove tracker_id=None when tracker assignment will work.
         from gorynych.info.domain.person import PersonID
 
         if not isinstance(person_id, PersonID):
@@ -327,8 +328,9 @@ class Paraglider(ValueObject):
             raise TypeError("Name must be an instance of Name class.")
         if not isinstance(country, Country):
             country = Country(country)
-        if not isinstance(tracker_id, TrackerID):
-            tracker_id = TrackerID(tracker_id)
+        # TODO: uncomment this when tracker assignment will work.
+        # if not isinstance(tracker_id, TrackerID):
+        #     tracker_id = TrackerID(tracker_id)
 
         self.person_id = person_id
         self.name = name.short()

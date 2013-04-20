@@ -124,7 +124,7 @@ class ContestTest(unittest.TestCase):
         self.assertEqual(len(cont.race_ids), 1)
         self.assertIsInstance(cont.race_ids[0], RaceID)
 
-        self.assertEqual(len(race.paragliders), 2)
+        self.assertEqual(len(race.paragliders), 3)
         p1 = race.paragliders[747]
         p2 = race.paragliders[757]
         self.assertEqual((p1.person_id, p1.name, p1.tracker_id, p1.glider,

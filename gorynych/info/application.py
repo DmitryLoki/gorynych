@@ -169,6 +169,13 @@ class ApplicationService(Service):
                                       change)
 
     def register_paraglider_on_contest(self, params):
+        '''
+
+        @param params:
+        @type params:
+        @return: Contest with registered paraglider wrapped in Deferred.
+        @rtype: C{Contest}
+        '''
         d = self._get_aggregate(params['contest_id'],
                                 contest.IContestRepository)
         d.addCallback(lambda cont: cont.register_paraglider(
@@ -255,10 +262,11 @@ class ApplicationService(Service):
 
     ############## Race Service part ################
     def create_new_race_for_contest(self, params):
-        d = self._get_aggregate(params['contest_id'], race.IRaceRepository)
+        d = self._get_aggregate(params['contest_id'],
+                                contest.IContestRepository)
         d.addCallback(lambda cont: cont.new_race(params['race_type'],
                                                  params['checkpoints'],
-                                                 params['race_title']))
+                                                 params['title']))
         d.addCallback(persistence.get_repository(race.IRaceRepository).save)
         return d
 

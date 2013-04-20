@@ -161,9 +161,9 @@ class APIResource(resource.Resource):
         # service will handle request
         try:
             service_result = yield service_method(request_params)
-        except NoAggregate:
+        except NoAggregate as error:
             self._handle_error(request, 404, "No such resource",
-                "Aggregate wasn't found in repository.")
+                "Aggregate wasn't found in repository %s. " % error.message)
             defer.returnValue('')
         except Exception as error:
             self._handle_error(request, 500, "Error while executing service "

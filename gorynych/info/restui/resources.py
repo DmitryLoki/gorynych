@@ -1,4 +1,6 @@
+import simplejson as json
 from gorynych.info.restui.base_resource import APIResource
+from gorynych.common.domain import types
 
 __author__ = 'Boris Tsema'
 
@@ -68,6 +70,12 @@ class ContestRaceResourceCollection(APIResource):
                            POST='create_new_race_for_contest')
     name = 'contest_race_collection'
 
+    def _get_args(self, args):
+        args['checkpoints'] = json.loads(args['checkpoints'])
+        for i, item in enumerate(args['checkpoints']):
+            args['checkpoints'][i] = types.checkpoint_from_geojson(item)
+        return args
+
     def read_POST(self, race, request_params=None):
         if race:
             return dict(race_type=race.task.type,
@@ -124,7 +132,6 @@ class ContestParagliderResource(APIResource):
     name = 'contest_paraglider_collection'
 
     def read_PUT(self, cont, request_params):
-        print "REQUEST PARAMS ", request_params
         par_id = request_params.get('person_id')
         if cont and par_id and cont.paragliders:
             return dict(person_id=par_id,

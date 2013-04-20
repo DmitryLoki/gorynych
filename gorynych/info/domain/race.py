@@ -125,7 +125,7 @@ class Race(AggregateRoot):
         self._checkpoints = checkpoints
         if not self._invariants_are_correct():
             self._rollback_set_checkpoints(old_checkpoints)
-            raise ValueError("Invariants are violated.")
+            raise ValueError("Race invariants are violated.")
         try:
             self.task.checkpoints_are_good(checkpoints)
         except (TypeError, ValueError) as e:
@@ -149,10 +149,10 @@ class Race(AggregateRoot):
         start_time = self._start_time
         end_time = self._end_time
         for point in checkpoints:
-            if point.start_time and point.start_time < start_time:
-                start_time = point.start_time
-            if point.end_time and point.end_time > end_time:
-                end_time = point.end_time
+            if point.open_time and point.open_time < start_time:
+                start_time = point.open_time
+            if point.close_time and point.close_time > end_time:
+                end_time = point.close_time
         if start_time < end_time:
             self._start_time = start_time
             self._end_time = end_time

@@ -11,6 +11,8 @@ from twisted.internet import defer
 
 from gorynych.info.application import ApplicationService
 from gorynych.common.domain.types import Checkpoint
+from gorynych.info import domain
+from gorynych.info.domain.test.test_race import create_checkpoints
 
 
 class GoodRepository:
@@ -207,7 +209,7 @@ class ContestParagliderRaceTest(unittest.TestCase):
         gc.collect()
 
 
-    def test_register_paraglider(self, patched):
+    def test_register_paraglider_on_contest(self, patched):
         patched.return_value = self.repository
         result = self.aps.register_paraglider_on_contest(dict(
             contest_id=self.cont_id, glider='gin', contest_number='1',
@@ -215,6 +217,7 @@ class ContestParagliderRaceTest(unittest.TestCase):
         paraglider = result.paragliders[self.p1_id]
         cont = self.repository.get_by_id(self.cont_id)
         self.assertEqual(len(cont.paragliders), 1)
+        self.assertEqual(cont._participants[self.p1_id]['role'], 'paraglider')
 
         self.assertEqual(paraglider['glider'], 'gin')
         self.assertEqual(paraglider['contest_number'], 1)
@@ -280,15 +283,30 @@ class ContestParagliderRaceTest(unittest.TestCase):
         except:
             raise unittest.SkipTest("Paraglider need to be registered.")
 
-        ch1 = Checkpoint('A', Point(0.1, 2), radius=400, times=(1, 2))
+        chs = create_checkpoints()
+        patched.mock_calls = []
 
         race = self.aps.create_new_race_for_contest(
                                             dict(contest_id=self.cont_id,
                                                  race_type='speedrun',
-                                                 race_title='task 3',
-                                                 checkpoints=[ch1])).result
-        self.assertEqual(race.id, self.repository.get_by_id(race.id).id)
+                                                 title='task 3',
+                                                 checkpoints=chs)).result
+        saved_race = self.repository.get_by_id(race.id)
+        self.assertEqual(race.id, saved_race.id)
         self.assertEqual(race.type, 'speedrun')
+        self.assertEqual(saved_race.type, 'speedrun')
+        self.assertEqual(race.title, 'Task 3')
+        self.assertEqual(saved_race.title, 'Task 3')
+        # I wish to check correct repository calling.
+        expected_call_list = []
+        expected_call_list.append(mock.call(domain.contest.IContestRepository))
+        expected_call_list.append(mock.call(domain.person.IPersonRepository))
+        expected_call_list.append(mock.call(domain.race.IRaceRepository))
+        self.assertTrue(expected_call_list == patched.mock_calls)
+        # Check contest
+        saved_contest = self.repository.get_by_id(self.cont_id)
+        self.assertEqual(saved_contest.race_ids[0], race.id)
+
 
     def test_get_contest_races(self, patched):
         patched.return_value = self.repository
@@ -302,11 +320,11 @@ class ContestParagliderRaceTest(unittest.TestCase):
             ch1 = Checkpoint('A', Point(0.1, 2), radius=400, times=(1, 2))
             self.aps.create_new_race_for_contest(dict(contest_id=self.cont_id,
                                                       race_type='speedrun',
-                                                      race_title='task 3',
+                                                      title='task 3',
                                                       checkpoints=[ch1]))
             self.aps.create_new_race_for_contest(dict(contest_id=self.cont_id,
                                                       race_type='speedrun',
-                                                      race_title='task 4',
+                                                      title='task 4',
                                                       checkpoints=[ch1]))
         except Exception:
             raise unittest.SkipTest("Race is needed for this test.")

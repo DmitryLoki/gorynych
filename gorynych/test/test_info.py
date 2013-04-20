@@ -5,6 +5,45 @@ import json
 import requests
 
 import unittest
+from gorynych.info.domain.test.test_race import create_checkpoints
+
+URL = 'http://localhost:8085'
+
+def create_contest():
+    params = dict(title='Contest with paragliders', start_time=1,
+        end_time=10,
+        place = 'La France', country='ru',
+        hq_coords='43.3,23.1', timezone='Europe/Paris')
+    r = requests.post(URL + '/contest', data=params)
+    return r.json()['id']
+
+
+def create_persons():
+    params = dict(name='Vasylyi', surname='Doe', country='SS',
+        email='vasya@example.com', reg_date='2012,12,12')
+    r = requests.post(URL + '/person', data=params)
+    return r.json()['id']
+
+
+def find_contest_with_paraglider():
+        contest_list = requests.get(URL + '/contest')
+        for cont in contest_list.json():
+            r = requests.get('/'.join((URL, 'contest', cont['id'],
+                'paraglider')))
+            paragliders_list = r.json()
+            if paragliders_list:
+                return cont['id'], paragliders_list[0]['person_id']
+
+
+def register_paraglider(pers_id, cont_id):
+    params = dict(person_id=pers_id, glider='gArlem 88',
+                  contest_number='666')
+    r = requests.post('/'.join((URL, 'contest', cont_id,
+                                'paraglider')), data=params)
+    if not r.status_code == 201:
+        raise Exception
+    return r
+
 
 
 class RESTAPITest(unittest.TestCase):
@@ -18,14 +57,13 @@ class RESTAPITest(unittest.TestCase):
         self.assertEqual(r.status_code, 404)
 
 
-
 class ContestRESTAPITest(unittest.TestCase):
     url = 'http://localhost:8085/contest/'
     def test_1_get_no_contests(self):
         '''
         Here I suppose that contest repository is empty.
         '''
-        # self.skipTest("I'm lazy and don't want to clean repository.")
+        self.skipTest("I'm lazy and don't want to clean repository.")
         r = requests.get(self.url)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json(), {})
@@ -104,43 +142,17 @@ class PersonAPITest(unittest.TestCase):
 
 class ParaglidersTest(unittest.TestCase):
     url = 'http://localhost:8085'
-    def _create_contest(self):
-        params = dict(title='Contest with paragliders', start_time=1,
-            end_time=10,
-            place = 'La France', country='ru',
-            hq_coords='43.3,23.1', timezone='Europe/Paris')
-        r = requests.post(self.url + '/contest', data=params)
-        return r.json()['id']
-
-    def _create_persons(self):
-        params = dict(name='Vasylyi', surname='Doe', country='SS',
-            email='vasya@example.com', reg_date='2012,12,12')
-        r = requests.post(self.url + '/person', data=params)
-        result = r.json()
-        return result['id']
-
-    def _find_contest_with_paraglider(self):
-        contest_list = requests.get(self.url + '/contest')
-        for cont in contest_list.json():
-            r = requests.get('/'.join((self.url, 'contest', cont['id'],
-                'paraglider')))
-            paragliders_list = r.json()
-            if paragliders_list:
-                return cont['id'], paragliders_list[0]['person_id']
 
     def test_1_register_paragliders(self):
         try:
-            cont_id = self._create_contest()
-            pers_id = self._create_persons()
+            cont_id = create_contest()
+            pers_id = create_persons()
         except Exception:
             raise unittest.SkipTest("Contest and persons hasn't been created"
                                     ".")
         if not cont_id and not pers_id:
             self.skipTest("Can't test without contest and race.")
-        params = dict(person_id=pers_id, glider='gArlem 88',
-            contest_number='666')
-        r = requests.post('/'.join((self.url, 'contest', cont_id,
-                                    'paraglider')), data=params)
+        r = register_paraglider(pers_id, cont_id)
         self.assertEqual(r.status_code, 201)
         result = r.json()
         self.assertEqual(result['person_id'], pers_id)
@@ -158,7 +170,7 @@ class ParaglidersTest(unittest.TestCase):
         self.assertTrue(result2.has_key('person_id'))
 
     def test_2_change_paraglider(self):
-        results = self._find_contest_with_paraglider()
+        results = find_contest_with_paraglider()
         if not results or (None in results):
             raise unittest.SkipTest("Can't test without contest and "
                                     "paraglider.")
@@ -171,6 +183,28 @@ class ParaglidersTest(unittest.TestCase):
         self.assertEqual(result['contest_number'], '13')
         self.assertEqual(result['glider'], 'marlboro')
 
+
+class ContestRaceTest(unittest.TestCase):
+    def test_create_race(self):
+        try:
+            c_id = create_contest()
+            p_id = create_persons()
+            i = register_paraglider(p_id, c_id)
+        except:
+            raise unittest.SkipTest("I need contest and paraglider for test")
+        if not (p_id and c_id):
+            raise unittest.SkipTest("I need contest and paraglider for test")
+
+        ch_list = create_checkpoints()
+        for i, item in enumerate(ch_list):
+            ch_list[i] = item.__geo_interface__
+        params = dict(title="Task 8", race_type='opendistance', bearing=12,
+                      checkpoints=json.dumps(ch_list))
+        r = requests.post('/'.join((URL, 'contest', c_id, 'race')), data=params)
+        self.assertEqual(r.status_code, 201)
+        self.assertDictContainsSubset({'type':'opendistance',
+                                       'title':'Task 8', 'start_time': '2',
+                                       'end_time': '8'}, r.json())
 
 
 if __name__ == '__main__':

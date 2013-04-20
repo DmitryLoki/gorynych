@@ -61,12 +61,20 @@ class Race(AggregateRoot):
 
         self.task = None
         self._checkpoints = []
-        self.title = ''
+        self._title = ''
         self.timelimits = ()
         self.paragliders = dict()
         self._start_time = decimal.Decimal('infinity')
         self._end_time = 1
         self._timezone = pytz.utc
+
+    @property
+    def title(self):
+        return self._title
+
+    @title.setter
+    def title(self, value):
+        self._title = value.strip().title()
 
     @property
     def type(self):

@@ -44,7 +44,7 @@ def json_renderer(template_values, template_name,
     def render(value, template):
         ''' Do actual rendering. Return string.
         '''
-        return template.substitute(value)
+        return template.safe_substitute(value)
 
     # render empty result
     if not template_values:

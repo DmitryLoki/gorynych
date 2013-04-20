@@ -2,6 +2,7 @@
 Application Services for info context.
 '''
 import uuid
+import simplejson as json
 
 from zope.interface import Interface
 from twisted.application.service import Service
@@ -9,6 +10,7 @@ from twisted.internet import defer
 
 from gorynych.info.domain import contest, person, race
 from gorynych.common.infrastructure import persistence
+from gorynych.common.domain.types import checkpoint_from_geojson
 
 
 class TrackerService(Interface):
@@ -308,9 +310,25 @@ class ApplicationService(Service):
         Change information about race in contest.
         @param params:
         @type params:
-        @return:
+        @return: Race
         @rtype:
         '''
+        def change(r):
+            if params.has_key('checkpoints'):
+                ch_list = json.loads(params['checkpoints'])['features']
+                checkpoints = []
+                for ch in ch_list:
+                    checkpoints.append(checkpoint_from_geojson(ch))
+                r.checkpoints = checkpoints
+            if params.has_key('race_title'):
+                r.title = params['race_title']
+            return r
+
+        d = self._get_aggregate(params['race_id'], race.IRaceRepository)
+        d.addCallback(change)
+        d.addCallback(persistence.get_repository(race.IRaceRepository).save)
+        return d
+
 
     ############## common methods ###################
     def _get_aggregate(self, id, repository):

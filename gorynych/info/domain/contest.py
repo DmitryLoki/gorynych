@@ -268,7 +268,7 @@ class Contest(AggregateRoot):
         else:
             raise ValueError("Unknown race type.")
 
-        race.title = race_title.strip().title()
+        race.title = race_title
         race.timelimits = (self.start_time, self.end_time)
         race.timezone = self.timezone
         # Here Race is created and we start to fill it with useful

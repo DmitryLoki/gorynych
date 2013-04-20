@@ -208,7 +208,7 @@ class ContestRaceTest(unittest.TestCase):
                                        'title':'Task 8', 'start_time': '2',
                                        'end_time': '8'}, r.json())
 
-        # Assume that races has been successfully created.
+        # Test GET /contest/{id}/race
         r = requests.get('/'.join((URL, 'contest', c_id, 'race')))
         self.assertEqual(r.status_code, 200)
         self.assertIsInstance(r.json(), list)
@@ -216,6 +216,7 @@ class ContestRaceTest(unittest.TestCase):
                                        'title':'Task 8', 'start_time': '2',
                                        'end_time': '8'}, r.json()[0])
 
+        # Test GET /contest/{id}/race/{id}
         r = requests.get('/'.join((URL, 'contest', c_id, 'race', race_id)))
         result = r.json()
         self.assertEqual(r.status_code, 200)
@@ -223,6 +224,20 @@ class ContestRaceTest(unittest.TestCase):
                          json.loads(json.dumps(ch_list)))
         self.assertEqual(result['race_title'], 'Task 8')
         self.assertEqual(result['timezone'], 'Europe/Paris')
+
+        # Test PUT /contest/{id}/race/{id}
+        new_ch_list = create_checkpoints()
+        new_ch_list[0].name = 'HAHA'
+        for i, item in enumerate(new_ch_list):
+            new_ch_list[i] = item.__geo_interface__
+        params = dict(race_title='Changed race', checkpoints=json.dumps(
+            {'type': 'FeatureCollection', 'features': new_ch_list}))
+        r = requests.put('/'.join((URL, 'contest', c_id, 'race', race_id)),
+                         data=json.dumps(params))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['race_title'], 'Changed Race')
+        self.assertEqual(r.json()['checkpoints']['features'],
+                         json.loads(json.dumps(new_ch_list)))
 
 
 if __name__ == '__main__':

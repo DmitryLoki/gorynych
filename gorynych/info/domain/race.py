@@ -63,6 +63,7 @@ class Race(AggregateRoot):
         self._checkpoints = []
         self._title = ''
         self.timelimits = ()
+        # {contest_number: Paraglider}
         self.paragliders = dict()
         self._start_time = decimal.Decimal('infinity')
         self._end_time = 1

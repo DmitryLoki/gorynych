@@ -210,3 +210,22 @@ class PersonResource(APIResource):
 
     def read_GET(self, pers, request_params=None):
         return self.read_PUT(pers)
+
+
+class RaceParagliderResourceCollection(APIResource):
+    '''
+    Resource /contest/{id}/race/{id}/paraglider
+    '''
+    name = 'race_paraglider_collection'
+    service_command = dict(GET='get_race_paragliders')
+
+    def read_GET(self, r, request_params=None):
+        if r:
+            result = []
+            for key in r.paragliders:
+                result.append(dict(contest_number=key,
+                                   glider=r.paragliders[key].glider,
+                                   name=r.paragliders[key].name,
+                                   person_id=r.paragliders[key].person_id,
+                                   country=r.paragliders[key].country))
+            return result

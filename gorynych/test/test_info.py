@@ -186,6 +186,7 @@ class ParaglidersTest(unittest.TestCase):
 
 class ContestRaceTest(unittest.TestCase):
     def test_create_and_read_race(self):
+        # TODO: refactor this test by splitting it and creating setUp method.
         try:
             c_id = create_contest()
             p_id = create_persons()
@@ -238,6 +239,33 @@ class ContestRaceTest(unittest.TestCase):
         self.assertEqual(r.json()['race_title'], 'Changed Race')
         self.assertEqual(r.json()['checkpoints']['features'],
                          json.loads(json.dumps(new_ch_list)))
+
+    def test_get_race_paragliders(self):
+        try:
+            c_id = create_contest()
+            p_id = create_persons()
+            i = register_paraglider(p_id, c_id)
+            ch_list = create_checkpoints()
+            for i, item in enumerate(ch_list):
+                ch_list[i] = item.__geo_interface__
+            params = dict(title="Task 8", race_type='opendistance', bearing=12,
+                          checkpoints=json.dumps(ch_list))
+            r = requests.post('/'.join((URL, 'contest', c_id, 'race')),
+                              data=params)
+            race_id = r.json()['id']
+        except Exception as error:
+            raise unittest.SkipTest("Something went wrong and I need race "
+                                    "for test: %r" % error)
+        if not (p_id and c_id and race_id):
+            raise unittest.SkipTest("I need race for test")
+
+        r = requests.get('/'.join((URL, 'contest', c_id, 'race', race_id,
+                                    'paraglider')))
+        self.assertEqual(r.status_code, 200)
+        self.assertDictContainsSubset({'glider':'garlem',
+                                       'contest_number':'666',
+                                       'name':'V. Doe', 'country':'SS'},
+                                      r.json()[0])
 
 
 if __name__ == '__main__':

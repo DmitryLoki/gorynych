@@ -329,6 +329,8 @@ class ApplicationService(Service):
         d.addCallback(persistence.get_repository(race.IRaceRepository).save)
         return d
 
+    def get_race_paragliders(self, params):
+        return self._get_aggregate(params['race_id'], race.IRaceRepository)
 
     ############## common methods ###################
     def _get_aggregate(self, id, repository):

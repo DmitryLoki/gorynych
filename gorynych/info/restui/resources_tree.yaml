@@ -26,6 +26,10 @@ contest:
             *uuid:
               leaf: ContestRaceResource
               package: *gorynych
+              tree:
+                paraglider:
+                  leaf: RaceParagliderResourceCollection
+                  package: *gorynych
 person:
   leaf: PersonResourceCollection
   package: *gorynych

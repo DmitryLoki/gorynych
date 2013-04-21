@@ -2,6 +2,7 @@
 Application Services for info context.
 '''
 import uuid
+import simplejson as json
 
 from zope.interface import Interface
 from twisted.application.service import Service
@@ -9,12 +10,14 @@ from twisted.internet import defer
 
 from gorynych.info.domain import contest, person, race
 from gorynych.common.infrastructure import persistence
+from gorynych.common.domain.types import checkpoint_from_geojson
 
 
 class TrackerService(Interface):
     '''
     Application Service which work with Tracker aggregate.
     '''
+
     def create_tracker(tracker_id, device_id, device_type):
         '''
         Create new tracker.
@@ -78,100 +81,39 @@ class TrackerService(Interface):
         @rtype:
         '''
 
-def read_contest(cont):
-    if cont:
-        return dict(contest_title = cont.title,
-                    contest_id = cont.id,
-                    contest_country_code = cont.country,
-                    contest_start_date = cont.start_time,
-                    contest_end_date = cont.end_time)
-
-def read_contest_list(cont_list):
-    if cont_list:
-        result = []
-        for cont in cont_list:
-            result.append(dict(contest_id=cont.id, contest_title=cont.title,
-                contest_start_time=cont.start_time,
-                contest_end_time=cont.end_time))
-        return result
-
-def read_person(pers):
-    if pers:
-        return dict(person_name=pers.name.full(),
-            person_id=pers.id, person_country=pers.country)
-
-
-def read_person_list(pers_list):
-    if pers_list:
-        result = []
-        for pers in pers_list:
-            result.append(dict(person_id=pers.id, person_name=pers.name.full()))
-        return result
-
-
-def read_race(race):
-    if race:
-        return dict(race_type=race.task.type, race_title=race.title,
-            race_id=race.id)
-
-
-def read_paraglider_list(p_list):
-    pass
-
-def read_contest_paraglider(cont, par_id):
-    if cont and par_id and cont.paragliders:
-        result = dict()
-        result['person_id'] = par_id
-        result['contest_number'] = cont.paragliders[par_id]['contest_number']
-        result['glider'] = cont.paragliders[par_id]['glider']
-        return result
-
-def read_contest_paraglider_list(p_dicts):
-    if p_dicts:
-        result = []
-        for person_id in p_dicts:
-            result.append(dict(person_id=person_id,
-                glider=p_dicts[person_id]['glider'],
-                contest_number=str(p_dicts[person_id]['contest_number'])))
-        return result
-
 
 class ApplicationService(Service):
-
     def __init__(self, event_publisher=None):
         self.event_publisher = event_publisher
 
     def startService(self):
-        self.contest_factory = contest.ContestFactory(self.event_publisher)
         Service.startService(self)
 
     def stopService(self):
         Service.stopService(self)
 
-
+    ############## Contest Service part #############
     def create_new_contest(self, params):
         '''
-        Create totally new contest, save it to repository and return dict
-        with contest parameters.
+        Create totally new contest and save it to repository.
         @param params:
         @type params:
-        @return: C{Deferred} which will be fired with dictionary with contest
-        parameters.
-        @rtype: C{dict}
+        @return: C{Deferred} which will be fired with L{Contest} aggregate.
+        @rtype: L{Contest}
         '''
         id = contest.ContestID(str(uuid.uuid4()))
-        cont = self.contest_factory.create_contest(id,
-            params['title'],
-            params['start_time'], params['end_time'],
-            params['place'], params['country'],
-            params['hq_coords'], params['timezone'])
-
+        contest_factory = contest.ContestFactory(self.event_publisher)
+        cont = contest_factory.create_contest(id, params['title'],
+                                              params['start_time'],
+                                              params['end_time'],
+                                              params['place'],
+                                              params['country'],
+                                              params['hq_coords'],
+                                              params['timezone'])
         d = defer.succeed(cont)
         d.addCallback(persistence.get_repository(contest.IContestRepository)
-                                            .save)
-        d.addCallback(read_contest)
+        .save)
         return d
-
 
     def get_contests(self, params=None):
         '''
@@ -181,24 +123,18 @@ class ApplicationService(Service):
         @return:
         @rtype:
         '''
-        return self._get_list_of_smth(params, contest.IContestRepository,
-            read_contest_list)
-
+        return self._get_aggregates_list(params, contest.IContestRepository)
 
     def get_contest(self, params):
         '''
         Return contest by id.
         @param params:
         @type params: C{dict}
-        @return: dictionary with contest data
+        @return: Contest wrapped by Deferred.
         @rtype: C{Deffered}
         '''
-        d = defer.succeed(params['contest_id'])
-        d.addCallback(persistence.get_repository(contest.IContestRepository).
-                                                get_by_id)
-        d.addCallback(read_contest)
-        return d
-
+        return self._get_aggregate(params['contest_id'],
+                                contest.IContestRepository)
 
     def change_contest(self, params):
         '''
@@ -232,33 +168,82 @@ class ApplicationService(Service):
             params['id'] = params['contest_id']
             del params['contest_id']
         return self._change_aggregate(params, contest.IContestRepository,
-            change, read_contest)
+                                      change)
+
+    def register_paraglider_on_contest(self, params):
+        '''
+
+        @param params:
+        @type params:
+        @return: Contest with registered paraglider wrapped in Deferred.
+        @rtype: C{Contest}
+        '''
+        d = self._get_aggregate(params['contest_id'],
+                                contest.IContestRepository)
+        d.addCallback(lambda cont: cont.register_paraglider(
+            params['person_id'], params['glider'],
+            params['contest_number']))
+        d.addCallback(
+            persistence.get_repository(contest.IContestRepository).save)
+        return d
+
+    def get_contest_paragliders(self, params):
+        '''
+        Return list with race paragliders.
+        @param params:
+        @type params:
+        @return:
+        @rtype:
+        '''
+        d = self._get_aggregate(params['contest_id'],
+                                contest.IContestRepository)
+        d.addCallback(lambda cont: cont.paragliders)
+        return d
+
+    def change_paraglider(self, params):
+        '''
+        Change paraglider information either for race or contest.
+        @param params:
+        @type params:
+        @return:
+        @rtype:
+        '''
+
+        def change(cont):
+            if params.has_key('glider'):
+                cont.change_participant_data(params['person_id'],
+                                             glider=params['glider'])
+            if params.has_key('contest_number'):
+                cont.change_participant_data(params['person_id'],
+                                     contest_number=params['contest_number'])
+            return cont
+
+        d = self._get_aggregate(params['contest_id'],
+                                contest.IContestRepository)
+        d.addCallback(change)
+        d.addCallback(persistence.get_repository(contest.IContestRepository)
+        .save)
+        return d
 
 
+    ############## Person Service part ##############
     def create_new_person(self, params):
         factory = person.PersonFactory(self.event_publisher)
         year, month, day = params['reg_date'].split(',')
         pers = factory.create_person(params['name'], params['surname'],
-            params['country'], params['email'], year, month, day)
+                                     params['country'], params['email'], year,
+                                     month, day)
         d = defer.succeed(pers)
         d.addCallback(persistence.get_repository(person.IPersonRepository).
-                                                save)
-        d.addCallback(read_person)
+        save)
         return d
-
 
     def get_person(self, params):
-        d = defer.succeed(params['person_id'])
-        d.addCallback(persistence.get_repository(person.IPersonRepository).
-                                                get_by_id)
-        d.addCallback(read_person)
-        return d
-
+        return self._get_aggregate(params['person_id'],
+                                   person.IPersonRepository)
 
     def get_persons(self, params=None):
-        return self._get_list_of_smth(params, person.IPersonRepository,
-            read_person_list)
-
+        return self._get_aggregates_list(params, person.IPersonRepository)
 
     def change_person(self, params):
         def change(pers, params):
@@ -271,125 +256,100 @@ class ApplicationService(Service):
             if params.get('country'):
                 pers.country = params['country']
             return pers
+
         if params.has_key('person_id'):
             params['id'] = params['person_id']
             del params['person_id']
         return self._change_aggregate(params, person.IPersonRepository,
-            change, read_person)
+                                      change)
 
-
+    ############## Race Service part ################
+    @defer.inlineCallbacks
     def create_new_race_for_contest(self, params):
-        d = defer.succeed(params['contest_id'])
-        d.addCallback(persistence.get_repository(contest.IContestRepository)
-                        .get_by_id)
-        d.addCallback(lambda cont: cont.new_race(params['race_type'],
-            params['checkpoints'], params['race_title']))
-        d.addCallback(persistence.get_repository(race.IRaceRepository).save)
-        d.addCallback(read_race)
-        return d
-
+        cont = yield self._get_aggregate(params['contest_id'],
+                                contest.IContestRepository)
+        r = yield cont.new_race(params['race_type'], params['checkpoints'],
+                      params['title'])
+        yield persistence.get_repository(race.IRaceRepository).save(r)
+        yield persistence.get_repository(contest.IContestRepository).save(
+            cont)
+        defer.returnValue(r)
 
     def get_contest_races(self, params):
         '''
-        Return list of races for contests
+        Return list of races for contest.
         @param params:
         @type params:
         @return:
         @rtype:
         '''
-
-
-    def get_race(self, params):
-        '''
-        Return info about concrete race.
-        @param params:
-        @type params:
-        @return:
-        @rtype:
-        '''
-
-
-    def change_race(self, params):
-        '''
-        Change race information.
-        @param params:
-        @type params:
-        @return:
-        @rtype:
-        '''
-
-
-    def register_paraglider_on_contest(self, params):
-        d = defer.succeed(params['contest_id'])
-        d.addCallback(persistence.get_repository(contest.IContestRepository)
-                    .get_by_id)
-        d.addCallback(lambda cont: cont.register_paraglider(
-            params['person_id'], params['glider'], params['contest_number']))
-        d.addCallback(persistence.get_repository(contest.IContestRepository)                                                .save)
-        d.addCallback(read_contest_paraglider, params['person_id'])
+        d = self._get_aggregate(params['contest_id'],
+                                contest.IContestRepository)
+        d.addCallback(lambda cont: [self._get_aggregate(id,
+                             race.IRaceRepository) for id in cont.race_ids])
+        d.addCallback(defer.gatherResults, consumeErrors=True)
         return d
 
-
-    def get_contest_paragliders(self, params):
+    @defer.inlineCallbacks
+    def get_contest_race(self, params):
         '''
-        Return list with race paragliders.
+        Return info about race in contest and about corresponding contest.
         @param params:
         @type params:
         @return:
         @rtype:
         '''
-        d = defer.succeed(params['contest_id'])
-        d.addCallback(persistence.get_repository(contest.IContestRepository).
-            get_by_id)
-        d.addCallback(lambda cont: cont.paragliders)
-        d.addCallback(read_contest_paraglider_list)
-        return d
+        r = yield self._get_aggregate(params['race_id'],
+                                      race.IRaceRepository)
+        c = yield self._get_aggregate(params['contest_id'],
+                                      contest.IContestRepository)
+        defer.returnValue((c, r))
 
-
-    def change_paraglider(self, params):
+    def change_contest_race(self, params):
         '''
-        Change paraglider information either for race or contest.
+        Change information about race in contest.
         @param params:
         @type params:
-        @return:
+        @return: Race
         @rtype:
         '''
-        def change(cont):
-            allowed_changes = ['glider', 'contest_number']
-            for item in allowed_changes:
-                if params.has_key(item):
-                    cont.change_participant_data(person_id, **params)
-            return cont
+        def change(r):
+            if params.has_key('checkpoints'):
+                ch_list = json.loads(params['checkpoints'])['features']
+                checkpoints = []
+                for ch in ch_list:
+                    checkpoints.append(checkpoint_from_geojson(ch))
+                r.checkpoints = checkpoints
+            if params.has_key('race_title'):
+                r.title = params['race_title']
+            return r
 
-        person_id = params['person_id']
-        del params['person_id'] # yes, this is necessary
-
-        d = defer.succeed(params['contest_id'])
-        d.addCallback(persistence.get_repository(contest.IContestRepository)
-            .get_by_id)
+        d = self._get_aggregate(params['race_id'], race.IRaceRepository)
         d.addCallback(change)
-        d.addCallback(persistence.get_repository(contest.IContestRepository)
-            .save)
-        d.addCallback(read_contest_paraglider, person_id)
+        d.addCallback(persistence.get_repository(race.IRaceRepository).save)
         return d
 
+    def get_race_paragliders(self, params):
+        return self._get_aggregate(params['race_id'], race.IRaceRepository)
 
-    def _change_aggregate(self, params, repo_interface, change_func,
-                          read_func):
+    ############## common methods ###################
+    def _get_aggregate(self, id, repository):
+        d = defer.succeed(id)
+        d.addCallback(persistence.get_repository(repository).get_by_id)
+        return d
+
+    def _change_aggregate(self, params, repo_interface, change_func):
         id = params.get('id')
         if not id:
             raise ValueError("Aggregate's id hasn't been received.")
         del params['id']
 
-        d = defer.succeed(id)
-        d.addCallback(persistence.get_repository(repo_interface).get_by_id)
+        d = self._get_aggregate(id, repo_interface)
         d.addCallback(change_func, params)
         d.addCallback(persistence.get_repository(repo_interface).save)
-        d.addCallback(read_func)
         return d
 
-    def _get_list_of_smth(self, limit_offset_params, repo_interface,
-                          read_func):
+    def _get_aggregates_list(self, limit_offset_params, repo_interface):
         if limit_offset_params:
             limit = limit_offset_params.get('limit', None)
             offset = limit_offset_params.get('offset', 0)
@@ -399,8 +359,5 @@ class ApplicationService(Service):
 
         d = defer.succeed(limit)
         d.addCallback(persistence.get_repository(repo_interface).get_list,
-            offset)
-        d.addCallback(read_func)
+                      offset)
         return d
-
-

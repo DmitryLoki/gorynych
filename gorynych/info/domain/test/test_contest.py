@@ -110,16 +110,22 @@ class ContestTest(unittest.TestCase):
         ch3 = Checkpoint('B02', Point(1, 2), 'es', radius=3)
         ch4 = Checkpoint('g10', Point(2, 2), 'goal', (None, 8), 3)
         race = cont.new_race('Speed Run', [ch1, ch2, ch3, ch4], 'task 4')
-        self.assertEqual(race.task.type, 'speedrun')
+
+        ### test Race aggregate ###
+        self.assertEqual(race.type, 'speedrun')
         self.assertEqual(race.checkpoints, [ch1, ch2, ch3, ch4])
         self.assertEqual(race.title, 'Task 4')
         self.assertTupleEqual((1, 15), race.timelimits)
         self.assertEqual(race.event_publisher, cont.event_publisher)
+        self.assertTupleEqual((race.start_time, race.end_time), (2, 8))
+        self.assertEqual(race.timezone, cont.timezone)
+        self.assertIsNone(race.bearing)
 
+        ### test Contest aggregate ###
         self.assertEqual(len(cont.race_ids), 1)
         self.assertIsInstance(cont.race_ids[0], RaceID)
 
-        self.assertEqual(len(race.paragliders), 2)
+        self.assertEqual(len(race.paragliders), 3)
         p1 = race.paragliders[747]
         p2 = race.paragliders[757]
         self.assertEqual((p1.person_id, p1.name, p1.tracker_id, p1.glider,

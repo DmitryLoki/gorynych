@@ -20,12 +20,16 @@ contest:
               leaf: ContestParagliderResource
               package: *gorynych
         race:
-          leaf: RaceResourceCollection
+          leaf: ContestRaceResourceCollection
           package: *gorynych
           tree:
             *uuid:
-              leaf: RaceResource
+              leaf: ContestRaceResource
               package: *gorynych
+              tree:
+                paraglider:
+                  leaf: RaceParagliderResourceCollection
+                  package: *gorynych
 person:
   leaf: PersonResourceCollection
   package: *gorynych

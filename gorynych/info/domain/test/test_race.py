@@ -6,12 +6,14 @@ from shapely.geometry import Point
 
 from gorynych.info.domain import race
 from gorynych.common.domain.types import Checkpoint
+from gorynych.common.exceptions import BadCheckpoint
 
 
 def create_race():
     pass
 
 def create_checkpoints():
+    # also used in test_info
     ch1 = Checkpoint('A01', Point(42.502, 0.798), 'TO', (2, None), 2)
     ch2 = Checkpoint('A01', Point(42.502, 0.798), 'ss', (4, 6), 3)
     ch3 = Checkpoint('B02', Point(1, 2), 'es', radius=3)
@@ -28,7 +30,7 @@ class RaceTest(unittest.TestCase):
     def tearDown(self):
         del self.race
 
-    def test_race(self):
+    def test_race_module(self):
         self.assertIsInstance(race.RACETASKS['speedrun'](), race.SpeedRunTask)
         self.assertIsInstance(race.RACETASKS['racetogoal'](),
             race.RaceToGoalTask)
@@ -49,7 +51,6 @@ class RaceTest(unittest.TestCase):
         self.race.paragliders = dict()
         self.assertFalse(self.race._invariants_are_correct())
 
-
     def test_set_checkpoints(self):
         # make race happy with it's invariants:
         self.race.paragliders[1] = 2
@@ -58,7 +59,6 @@ class RaceTest(unittest.TestCase):
         self.race.checkpoints = good_checkpoints
         self.race.event_publisher.publish.assert_called_once_with(
             race.CheckpointsAreAddedToRace(self.race.id, good_checkpoints))
-
 
     def test_rollback_checkpoints(self):
         # make race happy with it's invariants:
@@ -76,6 +76,21 @@ class RaceTest(unittest.TestCase):
         self.race.event_publisher.publish.assert_called_once_with(
             race.CheckpointsAreAddedToRace(self.race.id, good_checkpoints))
 
+    def test_get_times_from_checkpoints(self):
+        ch1 = mock.Mock()
+        ch1.open_time, ch1.close_time = 2, 5
+        ch2 = mock.Mock()
+        ch2.open_time, ch2.close_time = 4, None
+        self.race._get_times_from_checkpoints([ch1, ch2])
+        self.assertTupleEqual((self.race.start_time, self.race.end_time),
+                              (2, 5))
+
+    def test_get_times_from_checkpoints_bad_case(self):
+        ch2 = mock.Mock()
+        ch2.open_time, ch2.close_time = 4, None
+        self.assertRaises(BadCheckpoint,
+                          self.race._get_times_from_checkpoints, [ch2])
+
 
 class RaceTaskTest(unittest.TestCase):
     def test_creation(self):
@@ -90,8 +105,6 @@ class RaceTaskTest(unittest.TestCase):
             chs[1]]))
         self.assertRaises(ValueError, task.checkpoints_are_good, [])
         self.assertRaises(TypeError, task.checkpoints_are_good, [1, 2])
-
-
 
 
 if __name__ == '__main__':

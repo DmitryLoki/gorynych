@@ -93,3 +93,7 @@ class DomainEvent(object):
         else:
             self.id = id
         self.timestamp = int(time.time())
+
+    def __eq__(self, other):
+        # TODO: do correct event comparison
+        return self.id == other.id and self.timestamp == other.timestamp

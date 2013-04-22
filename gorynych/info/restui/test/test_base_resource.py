@@ -13,7 +13,7 @@ from twisted.web.server import Request, Site, Session, NOT_DONE_YET
 from twisted.web.resource import NoResource, Resource
 from zope.interface import implementer
 
-from gorynych.info.restui.resources import (APIResource,
+from gorynych.info.restui.base_resource import (APIResource,
      BadParametersError, json_renderer,
     resource_tree)
 from gorynych.common.exceptions import NoAggregate
@@ -242,8 +242,17 @@ class SimpleAPIResource(APIResource):
     name = 'SimpleAPIResource'
     service_command = {'GET': 'get_the_thing', 'POST': 'post_the_thing',
                        'PUT': 'put_the_thing'}
-    allowedMethods = ["GET"]
     renderers = {'application/json': lambda x, y: '::'.join((x, y))}
+
+    def read_GET(self, res, params):
+        return res
+
+    def read_POST(self, res, params):
+        return self.read_GET(res, params)
+
+    def read_PUT(self, res, params):
+        return self.read_GET(res, params)
+
 
 
 class SimpleService(object):
@@ -262,15 +271,15 @@ class APIResourceTest(unittest.TestCase):
         self.tree_ = {
             '\w+-\w+-3\w+': {'leaf': 'SimpleAPIResource',
                              'package': __import__(
-                         'test_resources',
+                         'test_base_resource',
                                  globals={"__name__": __name__}),
                              'tree': {}},
             'race': {'leaf': 'SomeResource',
-                     'package': __import__('test_resources',
+                     'package': __import__('test_base_resource',
                      globals={"__name__": __name__}),
                      'tree': 1},
             'no_tree': {'leaf': 'SomeResource',
-                 'package': __import__('test_resources',
+                 'package': __import__('test_base_resource',
                      globals={"__name__": __name__})}}
         self.api_resource = APIResource(self.tree_, 'service')
 
@@ -336,6 +345,7 @@ class APIResourceMethodTest(unittest.TestCase):
 
     def test_resource_renderer(self):
         req = Request(DummyChannel(), 1)
+        req.method = 'GET'
         result, body = self.api.resource_renderer('res', req)
         self.assertEqual(result.code, 200)
         self.assertEqual(body, 'res::SimpleAPIResource')
@@ -343,13 +353,14 @@ class APIResourceMethodTest(unittest.TestCase):
     def test_error_in_read_function(self):
         req = Request(DummyChannel(), 1)
         req.setResponseCode(200)
-        def error_function(a):
+        req.method = 'GET'
+        def error_function(a, b):
             raise Exception("boom")
-        self.api.read = error_function
+        self.api.read_GET = error_function
         self.api._handle_error = mock.Mock()
         result, body = self.api.resource_renderer('res', req)
         self.api._handle_error.assert_called_with(req, 500, "ReadError",
-            "Error %r in aggregate reading function." % Exception('boom'))
+            "Error %r in resource reading function." % Exception('boom'))
 
 
     def test_good_get(self):
@@ -367,7 +378,7 @@ class APIResourceMethodTest(unittest.TestCase):
             'The thing is {}::SimpleAPIResource')
 
     def test_good_put(self):
-        self.skipTest("I'm not sure what I want here.")
+        self.skipTest("I'm not sure what am I want here.")
         req = self._get_req()
         req.requestReceived('PUT', '/simple', 'HTTP/1.1')
         self.assertEqual(req.code, 200)

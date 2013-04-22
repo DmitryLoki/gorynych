@@ -2,7 +2,6 @@
 Aggregate Person.
 '''
 import datetime
-import uuid
 
 from zope.interface.interfaces import Interface
 
@@ -83,13 +82,17 @@ class Person(AggregateRoot):
         except KeyError:
             pass
 
+    # TODO: do aggregate root comparison
+    def __eq__(self, other):
+        return self.name.full() == other.name.full() and self.email == other.email
+
 
 class PersonFactory(object):
     def __init__(self, event_publisher):
         self.event_publisher = event_publisher
 
     def create_person(self, name, surname, country, email, year=None,
-                      month=None, day=None):
+                      month=None, day=None, id=None):
         '''
         Create an instance of Person aggregate.
         @param name:
@@ -116,7 +119,12 @@ class PersonFactory(object):
         if not MINYEAR <= year <= datetime.date.today().year:
             raise ValueError("Year is out of range %s-%s" %
                              (MINYEAR, datetime.date.today().year))
-        person = Person(PersonID(str(uuid.uuid4())),
+
+        if not id:
+            id = PersonID()
+        elif not isinstance(id, PersonID):
+            id = PersonID.fromstring(id)
+        person = Person(id,
                         Name(name, surname),
                         Country(country),
                         email,

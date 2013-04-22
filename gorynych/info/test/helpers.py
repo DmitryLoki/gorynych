@@ -41,7 +41,7 @@ class BaseRepository(object):
             try:
                 return data[id]
             except KeyError:
-                raise NoAggregate
+                raise NoAggregate(self.__class__.__name__)
 
     def get_list(self, limit=None, offset=None):
         with open(self.filename, 'rb') as f:
@@ -69,11 +69,4 @@ class PickleRaceRepository(BaseRepository):
 
 class PicklePersonRepository(BaseRepository):
     implements(IPersonRepository)
-    def find_the_same(self, obj, obj_list):
-        for item in obj_list:
-            c1 = item.email == obj.email
-            c2 = item.name == obj.name
-            c3 = item.country == obj.country
-            if c1 and c2 and c3:
-                return item
 

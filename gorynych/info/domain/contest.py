@@ -2,15 +2,18 @@
 Contest Aggregate.
 '''
 import uuid
+import re
+from datetime import date
 from copy import deepcopy
 
+import pytz
 from zope.interface.interfaces import Interface
 
 from gorynych.common.domain.model import IdentifierObject, AggregateRoot
 from gorynych.common.domain.model import ValueObject, DomainEvent
 from gorynych.common.domain.types import Address, Name, Country
 from gorynych.common.infrastructure import persistence
-from gorynych.info.domain.tracker import TrackerID
+# from gorynych.info.domain.tracker import TrackerID
 from gorynych.info.domain.race import RaceID, Race, RACETASKS
 from gorynych.info.domain.person import IPersonRepository
 
@@ -35,9 +38,25 @@ class IContestRepository(Interface):
         '''
 
 
-
 class ContestID(IdentifierObject):
-    pass
+    def __init__(self):
+        fmt = '%y%m%d'
+        self.__creation_date = date.today().strftime(fmt)
+        self.__aggregate_type = 'cnts'
+        self.__random = uuid.uuid4().fields[0]
+        self._id = '-'.join((self.__aggregate_type, self.__creation_date,
+                              str(self.__random)))
+
+    def _string_is_valid_id(self, string):
+        agr_type, creation_date, random_number = string.split('-')
+        assert agr_type == 'cnts', "Wrong aggregate type in id string."
+        assert re.match('[0-9]{6}', creation_date), "Wrong creation date in " \
+                                                    "id string."
+        try:
+            int(random_number)
+        except ValueError as error:
+            raise ValueError("Wrong third part of id string: %r" % error)
+        return True
 
 
 class ContestFactory(object):
@@ -45,16 +64,21 @@ class ContestFactory(object):
     def __init__(self, event_publisher=None):
         self.event_publisher = event_publisher
 
-    def create_contest(self, id, title, start_time, end_time,
-                       contest_place, contest_country, hq_coords):
+    def create_contest(self, title, start_time, end_time,
+               contest_place, contest_country, hq_coords, timezone,
+               id=None):
         address = Address(contest_place, contest_country, hq_coords)
         if not int(start_time) <  int(end_time):
             raise ValueError("Start time must be less then end time.")
-        if not isinstance(id, ContestID):
-            id = ContestID(id)
-
+        if not id:
+            id = ContestID()
+        elif not isinstance(id, ContestID):
+            id = ContestID.fromstring(id)
+        if not timezone in pytz.all_timezones_set:
+            raise pytz.exceptions.UnknownTimeZoneError("Wrong timezone.")
         contest = Contest(id, start_time, end_time, address)
         contest.title = title
+        contest.timezone = timezone
         if self.event_publisher:
             contest.event_publisher = self.event_publisher
         return contest
@@ -75,11 +99,33 @@ class Contest(AggregateRoot):
     def __init__(self, id, start_time, end_time, address):
         self.id = id
         self._title = ''
+        self._timezone = ''
         self._start_time = start_time
         self._end_time = end_time
         self.address = address
         self._participants = dict()
         self.race_ids = list()
+
+    @property
+    def timezone(self):
+        '''
+        @return: full name of time zone in which contest take place (
+        Europe/Moscow).
+        @rtype: C{str}
+        '''
+        return self._timezone
+
+    @timezone.setter
+    def timezone(self, value):
+        '''
+        This is a blocking function! It read a file in usual blocking mode
+        and it's better to wrap result in maybeDeferred.
+
+        @param value: time zone full name
+        @type value: C{str}
+        '''
+        if value in pytz.all_timezones_set:
+            self._timezone = value
 
     @property
     def start_time(self):
@@ -234,7 +280,7 @@ class Contest(AggregateRoot):
         @return: a new race for contest
         @rtype: Race
         '''
-        race_id = RaceID(uuid.uuid4())
+        race_id = RaceID()
         race = Race(race_id)
         race.event_publisher = self.event_publisher
         race_type = ''.join(race_type.strip().lower().split())
@@ -243,13 +289,14 @@ class Contest(AggregateRoot):
         else:
             raise ValueError("Unknown race type.")
 
-        race.title = race_title.strip().title()
+        race.title = race_title
         race.timelimits = (self.start_time, self.end_time)
+        race.timezone = self.timezone
         # Here Race is created and we start to fill it with useful
         # information.
+        # TODO: the same for transport and organizers.
         race = self._fill_race_with_paragliders(race)
         race.checkpoints = checkpoints
-        # TODO: the same for transport and organizers.
         self.race_ids.append(race_id)
         return race
 
@@ -258,7 +305,7 @@ class Contest(AggregateRoot):
             if self._participants[key]['role'] == 'paraglider':
                 person = persistence.get_repository(IPersonRepository
                                                     ).get_by_id(key)
-                if person and person.tracker:
+                if person: # TODO: do this later: and person.tracker:
                     race.paragliders[
                       self._participants[key]['contest_number']] = Paraglider(
                         key,
@@ -292,17 +339,19 @@ class Contest(AggregateRoot):
 class Paraglider(ValueObject):
 
     def __init__(self, person_id, name, country, glider, contest_number,
-                 tracker_id):
+                 tracker_id=None):
+        # TODO: remove tracker_id=None when tracker assignment will work.
         from gorynych.info.domain.person import PersonID
 
         if not isinstance(person_id, PersonID):
-            person_id = PersonID(person_id)
+            person_id = PersonID().fromstring(person_id)
         if not isinstance(name, Name):
             raise TypeError("Name must be an instance of Name class.")
         if not isinstance(country, Country):
             country = Country(country)
-        if not isinstance(tracker_id, TrackerID):
-            tracker_id = TrackerID(tracker_id)
+        # TODO: uncomment this when tracker assignment will work.
+        # if not isinstance(tracker_id, TrackerID):
+        #     tracker_id = TrackerID(tracker_id)
 
         self.person_id = person_id
         self.name = name.short()

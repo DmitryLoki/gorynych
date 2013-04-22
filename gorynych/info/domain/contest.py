@@ -2,6 +2,8 @@
 Contest Aggregate.
 '''
 import uuid
+import re
+from datetime import date
 from copy import deepcopy
 
 import pytz
@@ -36,9 +38,25 @@ class IContestRepository(Interface):
         '''
 
 
-
 class ContestID(IdentifierObject):
-    pass
+    def __init__(self):
+        fmt = '%y%m%d'
+        self.__creation_date = date.today().strftime(fmt)
+        self.__aggregate_type = 'cnts'
+        self.__random = uuid.uuid4().fields[0]
+        self._id = '-'.join((self.__aggregate_type, self.__creation_date,
+                              str(self.__random)))
+
+    def _string_is_valid_id(self, string):
+        agr_type, creation_date, random_number = string.split('-')
+        assert agr_type == 'cnts', "Wrong aggregate type in id string."
+        assert re.match('[0-9]{6}', creation_date), "Wrong creation date in " \
+                                                    "id string."
+        try:
+            int(random_number)
+        except ValueError as error:
+            raise ValueError("Wrong third part of id string: %r" % error)
+        return True
 
 
 class ContestFactory(object):
@@ -46,13 +64,16 @@ class ContestFactory(object):
     def __init__(self, event_publisher=None):
         self.event_publisher = event_publisher
 
-    def create_contest(self, id, title, start_time, end_time,
-                       contest_place, contest_country, hq_coords, timezone):
+    def create_contest(self, title, start_time, end_time,
+               contest_place, contest_country, hq_coords, timezone,
+               id=None):
         address = Address(contest_place, contest_country, hq_coords)
         if not int(start_time) <  int(end_time):
             raise ValueError("Start time must be less then end time.")
-        if not isinstance(id, ContestID):
-            id = ContestID(id)
+        if not id:
+            id = ContestID()
+        elif not isinstance(id, ContestID):
+            id = ContestID.fromstring(id)
         if not timezone in pytz.all_timezones_set:
             raise pytz.exceptions.UnknownTimeZoneError("Wrong timezone.")
         contest = Contest(id, start_time, end_time, address)
@@ -259,7 +280,7 @@ class Contest(AggregateRoot):
         @return: a new race for contest
         @rtype: Race
         '''
-        race_id = RaceID(uuid.uuid4())
+        race_id = RaceID()
         race = Race(race_id)
         race.event_publisher = self.event_publisher
         race_type = ''.join(race_type.strip().lower().split())
@@ -323,7 +344,7 @@ class Paraglider(ValueObject):
         from gorynych.info.domain.person import PersonID
 
         if not isinstance(person_id, PersonID):
-            person_id = PersonID(person_id)
+            person_id = PersonID().fromstring(person_id)
         if not isinstance(name, Name):
             raise TypeError("Name must be an instance of Name class.")
         if not isinstance(country, Country):

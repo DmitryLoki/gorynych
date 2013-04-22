@@ -1,7 +1,6 @@
 '''
 Application Services for info context.
 '''
-import uuid
 import simplejson as json
 
 from zope.interface import Interface
@@ -101,15 +100,16 @@ class ApplicationService(Service):
         @return: C{Deferred} which will be fired with L{Contest} aggregate.
         @rtype: L{Contest}
         '''
-        id = contest.ContestID(str(uuid.uuid4()))
+        id = contest.ContestID()
         contest_factory = contest.ContestFactory(self.event_publisher)
-        cont = contest_factory.create_contest(id, params['title'],
+        cont = contest_factory.create_contest(params['title'],
                                               params['start_time'],
                                               params['end_time'],
                                               params['place'],
                                               params['country'],
                                               params['hq_coords'],
-                                              params['timezone'])
+                                              params['timezone'],
+                                              id)
         d = defer.succeed(cont)
         d.addCallback(persistence.get_repository(contest.IContestRepository)
         .save)

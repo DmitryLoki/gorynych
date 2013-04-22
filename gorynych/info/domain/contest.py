@@ -10,12 +10,13 @@ import pytz
 from zope.interface.interfaces import Interface
 
 from gorynych.common.domain.model import IdentifierObject, AggregateRoot
-from gorynych.common.domain.model import ValueObject, DomainEvent
+from gorynych.common.domain.model import ValueObject
 from gorynych.common.domain.types import Address, Name, Country
 from gorynych.common.infrastructure import persistence
 # from gorynych.info.domain.tracker import TrackerID
 from gorynych.info.domain.race import RaceID, Race, RACETASKS
 from gorynych.info.domain.person import IPersonRepository
+from gorynych.info.domain.events import ParagliderRegisteredOnContest
 
 
 class IContestRepository(Interface):
@@ -82,16 +83,6 @@ class ContestFactory(object):
         if self.event_publisher:
             contest.event_publisher = self.event_publisher
         return contest
-
-
-class ParagliderRegisteredOnContest(DomainEvent):
-    def __init__(self, id, contest_id):
-        self.contest_id = contest_id
-        DomainEvent.__init__(self, id)
-
-    def __eq__(self, other):
-        return self.id == other.id and self.timestamp == other.timestamp and (
-            self.contest_id == other.contest_id)
 
 
 class Contest(AggregateRoot):

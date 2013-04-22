@@ -6,7 +6,7 @@ from shapely.geometry import Point
 from gorynych.info.domain import race
 from gorynych.common.domain.types import Checkpoint
 from gorynych.common.exceptions import BadCheckpoint
-from gorynych.info.domain.events import CheckpointsAreAddedToRace, ArchiveURLReceived
+from gorynych.info.domain.events import RaceCheckpointsChanged, ArchiveURLReceived
 
 
 def create_race():
@@ -58,7 +58,7 @@ class RaceTest(unittest.TestCase):
         good_checkpoints = create_checkpoints()
         self.race.checkpoints = good_checkpoints
         self.race.event_publisher.publish.assert_called_once_with(
-            CheckpointsAreAddedToRace(self.race.id, good_checkpoints))
+            RaceCheckpointsChanged(self.race.id, good_checkpoints))
 
     def test_rollback_checkpoints(self):
         # make race happy with it's invariants:
@@ -74,7 +74,7 @@ class RaceTest(unittest.TestCase):
             pass
         self.assertEqual(self.race._checkpoints, good_checkpoints)
         self.race.event_publisher.publish.assert_called_once_with(
-            CheckpointsAreAddedToRace(self.race.id, good_checkpoints))
+            RaceCheckpointsChanged(self.race.id, good_checkpoints))
 
     def test_get_times_from_checkpoints(self):
         ch1 = mock.Mock()

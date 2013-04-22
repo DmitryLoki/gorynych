@@ -9,6 +9,8 @@ from shapely.geometry import Point
 from gorynych.info.domain import contest
 from gorynych.common.domain.types import Address, Name, Country, Checkpoint
 from gorynych.info.domain.race import RaceID
+from info.domain.events import ParagliderRegisteredOnContest
+
 
 def create_contest(start_time, end_time, id=None,
                    title='  Hello world  ',
@@ -144,9 +146,9 @@ class ContestTest(unittest.TestCase):
         # contest creation.
         self.assertEqual(len(mock_calls), 3)
         self.assertEqual(mock_calls[-1], mock.call.publish(
-            contest.ParagliderRegisteredOnContest('person2', cont_id)))
+            ParagliderRegisteredOnContest('person2', cont_id)))
         self.assertEqual(mock_calls[-2], mock.call.publish(
-            contest.ParagliderRegisteredOnContest('person1', cont_id)))
+            ParagliderRegisteredOnContest('person1', cont_id)))
 
     @mock.patch('gorynych.common.infrastructure.persistence.get_repository')
     def test_new_race(self, patched):

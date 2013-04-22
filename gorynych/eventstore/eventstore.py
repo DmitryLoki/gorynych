@@ -1,13 +1,11 @@
 '''
 Store events in system according to Event Sourcing pattern.
 '''
-from gorynych.eventstore.interfaces import IEventStore
-
-__author__ = 'Boris Tsema'
-
 import sys
 
 from zope.interface import implementer
+
+from gorynych.eventstore.interfaces import IEventStore
 
 
 @implementer(IEventStore)

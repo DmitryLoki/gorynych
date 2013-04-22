@@ -3,7 +3,8 @@ Tracker Aggregate.
 '''
 from zope.interface.interfaces import Interface
 
-from gorynych.common.domain.model import AggregateRoot, DomainEvent, IdentifierObject
+from gorynych.common.domain.model import AggregateRoot, IdentifierObject
+from gorynych.info.domain.events import TrackerAssigned, TrackerUnAssigned
 
 
 DEVICE_TYPES = ['tr203']
@@ -15,31 +16,6 @@ class ITrackerRepository(Interface):
     def save(obj):
         '''
         '''
-
-class TrackerAssigned(DomainEvent):
-    '''
-    This event is fired then tracker is assigned to someone.
-
-    Event fields are:
-    @param id: id of aggregate to which tracker has been assigned.
-    @param tracker_id: tracker id.
-    '''
-
-    def __init__(self, id=None, tracker_id=None):
-        if not isinstance(tracker_id, TrackerID):
-            raise AttributeError("Wrong tracker id.")
-        else:
-            self.tracker_id = tracker_id
-
-        DomainEvent.__init__(self, id)
-
-    def __eq__(self, other):
-        return self.id == other.id and self.timestamp == other.timestamp and (
-            self.tracker_id == other.tracker_id)
-
-
-class TrackerUnAssigned(TrackerAssigned):
-    pass
 
 
 class TrackerHasOwner(Exception):

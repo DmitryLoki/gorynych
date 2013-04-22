@@ -11,7 +11,7 @@ from zope.interface.interfaces import Interface
 from gorynych.common.domain.model import AggregateRoot, IdentifierObject, ValueObject
 from gorynych.common.domain.types import Checkpoint
 from gorynych.common.exceptions import BadCheckpoint
-from gorynych.info.domain.events import CheckpointsAreAddedToRace, ArchiveURLReceived
+from gorynych.info.domain.events import RaceCheckpointsChanged, ArchiveURLReceived
 
 
 class RaceTask(ValueObject):
@@ -131,7 +131,7 @@ class Race(AggregateRoot):
     def checkpoints(self, checkpoints):
         '''
         Replace race checkpoints with a new list. Publish L{
-        CheckpointsAreAddedToRace} event with race id and checkpoints list.
+        RaceCheckpointsChanged} event with race id and checkpoints list.
         @param checkpoints: list of L{Checlpoint} instances.
         @type checkpoints: C{list}
         '''
@@ -147,7 +147,7 @@ class Race(AggregateRoot):
             raise e
         self._get_times_from_checkpoints(self._checkpoints)
         # Notify other systems about checkpoints changing.
-        self.event_publisher.publish(CheckpointsAreAddedToRace(self.id,
+        self.event_publisher.publish(RaceCheckpointsChanged(self.id,
                                                                 checkpoints))
 
     def _invariants_are_correct(self):

@@ -2,6 +2,7 @@ from zope.interface.declarations import implements
 from gorynych.info.domain.contest import ContestFactory, IContestRepository
 from gorynych.common.exceptions import NoAggregate
 
+
 SQL_SELECT_CONTEST = "SELECT \
 CONTEST_ID \
 , TITLE \
@@ -16,7 +17,7 @@ WHERE CONTEST_ID = %s\
 "
 
 SQL_INSERT_CONTEST = "INSERT INTO CONTEST( \
-NAME \
+TITLE \
 , START_DATE \
 , END_DATE \
 , HQ_PLACE \
@@ -28,12 +29,11 @@ RETURNING CONTEST_ID\
 "
 
 SQL_UPDATE_CONTEST = "UPDATE CONTEST SET \
-NAME = %s \
+TITLE = %s \
 , START_DATE = %s \
 , END_DATE = %s \
 , HQ_PLACE = %s \
 , HQ_COUNTRY = %s \
-, HQ_PLACE = %s \
 , HQ_LAT = %s \
 , HQ_LON = %s \
 WHERE CONTEST_ID = %s\

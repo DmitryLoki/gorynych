@@ -10,17 +10,17 @@ from gorynych.info.domain.contest import ContestID
 def create_person(name='John', surname='Doe',
                   country='UA', email='johndoe@example.com', reg_year=None,
                   reg_month=None,
-                  reg_day=None, event_publisher=None):
+                  reg_day=None, event_publisher=None, id=None):
     if not event_publisher:
         event_publisher = mock.MagicMock()
     factory = person.PersonFactory(event_publisher)
     pers = factory.create_person(name, surname, country, email, reg_year,
-        reg_month, reg_day)
+        reg_month, reg_day, id)
     return pers
 
 
 class PersonFactoryTest(unittest.TestCase):
-    def test_good_init(self):
+    def test_create_person(self):
         self.assertEqual(person.MINYEAR, 2012)
         pers = create_person('Harold', 'Herzen', 'DE', 'boss@gmail.com', '2012',
             11, '30')
@@ -31,6 +31,12 @@ class PersonFactoryTest(unittest.TestCase):
         self.assertEqual(pers.email, 'boss@gmail.com')
         self.assertEqual(pers.regdate, datetime.date(2012, 11, 30))
         self.assertIsInstance(pers.event_publisher, mock.MagicMock)
+
+        another_pers = create_person('Harold', 'erzen', 'DE',
+                                     'bss@gmail.com', '2012',
+                                     11, '30')
+        self.assertNotEqual(pers.id, another_pers.id)
+
 
 
     def test_good_init_without_regdate(self):
@@ -57,28 +63,32 @@ class PersonTest(unittest.TestCase):
         self.person = create_person()
 
     def test_tracker_assignment(self):
-        self.person.assign_tracker(TrackerID(15))
-        self.assertEqual(self.person.tracker, TrackerID(15))
+        tracker_id = TrackerID()
+        self.person.assign_tracker(tracker_id)
+        self.assertEqual(self.person.tracker, tracker_id)
 
     def test_tracker_unassignment(self):
-        self.person.assign_tracker(TrackerID(15))
+        tracker_id = TrackerID()
+        another_tracker = TrackerID()
+        self.person.assign_tracker(tracker_id)
         self.assertRaises(KeyError, self.person.unassign_tracker,
-            TrackerID(16))
-        self.person.unassign_tracker(TrackerID(15))
+            another_tracker)
+        self.person.unassign_tracker(tracker_id)
         self.assertIsNone(self.person.tracker)
 
     def test_participate_in_contest(self):
-        self.person.participate_in_contest(ContestID('some contest'),
+        contest_id = ContestID()
+        self.person.participate_in_contest(contest_id,
             'paraglider')
-        self.assertTrue(ContestID('some contest') in self.person.contests)
-        self.assertEqual(self.person._contests[ContestID('some contest')],
+        self.assertTrue(contest_id in self.person.contests)
+        self.assertEqual(self.person._contests[contest_id],
             'paraglider')
 
         self.assertRaises(ValueError, self.person.participate_in_contest,
             14, 2)
 
-        self.person.dont_participate_in_contest(ContestID('some contest'))
-        self.assertFalse(ContestID('some contest') in self.person.contests)
+        self.person.dont_participate_in_contest(contest_id)
+        self.assertFalse(contest_id in self.person.contests)
 
     def test_name_setter(self):
         self.person.name = dict(name='VAsya')
@@ -93,6 +103,11 @@ class PersonTest(unittest.TestCase):
     def test_country_setter(self):
         self.person.country = 'RUSSIA!'
         self.assertEqual(self.person.country, 'RU')
+
+    def test_equality(self):
+        p1 = create_person()
+        p2 = create_person()
+        self.assertEqual(p1, p2)
 
 
 if __name__ == '__main__':

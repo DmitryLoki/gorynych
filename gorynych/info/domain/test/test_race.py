@@ -1,5 +1,4 @@
 import unittest
-import uuid
 
 import mock
 from shapely.geometry import Point
@@ -24,7 +23,7 @@ def create_checkpoints():
 class RaceTest(unittest.TestCase):
 
     def setUp(self):
-        self.race = race.Race(race.RaceID(uuid.uuid4()))
+        self.race = race.Race(race.RaceID())
         self.race.event_publisher = mock.MagicMock()
 
     def tearDown(self):

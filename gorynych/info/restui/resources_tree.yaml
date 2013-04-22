@@ -3,12 +3,14 @@ package: &gorynych
 aliases:
   uuid: &uuid
     '[a-z0-9]+-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+'
+  contest_index: &contest_index
+    'cnts-[0-9]{6}-[0-9]+'
 
 contest:
   leaf: ContestResourceCollection
   package: *gorynych
   tree:
-    *uuid:
+    *contest_index:
       leaf: ContestResource
       package: *gorynych
       tree:

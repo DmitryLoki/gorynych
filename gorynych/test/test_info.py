@@ -58,7 +58,7 @@ class RESTAPITest(unittest.TestCase):
 
 
 class ContestRESTAPITest(unittest.TestCase):
-    url = 'http://localhost:8085/contest/'
+    url = 'http://localhost:8085/contest'
     def test_1_get_no_contests(self):
         '''
         Here I suppose that contest repository is empty.
@@ -79,22 +79,25 @@ class ContestRESTAPITest(unittest.TestCase):
         params = dict(title='Best contest', start_time=1, end_time=10,
             place = 'La France', country='ru',
             hq_coords='43.3,23.1', timezone='Europe/Moscow')
-        r = requests.post(self.url, data=params)
+        r = requests.post('/'.join((URL, 'contest')), data=params)
         self.assertEqual(r.status_code, 201)
         result = r.json()
         self.assertEqual(result['title'], u'Best Contest')
-        self.cont_id = result['id']
         r2 = requests.get('/'.join((self.url, result['id'])))
         self.assertEqual(r2.status_code, 200)
         self.assertEqual(r2.json()['title'], 'Best Contest')
 
     def test_3_change_contest(self):
-        r = requests.get(self.url)
-        cont_id = r.json()[0]["id"]
+        try:
+            r = requests.get('/'.join((URL, 'contest')))
+            cont_id = r.json()[0]["id"]
+        except:
+            raise unittest.SkipTest("Can't get contest id is needed for this "
+                                 "test.")
         params = json.dumps(dict(title='besT Contest changed  ',
             start_time=11, end_time=15, place='Paris', country='mc',
             coords='42.3,11.3', timezone='Europe/Paris'))
-        r2 = requests.put(self.url + cont_id, data=params)
+        r2 = requests.put('/'.join((URL, 'contest', cont_id)), data=params)
         result = r2.json()
         self.assertEqual(result['title'], 'Best Contest Changed')
         self.assertEqual(result['country'], 'MC')

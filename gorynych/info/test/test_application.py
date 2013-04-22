@@ -73,7 +73,7 @@ class ContestServiceTest(ApplicationServiceTestCase):
                  hq_coords=[12.3, 42.9],
                  timezone='Europe/Moscow')).result
         self.assertEqual(cont1.title, 'Hoi', "Bad return")
-        self.assertEqual(len(cont1.id), 36, "Bad return")
+        self.assertEqual(cont1.id.id[:5], 'cnts-', "Bad return")
 
         saved_result = self.repository.get_by_id(cont1.id)
         self.assertEqual(saved_result.title, 'Hoi',
@@ -153,9 +153,18 @@ class PersonServiceTest(ApplicationServiceTestCase):
         pers2 = self.cs.get_person({'person_id': pers1.id}).result
         self.assertEqual(pers1, pers2)
 
+        another_person = self.cs.create_new_person(dict(name='Vasya',
+                                                        surname='Do',
+            country='QQ', email='joh@example.com', reg_date='2012,12,21')
+                                ).result
+
+        self.assertNotEqual(pers1.id, another_person.id,
+                            "Person with the same id has been created.")
+
         pers_list = self.cs.get_persons().result
         self.assertIsInstance(pers_list, list)
-        self.assertEqual(pers1.id, pers_list[0].id)
+        id_list = [pers.id for pers in pers_list]
+        self.assertTrue(pers1.id in id_list)
 
         new_pers = self.cs.change_person(dict(person_id=pers1.id,
             name='Evlampyi')).result
@@ -202,9 +211,15 @@ class ContestParagliderRaceTest(unittest.TestCase):
                 reg_date='2012,12,21')).result
             return c.id, p1.id, p2.id
 
-        self.cont_id, self.p1_id, self.p2_id = fixture()
+        try:
+            self.cont_id, self.p1_id, self.p2_id = fixture()
+        except:
+            raise unittest.SkipTest("Fixture can't be created.")
+        if not self.cont_id and self.p1_id and self.p2_id:
+            raise unittest.SkipTest("I need ids for work.")
         pers = self.repository.get_by_id(self.p1_id)
-        pers.assign_tracker(TrackerID(15))
+        self.tracker_id = TrackerID()
+        pers.assign_tracker(self.tracker_id)
         self.repository.save(pers)
 
     def tearDown(self):
@@ -231,7 +246,8 @@ class ContestParagliderRaceTest(unittest.TestCase):
         self.aps.register_paraglider_on_contest(dict(
             contest_id=self.cont_id, glider='gin', contest_number='1',
             person_id=self.p1_id))
-        self.assertEqual(len(cont.paragliders), 1)
+        self.assertEqual(len(cont.paragliders), 1, "The same paraglider was "
+                                                   "registered twice.")
 
         d = self.aps.register_paraglider_on_contest(dict(
             contest_id=self.cont_id, glider='gin', contest_number='1',

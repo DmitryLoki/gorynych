@@ -1,7 +1,7 @@
 '''
 Realization of persistence logic.
 '''
-import psycopg2
+from txpostgres import txpostgres
 
 from zope.interface.declarations import implements
 
@@ -15,28 +15,27 @@ class PersonRepository(object):
     implements(IPersonRepository)
     pass
 
-connectionParams = {
-    "server":"localhost",
-    "dbname":"airtribune",
-    "user":"airtribune",
-    "password":"airtribune",
-    "schema":"airtribune_test"
+connection_params = {
+    "server": "localhost",
+    "dbname": "airtribune",
+    "user": "airtribune",
+    "password": "airtribune"
 }
 
-class ConnectionManager(object):
-    def open_connection(self):
-        global connectionParams
-        server_name = connectionParams["server"]
-        db_name = connectionParams["dbname"]
-        user_name = connectionParams["user"]
-        user_pass = connectionParams["password"]
-        schema_name = connectionParams["schema"]
 
-        connection = psycopg2.connect(
-            host = server_name, 
-            database = db_name, 
-            user = user_name, 
-            password = user_pass)
-        connection.cursor().execute("SET search_path TO %s", (schema_name,))
-        connection.commit()
-        return connection
+class ConnectionManager(object):
+    def __init__(self):
+        pass
+
+    def pool(self):
+        global connectionParams
+        self.pool = txpostgres.ConnectionPool(
+            None,
+            host=connection_params["server"],
+            database=connection_params["dbname"],
+            user=connection_params["user"],
+            password=connection_params["password"],
+            min=8
+        )
+        d = self.pool.start()
+        return d

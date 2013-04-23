@@ -2,20 +2,21 @@ from zope.interface.declarations import implements
 from gorynych.info.domain.transport import ITransportRepository, TransportFactory
 from gorynych.common.exceptions import NoAggregate
 
-SQL_SELECT_TRANSPORT = "SELECT TRANSPORT_ID, TRANSPORT_TYPE, TITLE, DESCRIPTION \
-FROM TRANSPORT WHERE TRANSPORT_ID = %s"
-SQL_INSERT_TRANSPORT = "INSERT INTO TRANSPORT (TRANSPORT_TYPE, TITLE, DESCRIPTION \
-VALUES(%s, %s, %s) RETURNING TRANSPORT_ID"
+SQL_SELECT_TRANSPORT = "SELECT TRANSPORT_ID, TRANSPORT_TYPE, TITLE, \
+DESCRIPTION FROM TRANSPORT WHERE TRANSPORT_ID = %s"
+SQL_INSERT_TRANSPORT = "INSERT INTO TRANSPORT (TRANSPORT_TYPE, TITLE, \
+DESCRIPTION VALUES(%s, %s, %s) RETURNING TRANSPORT_ID"
 SQL_UPDATE_TRANSPORT = "UPDATE TRANSPORT SET TRANSPORT_TYPE = %s, TITLE = %s, \
 DESCRIPTION = %s WHERE TRANSPORT_ID = %s"
+
 
 class PGSQLTransportRepository(object):
     implements(ITransportRepository)
 
-    def __init__(self, connection = None):
+    def __init__(self, connection=None):
         self.record_cache = dict()
         self.set_connection(connection)
-    
+
     def set_connection(self, connection):
         self.connection = connection
 
@@ -49,13 +50,14 @@ class PGSQLTransportRepository(object):
                     if data_row is not None:
                         value.id = data_row[0]
                 else:
-                    cursor.execute(SQL_UPDATE_TRANSPORT, self.params(value, True))
+                    cursor.execute(SQL_UPDATE_TRANSPORT,
+                                   self.params(value, True))
             self.record_cache[value.id] = value
             return value
         except Exception:
             return None
 
-    def params(self, value = None, with_id = False):
+    def params(self, value=None, with_id=False):
         if value is None:
             return ()
         if with_id:

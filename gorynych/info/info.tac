@@ -30,4 +30,4 @@ s_collection = service.IServiceCollection(application)
 
 app_service.setServiceParent(s_collection)
 internet.TCPServer(8085, server.Site(base_resource.APIResource(api_tree,
-                            app_service))).setServiceParent(s_collection)
+        app_service)), interface='127.0.0.1').setServiceParent(s_collection)

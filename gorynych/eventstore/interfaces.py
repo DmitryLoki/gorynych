@@ -1,5 +1,5 @@
 import sys
-from zope.interface import Interface
+from zope.interface import Interface, Attribute
 
 __author__ = 'Boris Tsema'
 
@@ -56,6 +56,12 @@ class IEventStore(Interface):
         @return: event stream
         @rtype: C{list}
         '''
+
+    def append(event):
+        '''
+        I append event to store. Event must be an implementer of L{IEvent}
+        interface.
+        '''
     #
     # def load_events_from_snapshot(id, snapshot_id, max_events=sys.maxint):
     #     '''
@@ -69,3 +75,19 @@ class IEventStore(Interface):
     #     @return: snapshot and event stream
     #     @rtype: C{tuple}
     #     '''
+
+
+class IEvent(Interface):
+    '''
+    I'm an occured event.
+    '''
+    aggregate_id = Attribute("""Id of aggregate to which I correspond.
+    @type aggregate_id: C{str}.""")
+
+    aggregate_type = Attribute("""Aggregate type. @type aggregate_type: C{
+    str}""")
+
+    occured_on = Attribute("""Time when event occured. @type occured_on: C{int}""")
+
+    payload = Attribute("""Body of the event. Here can be a C{dict},
+    file or something binary.""")

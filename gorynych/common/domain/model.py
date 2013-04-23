@@ -4,7 +4,10 @@ DDD-model specific base classes.
 import time
 import uuid
 
+from zope.interface import implementer
+
 from gorynych.common.infrastructure.messaging import DomainEventsPublisher
+from gorynych.eventstore.interfaces import IEvent
 
 __author__ = 'Boris Tsema'
 
@@ -83,17 +86,48 @@ class AggregateRoot(object):
     event_publisher = DomainEventsPublisher()
 
 
+@implementer(IEvent)
 class DomainEvent(object):
     '''
     Base class for domain events.
     '''
-    def __init__(self, id=None):
-        if not id:
-            raise AttributeError("No event owner id.")
+    def __init__(self, aggregate_id, payload, aggregate_type=None,
+                 occured_on=None):
+        self.aggregate_id = str(aggregate_id)
+        if aggregate_type:
+            self.aggregate_type = aggregate_type
+        elif issubclass(aggregate_id.__class__, IdentifierObject):
+            self.aggregate_type = aggregate_id.__class__.__name__[:-2].lower()
         else:
-            self.id = id
-        self.timestamp = int(time.time())
+            raise ValueError("Provide aggregate_type or instance of "
+                             "IdentifierObject subclass as id.")
+        if occured_on:
+            self.occured_on = int(occured_on)
+        else:
+            self.occured_on = int(time.time())
+
+        self.payload = payload
 
     def __eq__(self, other):
-        # TODO: do correct event comparison
-        return self.id == other.id and self.timestamp == other.timestamp
+        return self.occured_on == other.occured_on and (
+            self.aggregate_id == other.aggregate_id) and (
+            self.payload == other.payload) and (
+            self.aggregate_type == other.aggregate_type)
+
+    def __ne__(self, other):
+        return self.occured_on != other.occured_on or (
+            self.aggregate_id != other.aggregate_id) or (
+            self.payload != other.payload) or (
+            self.aggregate_type != other.aggregate_type)
+
+    def __repr__(self):
+        try:
+            payload = repr(self.payload)
+        except Exception:
+            payload = ''
+        return '<DomainEvent: name=%s, aggregate_id=%s, aggregate_type=%s, ' \
+               'occured_on=%s, payload=%s >' % (self.__class__.__name__,
+                self.aggregate_id, self.aggregate_type, self.occured_on,
+                payload)
+
+    __str__ = __repr__

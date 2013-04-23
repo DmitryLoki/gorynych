@@ -94,7 +94,8 @@ class RaceTest(unittest.TestCase):
 
 class RaceTrackArchiveTest(unittest.TestCase):
     def setUp(self):
-        r = race.Race(1)
+        self.id = race.RaceID()
+        r = race.Race(self.id)
         event_store = mock.Mock()
         event_store.load_from_stream = mock.Mock()
         event_store.load_from_stream.return_value = [1, 2]
@@ -109,7 +110,7 @@ class RaceTrackArchiveTest(unittest.TestCase):
         url = 'http://airtribune.com/22/asdf/tracs22-.zip'
         self.r.add_track_archive(url)
         self.r.event_publisher.publish.assert_called_once_with(
-            ArchiveURLReceived(1, url))
+            ArchiveURLReceived(self.id, url))
 
 
 class TrackArchiveTest(unittest.TestCase):
@@ -133,7 +134,7 @@ class TrackArchiveTest(unittest.TestCase):
             tap.assert_called_once_with(1)
 
     def test_archiveurlreceived(self):
-        ta = race.TrackArchive([ArchiveURLReceived(1, 'http://')])
+        ta = race.TrackArchive([ArchiveURLReceived(race.RaceID(), 'http://')])
         self.assertEqual(ta.state, 'work is started')
 
 

@@ -54,7 +54,7 @@ class Tracker(AggregateRoot):
         if self.is_free():
             self.assignee_id = assignee_id
             self.event_publisher.publish(TrackerAssigned(
-                id = assignee_id,
+                aggregate_id= assignee_id,
                 tracker_id = self.id
                 ))
         else:

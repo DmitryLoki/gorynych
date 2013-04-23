@@ -41,6 +41,7 @@ def register_paraglider(pers_id, cont_id):
     r = requests.post('/'.join((URL, 'contest', cont_id,
                                 'paraglider')), data=params)
     if not r.status_code == 201:
+        print r.text
         raise Exception
     return r
 

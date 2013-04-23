@@ -181,7 +181,7 @@ class ApplicationService(Service):
         d = self._get_aggregate(params['contest_id'],
                                 contest.IContestRepository)
         d.addCallback(lambda cont: cont.register_paraglider(
-            params['person_id'], params['glider'],
+            person.PersonID.fromstring(params['person_id']), params['glider'],
             params['contest_number']))
         d.addCallback(
             persistence.get_repository(contest.IContestRepository).save)

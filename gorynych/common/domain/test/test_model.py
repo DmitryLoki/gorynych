@@ -1,7 +1,11 @@
 import unittest
+import time
 import uuid
 
+from zope.interface.verify import verifyObject
+
 from gorynych.common.domain import model
+from gorynych.eventstore.interfaces import IEvent
 
 class IdentifierObjectTest(unittest.TestCase):
     def _get_id(self):
@@ -51,6 +55,44 @@ class IdentifierObjectTest(unittest.TestCase):
         self.assertRaises(ValueError, model.IdentifierObject.fromstring,
                           'hello')
 
+
+class DomainEventTest(unittest.TestCase):
+    def test_success_creation(self):
+        ts = int(time.time())
+        event = model.DomainEvent(1, 2, 'hello', ts)
+        verifyObject(IEvent, event)
+        self.assertTupleEqual(('1', 2, 'hello', ts), (event.aggregate_id,
+                    event.payload, event.aggregate_type, event.occured_on))
+
+    def test_creation_with_identifier_object(self):
+        class TestID(model.IdentifierObject): pass
+        id = TestID()
+        ev, ts = model.DomainEvent(id, 'payload'), int(time.time())
+        self.assertTupleEqual((id.id, 'payload', 'test', ts),
+              (ev.aggregate_id, ev.payload, ev.aggregate_type, ev.occured_on))
+
+    def test_equality(self):
+        ts = int(time.time())
+        ev1 = model.DomainEvent(1, 2, 'hello', ts)
+        ev2 = model.DomainEvent(1, 2, 'hello', ts)
+        self.assertEqual(ev1, ev2)
+
+    def test_non_equality(self):
+        ts = int(time.time())
+        ev1 = model.DomainEvent(1, 2, 'hello', ts)
+        ev2 = model.DomainEvent(1, 3, 'hello', ts)
+        self.assertNotEqual(ev1, ev2)
+        ev2 = model.DomainEvent(2, 2, 'hello', ts)
+        self.assertNotEqual(ev1, ev2)
+        ev2 = model.DomainEvent(1, 2, 'ello', ts)
+        self.assertNotEqual(ev1, ev2)
+        ev2 = model.DomainEvent(1, 2, 'hello', ts+1)
+        self.assertNotEqual(ev1, ev2)
+
+    def test_repr(self):
+        ts = int(time.time())
+        ev1 = model.DomainEvent(1, IdentifierObjectTest, 'hello', ts)
+        self.assertIsInstance(repr(ev1), str)
 
 
 if __name__ == '__main__':

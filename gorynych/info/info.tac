@@ -4,6 +4,7 @@ Info application for paragliders. Test version with cPickle' repository.
 from twisted.application import internet, service
 from twisted.web import server
 
+from gorynych import OPTS
 from gorynych.info.application import ApplicationService
 from gorynych.common.infrastructure.messaging import DomainEventsPublisher
 from gorynych.info.restui import base_resource
@@ -29,5 +30,6 @@ app_service = ApplicationService(DomainEventsPublisher())
 s_collection = service.IServiceCollection(application)
 
 app_service.setServiceParent(s_collection)
-internet.TCPServer(8085, server.Site(base_resource.APIResource(api_tree,
-                            app_service))).setServiceParent(s_collection)
+site_factory = server.Site(base_resource.APIResource(api_tree, app_service))
+internet.TCPServer(OPTS['info']['web_port'], site_factory,
+   interface='localhost').setServiceParent(s_collection)

@@ -81,6 +81,7 @@ class AggregateRoot(object):
     Base class for aggregate roots.
     '''
     event_publisher = DomainEventsPublisher()
+    _id = None
 
 
 class DomainEvent(object):

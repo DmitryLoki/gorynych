@@ -1,6 +1,8 @@
 '''
 Common types.
 '''
+import simplejson as json
+
 from shapely.geometry import shape
 from gorynych.common.domain.model import ValueObject
 
@@ -102,7 +104,12 @@ class Checkpoint(ValueObject):
             assert int(self.close_time) > int(self.open_time), \
                 "Checkpoint close_time must be after open_time."
 
-    def _as_dict(self):
+    @property
+    def __geo_interface__(self):
+        '''
+        Exposes python geo interface as
+        described here: L{https://gist.github.com/sgillies/2217756}
+        '''
         result = {'type': 'Feature'}
         result['properties'] = {}
         result['properties']['checkpoint_type'] = self.type
@@ -114,16 +121,33 @@ class Checkpoint(ValueObject):
         result['geometry'] = self.geometry.__geo_interface__
         return result
 
-    __geo_interface__ = property(_as_dict)
-
     def __eq__(self, other):
         return self.__geo_interface__ == other.__geo_interface__
 
     def __ne__(self, other):
         return self.__geo_interface__ != other.__geo_interface__
 
+    @staticmethod
+    def from_geojson(value):
+        '''
+        Create Checkpoints intsance from GeoJSON string or dict.
+        @param value: string or dict which looks like correct GeoJSON thing: http://geojson.org/geojson-spec.html#examples
+        @param type: C{str} or C{dict}
+        '''
+        if isinstance(value, str):
+            value = json.loads(value)
+        return checkpoint_from_geojson(value)
+
 
 def checkpoint_from_geojson(geodict):
+    '''
+    Create L{Checkpoint} instance from geojson-like dictionary.
+    @param geodict: dictionary which json representation is a correct
+    GeoJSON string.
+    @type geodict: C{dict}
+    @return: L{Checkpoint} instance
+    @rtype: L{Checkpoint}
+    '''
     assert isinstance(geodict, dict), "I need a dict for checkpoint creation" \
                                       " but got %s" % type(geodict)
     # Checkpoint is a Feature so it must have 'geometry' and 'properties' keys.

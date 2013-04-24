@@ -92,6 +92,7 @@ class ContestFactoryTest(unittest.TestCase):
         self.assertEquals((cont.start_time, cont.end_time), (1, 2))
         self.assertIsInstance(cont.event_publisher, mock.MagicMock)
         self.assertIsInstance(cont.id, contest.ContestID)
+        self.assertIsNone(cont._id)
 
         cont2, cont_id2 = create_contest(3, 4)
         self.assertNotEqual(cont_id, cont_id2, "Contest with the same id has"
@@ -153,6 +154,7 @@ class ContestTest(unittest.TestCase):
             ParagliderRegisteredOnContest(p2, cont_id)))
         self.assertEqual(mock_calls[-2], mock.call.publish(
             ParagliderRegisteredOnContest(p1, cont_id)))
+
 
     def test_times_changing(self):
         cont, cont_id = create_contest(1, '15')

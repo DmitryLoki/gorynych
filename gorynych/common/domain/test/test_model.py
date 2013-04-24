@@ -6,6 +6,7 @@ from zope.interface.verify import verifyObject
 
 from gorynych.common.domain import model
 from gorynych.eventstore.interfaces import IEvent
+from gorynych.common.infrastructure.messaging import DomainEventsPublisher
 
 class IdentifierObjectTest(unittest.TestCase):
     def _get_id(self):
@@ -94,6 +95,13 @@ class DomainEventTest(unittest.TestCase):
         ev1 = model.DomainEvent(1, IdentifierObjectTest, 'hello', ts)
         self.assertIsInstance(repr(ev1), str)
 
+class AggregateRootTest(unittest.TestCase):
+    def test_init(self):
+        ar = model.AggregateRoot()
+        self.assertIsNone(ar._id)
+        ar._id = 1
+        self.assertIsNotNone(ar._id)
+        self.assertIsInstance(ar.event_publisher, DomainEventsPublisher)
 
 if __name__ == '__main__':
     unittest.main()

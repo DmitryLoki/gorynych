@@ -120,6 +120,32 @@ class CheckpointTest(unittest.TestCase):
                                       ch.__geo_interface__['properties'])
         self.assertIsInstance(ch.geometry, Point)
 
+    def test_from_geojson_staticmethod_dict(self):
+        point = {'geometry': {'type': 'Point', 'coordinates': [0.0, 1.0]},
+                 'type': 'Feature',
+                 'properties': {'name': "A01", 'radius': 400,
+                                'open_time': 12345, 'close_time': 123456}}
+        ch = types.Checkpoint.from_geojson(point)
+        self.assertIsInstance(ch.geometry, Point)
+        self.assertIsInstance(ch, types.Checkpoint)
+        self.assertEqual(ch.type, 'ordinal')
+        self.assertDictContainsSubset(point['properties'],
+                                      ch.__geo_interface__['properties'])
+        self.assertIsInstance(ch.geometry, Point)
+
+    def test_from_geojson_staticmethod_str(self):
+        point = {'geometry': {'type': 'Point', 'coordinates': [0.0, 1.0]},
+                 'type': 'Feature',
+                 'properties': {'name': "A01", 'radius': 400,
+                                'open_time': 12345, 'close_time': 123456}}
+        ch = types.Checkpoint.from_geojson(json.dumps(point))
+        self.assertIsInstance(ch.geometry, Point)
+        self.assertIsInstance(ch, types.Checkpoint)
+        self.assertEqual(ch.type, 'ordinal')
+        self.assertDictContainsSubset(point['properties'],
+                                      ch.__geo_interface__['properties'])
+        self.assertIsInstance(ch.geometry, Point)
+
     def test_bad_creating(self):
         self.assertRaises(ValueError, types.Checkpoint, 'A01', Point(1,1))
         self.assertRaises(AssertionError, types.Checkpoint, '2', Point(2,2),

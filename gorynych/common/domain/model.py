@@ -3,6 +3,8 @@ DDD-model specific base classes.
 '''
 import time
 import uuid
+import simplejson as json
+
 
 from zope.interface import implementer
 
@@ -75,6 +77,13 @@ class IdentifierObject(object):
         '''
         return self._id
 
+    def __str__(self):
+        '''
+        Make the usage of ID more comfort.
+        Id value can be received by str(IdentifierObject instance)
+        '''
+        return str(self._id)
+
     def __len__(self):
         return len(str(self._id))
 
@@ -131,4 +140,35 @@ class DomainEvent(object):
                 self.aggregate_id, self.aggregate_type, self.occured_on,
                 payload)
 
-    __str__ = __repr__
+    def __str__(self):
+        '''
+        Represent event as string which can be jsonifyed in a dict with keys
+         equal to column names in EventStore PostgreSQL realization.
+        @return: a string which can be dumped by json.
+        @rtype: C{str}
+        '''
+        result = dict(event_name=self.__class__.__name__,
+                      aggregate_id=self.aggregate_id,
+                      aggregate_type=self.aggregate_type,
+                      event_payload=self._payload_to_bytes(),
+                      occured_on=self.occured_on)
+        return json.dumps(result)
+
+    def _payload_to_bytes(self):
+        '''
+        Represent event payload as bytes for serialization purpose.
+        Reload this method if event payload can't be simply represented by
+        bytes(payload).
+        @return:
+        @rtype:
+        '''
+        if isinstance(self.payload, bytes):
+            return bytes(self.payload)
+        elif issubclass(self.payload.__class__, IdentifierObject):
+            return bytes(str(self.payload))
+        elif isinstance(self.payload, dict):
+            return bytes(json.dumps(self.payload))
+        elif isinstance(self.payload, int):
+            return bytes(self.payload)
+
+

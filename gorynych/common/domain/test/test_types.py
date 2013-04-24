@@ -152,6 +152,16 @@ class CheckpointTest(unittest.TestCase):
                                                            times=(3, 1),
                                                            radius=1)
 
+    def test_str(self):
+        point = {'geometry': {'type': 'Point', 'coordinates': [0.0, 1.0]},
+                 'type': 'Feature',
+                 'properties': {'name': "A01", 'radius': 400,
+                                'open_time': 12345, 'close_time': 123456,
+                                'checkpoint_type': 'ordinal'}}
+        ch = types.Checkpoint.from_geojson(point)
+        self.assertIsInstance(str(ch), bytes)
+        self.assertEqual(str(ch), json.dumps(point))
+
 
 if __name__ == '__main__':
     unittest.main()

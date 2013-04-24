@@ -1,6 +1,7 @@
 import unittest
 import time
 import uuid
+import simplejson as json
 
 from zope.interface.verify import verifyObject
 
@@ -46,6 +47,11 @@ class IdentifierObjectTest(unittest.TestCase):
         self.assertIsInstance(repr(id), str)
         self.assertEqual(len(repr(id)), 36)
 
+    def test_str(self):
+        uid = str(uuid.uuid4())
+        id = model.IdentifierObject.fromstring(uid)
+        self.assertEqual(str(id), uid)
+
     def test_create_from_string(self):
         string = str(uuid.uuid4())
         id = model.IdentifierObject.fromstring(string)
@@ -56,6 +62,7 @@ class IdentifierObjectTest(unittest.TestCase):
         self.assertRaises(ValueError, model.IdentifierObject.fromstring,
                           'hello')
 
+class TestID(model.IdentifierObject): pass
 
 class DomainEventTest(unittest.TestCase):
     def test_success_creation(self):
@@ -66,7 +73,6 @@ class DomainEventTest(unittest.TestCase):
                     event.payload, event.aggregate_type, event.occured_on))
 
     def test_creation_with_identifier_object(self):
-        class TestID(model.IdentifierObject): pass
         id = TestID()
         ev, ts = model.DomainEvent(id, 'payload'), int(time.time())
         self.assertTupleEqual((id.id, 'payload', 'test', ts),
@@ -94,6 +100,30 @@ class DomainEventTest(unittest.TestCase):
         ts = int(time.time())
         ev1 = model.DomainEvent(1, IdentifierObjectTest, 'hello', ts)
         self.assertIsInstance(repr(ev1), str)
+
+    def test_str(self):
+        ts = int(time.time())
+        ev1 = model.DomainEvent(1, 1, 'hello', ts)
+        result = dict(event_name="DomainEvent",
+                      aggregate_id='1',
+                      aggregate_type='hello',
+                      event_payload='1',
+                      occured_on=ts)
+        self.assertEqual(str(ev1), json.dumps(result))
+
+    def test_payload(self):
+        ts = int(time.time())
+        ev1 = model.DomainEvent(1, 1, 'hello', ts)
+        self.assertIsInstance(ev1._payload_to_bytes(), bytes)
+
+        d = dict(name='Vasya')
+        ev1 = model.DomainEvent(1, d, d, ts)
+        self.assertEqual(ev1._payload_to_bytes(), bytes(json.dumps(d)))
+
+        d = TestID()
+        ev1 = model.DomainEvent(1, d, d, ts)
+        self.assertEqual(ev1._payload_to_bytes(), str(d))
+
 
 class AggregateRootTest(unittest.TestCase):
     def test_init(self):

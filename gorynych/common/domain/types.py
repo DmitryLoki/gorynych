@@ -138,6 +138,8 @@ class Checkpoint(ValueObject):
             value = json.loads(value)
         return checkpoint_from_geojson(value)
 
+    def __str__(self):
+        return bytes(json.dumps(self.__geo_interface__))
 
 def checkpoint_from_geojson(geodict):
     '''

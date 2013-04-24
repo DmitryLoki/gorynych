@@ -46,14 +46,7 @@ class PGSQLContestRepository(object):
     def __init__(self, pool):
         self.pool = pool
 
-# Выполняем SQL_SELECT_CONTEST с передачей contest_id, возвращаем deferred
-    def get_by_id(self, contest_id):
-        d = self.pool.runQuery(SQL_SELECT_CONTEST, (contest_id,))
-# По завершению запроса вызываем parse_select_result
-        d.addBoth(self.parse_select_result)
-        return d
-
-    def parse_select_result(self, data):
+    def _process_select_result(self, data):
         if len(data) == 1:
             data_row = data[0]
             factory = ContestFactory()
@@ -69,19 +62,8 @@ class PGSQLContestRepository(object):
             return result
         return NoAggregate("Contest")
 
-    def save(self, value):
-        d = None
-        if value.id is not None:
-            d = self.pool.runOperation(SQL_UPDATE_CONTEST,
-                                       self._params(value, True))
-            d.addCallback(lambda _: value)
-        else:
-            d = self.pool.runQuery(SQL_INSERT_CONTEST, self._params(value))
-            d.addCallback(self.process_insert_id, value)
-        return d
-
-    def process_insert_id(self, data, value):
-        if data is not None:
+    def _process_insert_result(self, data, value):
+        if data is not None and value is not None:
             inserted_id = data[0][0]
             value.id = inserted_id
             return value
@@ -97,3 +79,21 @@ class PGSQLContestRepository(object):
         return (value.title, value.start_time, value.end_time,
                 value.address.place, value.address.country,
                 value.address.lat, value.address.lon)
+
+# Выполняем SQL_SELECT_CONTEST с передачей contest_id, возвращаем deferred
+    def get_by_id(self, contest_id):
+        d = self.pool.runQuery(SQL_SELECT_CONTEST, (contest_id,))
+# По завершению запроса вызываем parse_select_result
+        d.addBoth(self._process_select_result)
+        return d
+
+    def save(self, value):
+        d = None
+        if value.id is not None:
+            d = self.pool.runOperation(SQL_UPDATE_CONTEST,
+                                       self._params(value, True))
+            d.addCallback(lambda _: value)
+        else:
+            d = self.pool.runQuery(SQL_INSERT_CONTEST, self._params(value))
+            d.addCallback(self._process_insert_result, value)
+        return d

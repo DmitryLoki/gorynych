@@ -4,11 +4,11 @@ from gorynych.common.exceptions import NoAggregate
 
 SQL_SELECT_PERSON = "SELECT \
 PERSON_ID \
-, FIRSTNAME \
 , LASTNAME \
-, REGDATE \
-, EMAIL \
+, FIRSTNAME \
 , COUNTRY \
+, EMAIL \
+, REGDATE \
 FROM PERSON WHERE EMAIL = %s\
 "
 SQL_INSERT_PERSON = "INSERT INTO PERSON(\
@@ -28,15 +28,45 @@ FIRSTNAME = %s\
 WHERE EMAIL = %s\
 "
 
+
 class PGSQLPersonRepository(object):
     implements(IPersonRepository)
 
-    def __init__(self, connection = None):
-        self.record_cache = dict()
-        self.set_connection(connection)
+    def __init__(self, pool):
+        self.pool = pool
 
-    def set_connection(self, connection):
-        self.connection = connection
+    def _process_select_result(self, data):
+        if len(data) == 1:
+            data_row = data[0]
+            if data_row is not None:
+                regdate = data_row[5]
+                factory = PersonFactory()
+                result = factory.create_person(
+                    data_row[1],
+                    data_row[2],
+                    data_row[3],
+                    data_row[4],
+                    regdate.year,
+                    regdate.month,
+                    regdate.day)
+                return result
+        raise NoAggregate("Person")
+
+    def _process_insert_result(self, data, value):
+        if data is not None and value is not None:
+            inserted_id = data[0][0]
+            value.id = inserted_id
+            return value
+        return None
+
+    def _params(self, value=None, with_id=False):
+        if value is None:
+            return ()
+        if with_id:
+            return (value.name().surname(), value.name().name(), value.regdate,
+                    value.country().code(), value.email)
+        return (value.name().surname(), value.name().name(), value.regdate,
+                value.email, value.country().code())
 
     def get_by_id(self, person_id):
         # searching in record cache
@@ -76,20 +106,16 @@ class PGSQLPersonRepository(object):
             if self.connection is not None:
                 cursor = self.connection.cursor()
                 if value.id is None:
-                    cursor.execute(SQL_INSERT_PERSON, self.params(value))
+                    cursor.execute(SQL_INSERT_PERSON,
+                                   self._params(value))
                     data_row = cursor.fetchone()
                     if data_row is not None:
                         value.id = data_row[1]
                 else:
-                    cursor.execute(SQL_UPDATE_PERSON, self.params(value, True))
+                    cursor.execute(SQL_UPDATE_PERSON,
+                                   self._params(value, True))
             self.record_cache[value.id] = value
             return value
         except Exception:
             return None
 
-    def params(self, value = None, with_id = False):
-        if value is None:
-            return ()
-        if with_id:
-            return (value.name().surname(), value.name().name(), value.regdate, value.country().code(), value.email)
-        return (value.name().surname(), value.name().name(), value.regdate, value.email, value.country().code())

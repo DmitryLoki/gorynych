@@ -2,17 +2,21 @@ from zope.interface.declarations import implements
 from gorynych.info.domain.race import IRaceRepository, Race
 from gorynych.common.exceptions import NoAggregate
 
-SQL_SELECT_RACE = "SELECT RACE_ID, TITLE, START_TIME, FINISH_TIME FROM RACE WHERE RACE_ID = %s"
-SQL_INSERT_RACE = "INSERT INTO RACE (TITLE, START_TIME, FINISH_TIME) VALUES (%s, %s, %s) RETURNING RACE_ID"
-SQL_UPDATE_RACE = "UPDATE RACE SET TITLE = %s, START_TIME = %s, END_TIME = %s WHERE RACE_ID = %s"
+SQL_SELECT_RACE = "SELECT RACE_ID, TITLE, START_TIME, FINISH_TIME FROM RACE \
+WHERE RACE_ID = %s"
+SQL_INSERT_RACE = "INSERT INTO RACE (TITLE, START_TIME, FINISH_TIME) \
+VALUES (%s, %s, %s) RETURNING RACE_ID"
+SQL_UPDATE_RACE = "UPDATE RACE SET TITLE = %s, START_TIME = %s, \
+END_TIME = %s WHERE RACE_ID = %s"
+
 
 class PGSQLRaceRepository(object):
     implements(IRaceRepository)
 
-    def __init__(self, connection = None):
+    def __init__(self, connection=None):
         self.record_cache = dict()
         self.set_connection(connection)
-    
+
     def set_connection(self, connection):
         self.connection = connection
 

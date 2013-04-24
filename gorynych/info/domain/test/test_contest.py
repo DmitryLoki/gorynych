@@ -89,6 +89,7 @@ class ContestFactoryTest(unittest.TestCase):
         self.assertEquals((cont.start_time, cont.end_time), (1, 2))
         self.assertIsInstance(cont.event_publisher, mock.MagicMock)
         self.assertIsInstance(cont.id, contest.ContestID)
+        self.assertIsNone(cont._id)
 
         cont2, cont_id2 = create_contest(3, 4)
         self.assertNotEqual(cont_id, cont_id2, "Contest with the same id has"
@@ -175,6 +176,7 @@ class ContestTest(unittest.TestCase):
         self.assertTupleEqual((race.start_time, race.end_time), (2, 8))
         self.assertEqual(race.timezone, cont.timezone)
         self.assertIsNone(race.bearing)
+        self.assertIsNone(race._id)
 
         ### test Contest aggregate ###
         self.assertEqual(len(cont.race_ids), 1)

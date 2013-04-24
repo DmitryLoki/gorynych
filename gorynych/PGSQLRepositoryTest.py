@@ -188,12 +188,12 @@ def run_test():
 def connect_ok(pool):
     print pool
     rep = PGSQLContestRepository(pool)
-    for i in xrange(100):
+    for i in xrange(10):
         d1 = rep.get_by_id(i)
         d1.addCallback(load_ok)
 
     data_collector = []
-    for i in xrange(100):
+    for i in xrange(10):
         value = Contest(None, "TEST VALUE 01", datetime.now(), datetime.now(),
                          "TEST VALUE02", "TEST VALUE 03", [20, 30])
         d2 = rep.save(value)

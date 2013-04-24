@@ -42,7 +42,6 @@ WHERE CONTEST_ID = %s\
 class PGSQLContestRepository(object):
     implements(IContestRepository)
 
-# Передаем ConnectionPool, с которым будет работать репозиторий
     def __init__(self, pool):
         self.pool = pool
 
@@ -80,10 +79,8 @@ class PGSQLContestRepository(object):
                 value.address.place, value.address.country,
                 value.address.lat, value.address.lon)
 
-# Выполняем SQL_SELECT_CONTEST с передачей contest_id, возвращаем deferred
     def get_by_id(self, contest_id):
         d = self.pool.runQuery(SQL_SELECT_CONTEST, (contest_id,))
-# По завершению запроса вызываем parse_select_result
         d.addBoth(self._process_select_result)
         return d
 

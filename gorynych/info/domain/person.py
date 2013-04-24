@@ -15,6 +15,7 @@ MINYEAR = 2012
 # Person can participate in contest with one of this roles.
 ROLES = frozenset(['paraglider', 'organizator'])
 
+
 class PersonID(IdentifierObject):
     '''
     Person identificator is a uuid string.
@@ -23,9 +24,8 @@ class PersonID(IdentifierObject):
 
 
 class Person(AggregateRoot):
-
-    def __init__(self, id, name, country, email, regdate):
-        self.id = id
+    def __init__(self, person_id, name, country, email, regdate):
+        self.id = person_id
         self.email = email
         self._name = name
         self._country = country
@@ -62,7 +62,8 @@ class Person(AggregateRoot):
         self.tracker = None
 
     def participate_in_contest(self, contest_id, role):
-        # TODO: does person really need to keep information about contests in which he or she take participatance?
+        # TODO: does person really need to keep information about contests
+        # in which he or she take participatance?
         from gorynych.info.domain.contest import ContestID
         if isinstance(contest_id, ContestID):
             if role in ROLES:
@@ -82,9 +83,13 @@ class Person(AggregateRoot):
         except KeyError:
             pass
 
-    # TODO: do aggregate root comparison
     def __eq__(self, other):
-        return self.name.full() == other.name.full() and self.email == other.email
+        if self.name.full() != other.name.full():
+            return False
+        if self.email.full() != other.email.full():
+            return False
+        # TODO: do aggregate root comparison
+        return True
 
 
 class PersonFactory(object):
@@ -92,7 +97,7 @@ class PersonFactory(object):
         self.event_publisher = event_publisher
 
     def create_person(self, name, surname, country, email, year=None,
-                      month=None, day=None, id=None):
+                      month=None, day=None, person_id=None):
         '''
         Create an instance of Person aggregate.
         @param name:
@@ -120,11 +125,11 @@ class PersonFactory(object):
             raise ValueError("Year is out of range %s-%s" %
                              (MINYEAR, datetime.date.today().year))
 
-        if not id:
-            id = PersonID()
-        elif not isinstance(id, PersonID):
-            id = PersonID.fromstring(id)
-        person = Person(id,
+        if not person_id:
+            person_id = PersonID()
+        elif not isinstance(person_id, PersonID):
+            person_id = PersonID.fromstring(id)
+        person = Person(person_id,
                         Name(name, surname),
                         Country(country),
                         email,
@@ -132,9 +137,9 @@ class PersonFactory(object):
         person.event_publisher = self.event_publisher
         return person
 
-    
+
 class IPersonRepository(Interface):
-    def get_by_id(id):
+    def get_by_id(person_id):  # @NoSelf
         '''
         Return a person with id.
         @param id:
@@ -143,7 +148,7 @@ class IPersonRepository(Interface):
         @rtype: Person
         '''
 
-    def save(person):
+    def save(person):  # @NoSelf
         '''
         Persist person.
         @param person:

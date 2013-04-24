@@ -1,0 +1,17 @@
+# This is global configuration for gorynych.
+# Motivation and usage in https://devc.ru/issues/3110
+# This file must be a valid YAML file!
+# Use 2 spaces while editing and don't use tabs!
+
+# Default options which are common for system.
+default:
+  info:
+    web_port: 8085
+
+production:
+
+# Personal settings for developers
+develop:
+
+# Test options
+test:

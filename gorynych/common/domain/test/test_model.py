@@ -2,6 +2,7 @@ import unittest
 import uuid
 
 from gorynych.common.domain import model
+from gorynych.common.infrastructure.messaging import DomainEventsPublisher
 
 class IdentifierObjectTest(unittest.TestCase):
     def _get_id(self):
@@ -51,7 +52,13 @@ class IdentifierObjectTest(unittest.TestCase):
         self.assertRaises(ValueError, model.IdentifierObject.fromstring,
                           'hello')
 
-
+class AggregateRootTest(unittest.TestCase):
+    def test_init(self):
+        ar = model.AggregateRoot()
+        self.assertIsNone(ar._id)
+        ar._id = 1
+        self.assertIsNotNone(ar._id)
+        self.assertIsInstance(ar.event_publisher, DomainEventsPublisher)
 
 if __name__ == '__main__':
     unittest.main()

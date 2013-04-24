@@ -31,13 +31,12 @@ class PersonFactoryTest(unittest.TestCase):
         self.assertEqual(pers.email, 'boss@gmail.com')
         self.assertEqual(pers.regdate, datetime.date(2012, 11, 30))
         self.assertIsInstance(pers.event_publisher, mock.MagicMock)
+        self.assertIsNone(pers._id)
 
         another_pers = create_person('Harold', 'erzen', 'DE',
                                      'bss@gmail.com', '2012',
                                      11, '30')
         self.assertNotEqual(pers.id, another_pers.id)
-
-
 
     def test_good_init_without_regdate(self):
         self.assertEqual(person.MINYEAR, 2012)

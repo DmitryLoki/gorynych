@@ -9,25 +9,18 @@ VALUES (%s, %s, %s) RETURNING TRACKER_ID"
 SQL_UPDATE_TRACKER = "UPDATE TRACKER SET DEVICE_ID = %s, DEVICE_TYPE = %s, \
 NAME = %s WHERE TRACKER_ID = %s"
 
+
 class PGSQLTrackerRepository(object):
     implements(ITrackerRepository)
 
-    def __init__(self, connection = None):
-        self.record_cache = dict()
-        self.set_connection(connection)
-    
-    def set_connection(self, connection):
-        self.connection = connection
+    def __init__(self, pool):
+        self.pool = pool
 
-    def get_by_id(self, tracker_id):
-        if tracker_id in self.record_cache:
-            return self.record_cache[tracker_id]
-        if self.connection is not None:
-            cursor = self.connection.cursor()
-            cursor.execute(SQL_SELECT_TRACKER, (tracker_id, ))
-            data_row = cursor.fetchone()
+    def _process_select_result(self, data):
+        if len(data) >= 1:
+            data_row = data[0]
             if data_row is not None:
-                factory = TrackerFactory() 
+                factory = TrackerFactory()
                 result = factory.create_tracker(
                     data_row[0],
                     data_row[1],
@@ -38,25 +31,33 @@ class PGSQLTrackerRepository(object):
                 return result
         raise NoAggregate("Tracker")
 
-    def save(self, value):
-        try:
-            if self.connection is not None:
-                cursor = self.connection.cursor()
-                if value.tracker_id is None:
-                    cursor.execute(SQL_INSERT_TRACKER, self.params(value))
-                    data_row = cursor.fetchone()
-                    if data_row is not None:
-                        value.tracker_id = data_row[0]
-                else:
-                    cursor.execute(SQL_UPDATE_TRACKER, self.params(value, True))
-            self.record_cache[value.tracker_id] = value
+    def _process_insert_result(self, data, value):
+        if data is not None and value is not None:
+            inserted_id = data[0][0]
+            value.id = inserted_id
             return value
-        except Exception:
-            return None
-        
-    def params(self, value = None, with_id = False):
+
+    def _params(self, value=None, with_id=False):
         if value is None:
             return ()
         if with_id:
-            return (value.device_id, value.device_type, value._name, value.tracker_id)
+            return (value.device_id, value.device_type, value._name,
+                    value.tracker_id)
         return (value.device_id, value.device_type, value._name)
+
+    def get_by_id(self, tracker_id):
+        d = self.pool.runQuery(SQL_SELECT_TRACKER, (tracker_id,))
+        d.addBoth(self._process_select_result)
+        return d
+
+    def save(self, value):
+        d = None
+        if self.pool is not None:
+            if value._id is not None:
+                d = self.pool.runOperation(SQL_UPDATE_TRACKER,
+                                           self._params(value, True))
+                d.addCallback(lambda _: value)
+            else:
+                d = self.pool.runQuery(SQL_INSERT_TRACKER, self._params(value))
+                d.addCallback(self._process_insert_result, value)
+        return d

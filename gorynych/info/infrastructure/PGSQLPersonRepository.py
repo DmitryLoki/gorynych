@@ -1,3 +1,6 @@
+#! /usr/bin/python
+#coding=utf-8
+
 from zope.interface.declarations import implements
 from gorynych.info.domain.person import PersonFactory, IPersonRepository
 from gorynych.common.exceptions import NoAggregate

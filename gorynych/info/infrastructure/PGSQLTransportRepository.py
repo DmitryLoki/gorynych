@@ -1,3 +1,6 @@
+#! /usr/bin/python
+#coding=utf-8
+
 from zope.interface.declarations import implements
 from gorynych.info.domain.transport import ITransportRepository, TransportFactory
 from gorynych.common.exceptions import NoAggregate
@@ -13,53 +16,48 @@ DESCRIPTION = %s WHERE TRANSPORT_ID = %s"
 class PGSQLTransportRepository(object):
     implements(ITransportRepository)
 
-    def __init__(self, connection=None):
-        self.record_cache = dict()
-        self.set_connection(connection)
+    def __init__(self, pool):
+        self.pool = pool
 
-    def set_connection(self, connection):
-        self.connection = connection
-
-    def get_by_id(self, transport_id):
-        if transport_id in self.record_cache:
-            return self.record_cache[transport_id]
-        else:
-            if self.connection is not None:
-                cursor = self.connection.cursor()
-                cursor.execute(SQL_SELECT_TRANSPORT, (transport_id,))
-                data_row = cursor.fetchone()
-                if data_row is not None:
-                    factory = TransportFactory()
-                    result = factory.create_transport(
-                        data_row[0],
-                        data_row[1],
-                        data_row[2],
-                        data_row[3]
-                    )
-                    self.record_cache[data_row[0]] = result
-                    return result
+    def _process_select_result(self, data):
+        if len(data) >= 1:
+            data_row = data[0]
+            if data_row is not None:
+                factory = TransportFactory()
+                result = factory.create_transport(
+                    data_row[0],
+                    data_row[1],
+                    data_row[2],
+                    data_row[3]
+                )
+                return result
         raise NoAggregate("Transport")
 
-    def save(self, value):
-        try:
-            if self.connection is not None:
-                cursor = self.connection.cursor()
-                if value.id is None:
-                    cursor.execute(SQL_INSERT_TRANSPORT, self.params(value))
-                    data_row = cursor.fetchone()
-                    if data_row is not None:
-                        value.id = data_row[0]
-                else:
-                    cursor.execute(SQL_UPDATE_TRANSPORT,
-                                   self.params(value, True))
-            self.record_cache[value.id] = value
+    def _process_insert_result(self, data, value):
+        if data is not None and value is not None:
+            inserted_id = data[0][0]
+            value.id = inserted_id
             return value
-        except Exception:
-            return None
 
-    def params(self, value=None, with_id=False):
+    def _params(self, value=None, with_id=False):
         if value is None:
             return ()
         if with_id:
             return (value.type, value.title, value.description, value.id)
         return (value.type, value.title, value.description)
+
+    def get_by_id(self, transport_id):
+        d = self.pool.runQuery(SQL_SELECT_TRANSPORT, (transport_id,))
+        d.addBoth(self._process_select_result)
+        return d
+
+    def save(self, value):
+        d = None
+        if value._id is not None:
+            d = self.pool.runOperation(SQL_UPDATE_TRANSPORT,
+                                       self._params(value, True))
+            d.addCallback(lambda _: value)
+        else:
+            d = self.pool.runQuery(SQL_INSERT_TRANSPORT, self._params(value))
+            d.addCallback(self._process_insert_result, value)
+        return d

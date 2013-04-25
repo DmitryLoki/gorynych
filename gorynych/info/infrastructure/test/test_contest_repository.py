@@ -10,25 +10,20 @@ from gorynych.info.infrastructure.PGSQLContestRepository import PGSQLContestRepo
 
 
 class Test(unittest.TestCase):
-    
+
     def setUp(self):
-        # create pool and pass it to connection manager
         pass
 
     def tearDown(self):
-        # stop pool
         pass
 
-    def testGetById(self):
-        # get item with ID 0, which is created in database via initial script
+    def test_get_by_id(self):
         pass
 
-    def testSaveNew(self):
-        # create new contest and save it using repository,  
+    def test_save_new(self):
         pass
 
-    def testUpdateExisting(self):
-        # create another contest, save it, change some property and save again
+    def test_update_existing(self):
         pass
 
 if __name__ == "__main__":

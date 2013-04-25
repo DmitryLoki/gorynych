@@ -6,7 +6,7 @@ Created on 24.04.2013
 import unittest
 from twisted.internet import defer, reactor
 from gorynych.info.infrastructure.persistence import ConnectionManager
-from gorynych.info.infrastructure.PGSQLPersonRepository import PGSQLPersonRepository
+from gorynych.info.infrastructure.PGSQLRaceRepository import PGSQLRaceRepository
 
 
 class Test(unittest.TestCase):

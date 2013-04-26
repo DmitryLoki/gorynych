@@ -202,14 +202,17 @@ class ContestRaceTest(unittest.TestCase):
         ch_list = create_checkpoints()
         for i, item in enumerate(ch_list):
             ch_list[i] = item.__geo_interface__
+        checkpoints = json.dumps(dict(type='FeatureCollection',
+                                      features=ch_list))
         params = dict(title="Task 8", race_type='opendistance', bearing=12,
-                      checkpoints=json.dumps(ch_list))
+                       checkpoints=checkpoints)
         r = requests.post('/'.join((URL, 'contest', c_id, 'race')),
                          data=params)
         race_id = r.json()['id']
         self.assertEqual(r.status_code, 201)
         self.assertDictContainsSubset({'type':'opendistance',
-                                       'title':'Task 8', 'start_time': '1347711300',
+                                       'title':'Task 8',
+                                       'start_time': '1347711300',
                                        'end_time': '1347732000'}, r.json())
 
         # Test GET /contest/{id}/race
@@ -217,7 +220,8 @@ class ContestRaceTest(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIsInstance(r.json(), list)
         self.assertDictContainsSubset({'type':'opendistance',
-                                       'title':'Task 8', 'start_time': '1347711300',
+                                       'title':'Task 8',
+                                       'start_time': '1347711300',
                                        'end_time': '1347732000'}, r.json()[0])
 
         # Test GET /contest/{id}/race/{id}

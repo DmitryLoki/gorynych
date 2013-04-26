@@ -8,16 +8,18 @@ from gorynych.common.domain.types import Checkpoint
 from gorynych.common.exceptions import BadCheckpoint
 
 
-def create_race():
-    pass
-
 def create_checkpoints():
     # also used in test_info
-    ch1 = Checkpoint('A01', Point(42.502, 0.798), 'TO', (2, None), 2)
-    ch2 = Checkpoint('A01', Point(42.502, 0.798), 'ss', (4, 6), 3)
-    ch3 = Checkpoint('B02', Point(1, 2), 'es', radius=3)
-    ch4 = Checkpoint('g10', Point(2, 2), 'goal', (None, 8), 3)
-    return [ch1, ch2, ch3, ch4]
+    ch1 = Checkpoint('D01', Point(43.9785, 6.48), 'TO',
+                     (1347711300, 1347716700), 1)
+    ch2 = Checkpoint('D01', Point(43.9785, 6.48), 'ss',
+                     (1347714900, 1347732000), 3000)
+    ch2_ordinal = Checkpoint('B20', Point(43.9511, 6.3708),  radius=2000)
+    ch3 = Checkpoint('B37', Point(43.9658, 6.5578), 'es',
+                     (1347714900, 1347732000), radius=1500)
+    ch4 = Checkpoint('g10', Point(43.9658, 6.5578), 'goal',
+                     (1347714900, 1347732000), 1000)
+    return [ch1, ch2, ch2_ordinal, ch3, ch4]
 
 
 class RaceTest(unittest.TestCase):
@@ -76,13 +78,10 @@ class RaceTest(unittest.TestCase):
             race.CheckpointsAreAddedToRace(self.race.id, good_checkpoints))
 
     def test_get_times_from_checkpoints(self):
-        ch1 = mock.Mock()
-        ch1.open_time, ch1.close_time = 2, 5
-        ch2 = mock.Mock()
-        ch2.open_time, ch2.close_time = 4, None
-        self.race._get_times_from_checkpoints([ch1, ch2])
+        chs = create_checkpoints()
+        self.race._get_times_from_checkpoints(chs)
         self.assertTupleEqual((self.race.start_time, self.race.end_time),
-                              (2, 5))
+                              (1347711300, 1347732000))
 
     def test_get_times_from_checkpoints_bad_case(self):
         ch2 = mock.Mock()

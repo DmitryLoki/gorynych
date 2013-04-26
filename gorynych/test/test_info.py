@@ -25,6 +25,22 @@ def create_persons():
     return r.json()['id']
 
 
+def create_geojson_checkpoints():
+    ch_list = create_checkpoints()
+    for i, item in enumerate(ch_list):
+        ch_list[i] = item.__geo_interface__
+    return json.dumps(dict(type='FeatureCollection',
+                                  features=ch_list))
+
+
+def create_race(contest_id, checkpoints=None):
+    if not checkpoints:
+        checkpoints = create_geojson_checkpoints()
+    params = dict(title="Task 8", race_type='opendistance', bearing=12,
+                   checkpoints=checkpoints)
+    return requests.post('/'.join((URL, 'contest', contest_id, 'race')),
+                     data=params)
+
 def find_contest_with_paraglider():
         contest_list = requests.get(URL + '/contest')
         for cont in contest_list.json():
@@ -199,15 +215,8 @@ class ContestRaceTest(unittest.TestCase):
         if not (p_id and c_id):
             raise unittest.SkipTest("I need contest and paraglider for test")
 
-        ch_list = create_checkpoints()
-        for i, item in enumerate(ch_list):
-            ch_list[i] = item.__geo_interface__
-        checkpoints = json.dumps(dict(type='FeatureCollection',
-                                      features=ch_list))
-        params = dict(title="Task 8", race_type='opendistance', bearing=12,
-                       checkpoints=checkpoints)
-        r = requests.post('/'.join((URL, 'contest', c_id, 'race')),
-                         data=params)
+        chs = create_geojson_checkpoints()
+        r = create_race(c_id, chs)
         race_id = r.json()['id']
         self.assertEqual(r.status_code, 201)
         self.assertDictContainsSubset({'type':'opendistance',
@@ -228,8 +237,8 @@ class ContestRaceTest(unittest.TestCase):
         r = requests.get('/'.join((URL, 'contest', c_id, 'race', race_id)))
         result = r.json()
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(result['checkpoints']['features'],
-                         json.loads(json.dumps(ch_list)))
+        self.assertEqual(result['checkpoints'],
+                         json.loads(chs))
         self.assertEqual(result['race_title'], 'Task 8')
         self.assertEqual(result['timezone'], 'Europe/Paris')
 
@@ -253,13 +262,7 @@ class ContestRaceTest(unittest.TestCase):
             p_id = create_persons()
             i = register_paraglider(p_id, c_id)
             ch_list = create_checkpoints()
-            for i, item in enumerate(ch_list):
-                ch_list[i] = item.__geo_interface__
-            params = dict(title="Task 8", race_type='opendistance', bearing=12,
-                          checkpoints=json.dumps(ch_list))
-            r = requests.post('/'.join((URL, 'contest', c_id, 'race')),
-                              data=params)
-            race_id = r.json()['id']
+            race_id = create_race(c_id).json()['id']
         except Exception as error:
             raise unittest.SkipTest("Something went wrong and I need race "
                                     "for test: %r" % error)

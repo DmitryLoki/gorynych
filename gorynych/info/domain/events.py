@@ -2,6 +2,7 @@
 List of domain events in context "info".
 '''
 from gorynych.common.domain.model import DomainEvent
+from gorynych.common.infrastructure import serializer
 
 
 class ArchiveURLReceived(DomainEvent):
@@ -12,6 +13,7 @@ class ArchiveURLReceived(DomainEvent):
     @param id: race id
     @param url: url with track archive.
     '''
+    serializer = serializer.StringSerializer()
 
 
 class RaceCheckpointsChanged(DomainEvent):
@@ -22,6 +24,8 @@ class RaceCheckpointsChanged(DomainEvent):
     @param id: race id
     @param payload: list with new checkpoints. List of L{Checkpoints}.
     '''
+    from gorynych.common.domain.types import checkpoint_from_geojson
+    serializer = serializer.GeoObjectListSerializer(checkpoint_from_geojson)
 
 
 class ParagliderRegisteredOnContest(DomainEvent):
@@ -32,6 +36,8 @@ class ParagliderRegisteredOnContest(DomainEvent):
     @param aggregate_id: L{PersonID}
     @param payload: L{ContestID}
     '''
+    from gorynych.info.domain.contest import ContestID
+    serializer = serializer.IdentifierObjectSerializer(ContestID)
 
 
 class TrackerAssigned(DomainEvent):

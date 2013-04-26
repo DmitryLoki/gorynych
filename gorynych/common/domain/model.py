@@ -101,6 +101,9 @@ class DomainEvent(object):
     '''
     Base class for domain events.
     '''
+
+    serializer = None
+
     def __init__(self, aggregate_id, payload, aggregate_type=None,
                  occured_on=None):
         self.aggregate_id = str(aggregate_id)
@@ -150,25 +153,6 @@ class DomainEvent(object):
         result = dict(event_name=self.__class__.__name__,
                       aggregate_id=self.aggregate_id,
                       aggregate_type=self.aggregate_type,
-                      event_payload=self._payload_to_bytes(),
+                      event_payload=repr(self.payload),
                       occured_on=self.occured_on)
         return json.dumps(result)
-
-    def _payload_to_bytes(self):
-        '''
-        Represent event payload as bytes for serialization purpose.
-        Reload this method if event payload can't be simply represented by
-        bytes(payload).
-        @return:
-        @rtype:
-        '''
-        if isinstance(self.payload, bytes):
-            return bytes(self.payload)
-        elif issubclass(self.payload.__class__, IdentifierObject):
-            return bytes(str(self.payload))
-        elif isinstance(self.payload, dict):
-            return bytes(json.dumps(self.payload))
-        elif isinstance(self.payload, int):
-            return bytes(self.payload)
-
-

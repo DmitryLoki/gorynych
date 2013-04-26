@@ -110,7 +110,7 @@ class Checkpoint(ValueObject):
         Exposes python geo interface as
         described here: L{https://gist.github.com/sgillies/2217756}
         '''
-        result = {'type': 'Feature'}
+        result = dict(type='Feature')
         result['properties'] = {}
         result['properties']['checkpoint_type'] = self.type
         result['properties']['name'] = self.name

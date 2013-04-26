@@ -9,8 +9,8 @@ from gorynych.info.domain.test.test_race import create_checkpoints
 
 URL = 'http://localhost:8085'
 
-def create_contest():
-    params = dict(title='Contest with paragliders', start_time=1,
+def create_contest(title='Contest with paragliders'):
+    params = dict(title=title, start_time=1,
         end_time=10,
         place = 'La France', country='ru',
         hq_coords='43.3,23.1', timezone='Europe/Paris')
@@ -191,7 +191,7 @@ class ContestRaceTest(unittest.TestCase):
     def test_create_and_read_race(self):
         # TODO: refactor this test by splitting it and creating setUp method.
         try:
-            c_id = create_contest()
+            c_id = create_contest(title='Contest with checkpoints and race')
             p_id = create_persons()
             i = register_paraglider(p_id, c_id)
         except:
@@ -245,7 +245,7 @@ class ContestRaceTest(unittest.TestCase):
 
     def test_get_race_paragliders(self):
         try:
-            c_id = create_contest()
+            c_id = create_contest(title='Contest with checkpoints and race')
             p_id = create_persons()
             i = register_paraglider(p_id, c_id)
             ch_list = create_checkpoints()

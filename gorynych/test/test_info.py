@@ -209,16 +209,16 @@ class ContestRaceTest(unittest.TestCase):
         race_id = r.json()['id']
         self.assertEqual(r.status_code, 201)
         self.assertDictContainsSubset({'type':'opendistance',
-                                       'title':'Task 8', 'start_time': '2',
-                                       'end_time': '8'}, r.json())
+                                       'title':'Task 8', 'start_time': '1347711300',
+                                       'end_time': '1347732000'}, r.json())
 
         # Test GET /contest/{id}/race
         r = requests.get('/'.join((URL, 'contest', c_id, 'race')))
         self.assertEqual(r.status_code, 200)
         self.assertIsInstance(r.json(), list)
         self.assertDictContainsSubset({'type':'opendistance',
-                                       'title':'Task 8', 'start_time': '2',
-                                       'end_time': '8'}, r.json()[0])
+                                       'title':'Task 8', 'start_time': '1347711300',
+                                       'end_time': '1347732000'}, r.json()[0])
 
         # Test GET /contest/{id}/race/{id}
         r = requests.get('/'.join((URL, 'contest', c_id, 'race', race_id)))

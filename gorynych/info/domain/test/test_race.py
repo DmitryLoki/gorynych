@@ -7,6 +7,8 @@ from gorynych.info.domain import race
 from gorynych.common.domain.types import Checkpoint
 from gorynych.common.exceptions import BadCheckpoint
 from gorynych.info.domain.events import RaceCheckpointsChanged, ArchiveURLReceived
+from gorynych.info.domain.ids import RaceID
+
 
 
 def create_race():
@@ -24,7 +26,7 @@ def create_checkpoints():
 class RaceTest(unittest.TestCase):
 
     def setUp(self):
-        self.race = race.Race(race.RaceID())
+        self.race = race.Race(RaceID())
         self.race.event_publisher = mock.MagicMock()
 
     def tearDown(self):
@@ -94,7 +96,7 @@ class RaceTest(unittest.TestCase):
 
 class RaceTrackArchiveTest(unittest.TestCase):
     def setUp(self):
-        self.id = race.RaceID()
+        self.id = RaceID()
         r = race.Race(self.id)
         event_store = mock.Mock()
         event_store.load_from_stream = mock.Mock()
@@ -134,7 +136,7 @@ class TrackArchiveTest(unittest.TestCase):
             tap.assert_called_once_with(1)
 
     def test_archiveurlreceived(self):
-        ta = race.TrackArchive([ArchiveURLReceived(race.RaceID(), 'http://')])
+        ta = race.TrackArchive([ArchiveURLReceived(RaceID(), 'http://')])
         self.assertEqual(ta.state, 'work is started')
 
 

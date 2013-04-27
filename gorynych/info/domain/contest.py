@@ -1,22 +1,20 @@
 '''
 Contest Aggregate.
 '''
-import uuid
-import re
-from datetime import date
 from copy import deepcopy
 
 import pytz
 from zope.interface.interfaces import Interface
 
-from gorynych.common.domain.model import IdentifierObject, AggregateRoot
+from gorynych.common.domain.model import AggregateRoot
 from gorynych.common.domain.model import ValueObject
 from gorynych.common.domain.types import Address, Name, Country
 from gorynych.common.infrastructure import persistence
 # from gorynych.info.domain.tracker import TrackerID
-from gorynych.info.domain.race import RaceID, Race, RACETASKS
+from gorynych.info.domain.race import Race, RACETASKS
 from gorynych.info.domain.person import IPersonRepository
 from gorynych.info.domain.events import ParagliderRegisteredOnContest
+from gorynych.info.domain.ids import ContestID, RaceID
 
 
 class IContestRepository(Interface):
@@ -37,27 +35,6 @@ class IContestRepository(Interface):
         @return:
         @rtype:
         '''
-
-
-class ContestID(IdentifierObject):
-    def __init__(self):
-        fmt = '%y%m%d'
-        self.__creation_date = date.today().strftime(fmt)
-        self.__aggregate_type = 'cnts'
-        self.__random = uuid.uuid4().fields[0]
-        self._id = '-'.join((self.__aggregate_type, self.__creation_date,
-                              str(self.__random)))
-
-    def _string_is_valid_id(self, string):
-        agr_type, creation_date, random_number = string.split('-')
-        assert agr_type == 'cnts', "Wrong aggregate type in id string."
-        assert re.match('[0-9]{6}', creation_date), "Wrong creation date in " \
-                                                    "id string."
-        try:
-            int(random_number)
-        except ValueError as error:
-            raise ValueError("Wrong third part of id string: %r" % error)
-        return True
 
 
 class ContestFactory(object):

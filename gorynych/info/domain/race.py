@@ -8,7 +8,7 @@ import re
 import pytz
 from zope.interface.interfaces import Interface
 
-from gorynych.common.domain.model import AggregateRoot, IdentifierObject, ValueObject
+from gorynych.common.domain.model import AggregateRoot, ValueObject
 from gorynych.common.domain.types import Checkpoint
 from gorynych.common.exceptions import BadCheckpoint
 from gorynych.info.domain.events import RaceCheckpointsChanged, ArchiveURLReceived
@@ -38,9 +38,6 @@ class OpenDistanceTask(RaceTask):
 RACETASKS = {'speedrun': SpeedRunTask,
              'racetogoal': RaceToGoalTask,
              'opendistance': OpenDistanceTask}
-
-class RaceID(IdentifierObject):
-    pass
 
 
 class TrackArchiveAlreadyExist(Exception):

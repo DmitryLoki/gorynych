@@ -1,6 +1,4 @@
-from datetime import date
 import uuid
-from sys import getsizeof
 import unittest
 
 import mock
@@ -8,8 +6,8 @@ from shapely.geometry import Point
 
 from gorynych.info.domain import contest, person
 from gorynych.common.domain.types import Address, Name, Country, Checkpoint
-from gorynych.info.domain.race import RaceID
 from gorynych.info.domain.events import ParagliderRegisteredOnContest
+from gorynych.info.domain.ids import RaceID
 
 
 def create_contest(start_time, end_time, id=None,
@@ -39,42 +37,6 @@ class MockedPersonRepository(object):
         elif key == 'person3':
             person.tracker = None
         return person
-
-
-class ContestIDTest(unittest.TestCase):
-    def _get_id(self):
-        return contest.ContestID()
-
-    def test_aggregate_type(self):
-        self.assertEqual('cnts', self._get_id().id.split('-')[0])
-
-    def test_date(self):
-        id = self._get_id().id
-        d = date.today().strftime('%y%m%d')
-        self.assertEquals(d, id.split('-')[1])
-
-    def test_random(self):
-        id = self._get_id().id
-        self.assertEqual(getsizeof(int(id.split('-')[-1])), 24)
-
-    def test_create_from_string(self):
-        r_field = str(uuid.uuid4().fields[0])
-        string = 'cnts-120203-' + r_field
-        id = contest.ContestID.fromstring(string)
-        self.assertIsInstance(id, contest.ContestID)
-        self.assertEqual(id.id, string)
-
-    def test_bad_creation_from_string(self):
-        string = 'c'
-        self.assertRaises(ValueError, contest.ContestID.fromstring, string)
-        string = 'cnt-120203-12345'
-        self.assertRaises(AssertionError, contest.ContestID.fromstring,
-                          string)
-        string = 'cnts-1201-12345'
-        self.assertRaises(AssertionError, contest.ContestID.fromstring,
-                          string)
-        string = 'cnts-120203-abr'
-        self.assertRaises(ValueError, contest.ContestID.fromstring, string)
 
 
 class ContestFactoryTest(unittest.TestCase):

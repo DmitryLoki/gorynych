@@ -48,7 +48,6 @@ class TrackArchiveAlreadyExist(Exception):
 
 
 class Race(AggregateRoot):
-    event_store = None
     def __init__(self, id):
         self.id = id
 
@@ -144,7 +143,7 @@ class Race(AggregateRoot):
             raise e
         self._get_times_from_checkpoints(self._checkpoints)
         # Notify other systems about checkpoints changing.
-        self.event_publisher.publish(RaceCheckpointsChanged(self.id,
+        self.event_store.persist(RaceCheckpointsChanged(self.id,
                                                                 checkpoints))
 
     def _invariants_are_correct(self):
@@ -172,7 +171,7 @@ class Race(AggregateRoot):
 
     @property
     def track_archive(self):
-        events = self.event_store.load_from_stream(self.id)
+        events = self.event_store.load_events(self.id)
         track_archive = TrackArchive(events)
         return track_archive
 
@@ -182,7 +181,7 @@ class Race(AggregateRoot):
                                            "already parsed.")
         url_pattern = r'https?://airtribune.com/\w+'
         if re.match(url_pattern, url):
-            self.event_publisher.publish(ArchiveURLReceived(self.id, url))
+            self.event_store.persist(ArchiveURLReceived(self.id, url))
         else:
             raise ValueError("Received URL doesn't match allowed pattern.")
 

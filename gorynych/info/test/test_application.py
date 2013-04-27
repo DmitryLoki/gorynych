@@ -191,7 +191,7 @@ class PersonServiceTest(ApplicationServiceTestCase):
 class ContestParagliderRaceTest(unittest.TestCase):
     def setUp(self):
         from gorynych.info.domain.tracker import TrackerID
-        self.aps = ApplicationService(mock.Mock())
+        self.aps = ApplicationService(mock.Mock(), mock.Mock())
         self.aps.startService()
         self.repository = GoodRepository()
         if not self.repository.is_store_empty():

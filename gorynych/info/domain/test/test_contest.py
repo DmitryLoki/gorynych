@@ -14,7 +14,7 @@ def create_contest(start_time, end_time, id=None,
                    title='  Hello world  ',
                    place='Yrupinsk', country='rU', coords=(45.23, -23.22),
                    timezone='Europe/Moscow'):
-    factory = contest.ContestFactory(mock.MagicMock())
+    factory = contest.ContestFactory(mock.MagicMock(), mock.MagicMock())
     cont = factory.create_contest(title, start_time, end_time, place,
         country, coords, timezone, id)
     if not id:
@@ -41,8 +41,16 @@ class MockedPersonRepository(object):
 
 class ContestFactoryTest(unittest.TestCase):
     def test_creation(self):
+        factory = contest.ContestFactory(mock.MagicMock(), mock.MagicMock())
+        self.assertIsInstance(factory.event_publisher, mock.MagicMock)
+        self.assertIsInstance(factory.event_store, mock.MagicMock)
+
+    @mock.patch('gorynych.common.infrastructure.persistence.event_store')
+    def test_creation_without_event_store(self, patched):
+        patched.return_value = 'event_store'
         factory = contest.ContestFactory(mock.MagicMock())
         self.assertIsInstance(factory.event_publisher, mock.MagicMock)
+        self.assertEqual(factory.event_store, 'event_store')
 
     def test_contestid_successfull_contest_creation(self):
         cont, cont_id = create_contest(1, 2)
@@ -108,13 +116,13 @@ class ContestTest(unittest.TestCase):
         self.assertRaises(ValueError, cont.register_paraglider, 'person3',
             'mantrA 9', '757')
 
-        mock_calls = cont.event_publisher.mock_calls
+        mock_calls = cont.event_store.mock_calls
         # len(mock_calls) == 3 because of call.__nonzero()__ call after
         # contest creation.
         self.assertEqual(len(mock_calls), 3)
-        self.assertEqual(mock_calls[-1], mock.call.publish(
+        self.assertEqual(mock_calls[-1], mock.call.persist(
             ParagliderRegisteredOnContest(p2, cont_id)))
-        self.assertEqual(mock_calls[-2], mock.call.publish(
+        self.assertEqual(mock_calls[-2], mock.call.persist(
             ParagliderRegisteredOnContest(p1, cont_id)))
 
 

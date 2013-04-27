@@ -7,6 +7,7 @@ from zope.interface.interfaces import Interface
 
 from gorynych.common.domain.model import AggregateRoot
 from gorynych.common.domain.types import Name, Country
+from gorynych.common.infrastructure import persistence
 from gorynych.info.domain.ids import PersonID, TrackerID
 
 # First registration was occured in 2012 year.
@@ -81,8 +82,11 @@ class Person(AggregateRoot):
 
 
 class PersonFactory(object):
-    def __init__(self, event_publisher):
+    def __init__(self, event_publisher, event_store=None):
         self.event_publisher = event_publisher
+        if not event_store:
+            event_store = persistence.event_store()
+        self.event_store = event_store
 
     def create_person(self, name, surname, country, email, year=None,
                       month=None, day=None, id=None):
@@ -123,6 +127,7 @@ class PersonFactory(object):
                         email,
                         datetime.date(year, month, day))
         person.event_publisher = self.event_publisher
+        person.event_store = self.event_store
         return person
 
     

@@ -27,7 +27,7 @@ class RaceTest(unittest.TestCase):
 
     def setUp(self):
         self.race = race.Race(RaceID())
-        self.race.event_publisher = mock.MagicMock()
+        self.race.event_store = mock.MagicMock()
 
     def tearDown(self):
         del self.race
@@ -59,7 +59,7 @@ class RaceTest(unittest.TestCase):
         self.race.task = race.OpenDistanceTask()
         good_checkpoints = create_checkpoints()
         self.race.checkpoints = good_checkpoints
-        self.race.event_publisher.publish.assert_called_once_with(
+        self.race.event_store.persist.assert_called_once_with(
             RaceCheckpointsChanged(self.race.id, good_checkpoints))
 
     def test_rollback_checkpoints(self):
@@ -75,7 +75,7 @@ class RaceTest(unittest.TestCase):
         except:
             pass
         self.assertEqual(self.race._checkpoints, good_checkpoints)
-        self.race.event_publisher.publish.assert_called_once_with(
+        self.race.event_store.persist.assert_called_once_with(
             RaceCheckpointsChanged(self.race.id, good_checkpoints))
 
     def test_get_times_from_checkpoints(self):
@@ -99,8 +99,8 @@ class RaceTrackArchiveTest(unittest.TestCase):
         self.id = RaceID()
         r = race.Race(self.id)
         event_store = mock.Mock()
-        event_store.load_from_stream = mock.Mock()
-        event_store.load_from_stream.return_value = [1, 2]
+        event_store.load_events = mock.Mock()
+        event_store.load_events.return_value = [1, 2]
         r.event_store = event_store
         self.r = r
 
@@ -108,10 +108,9 @@ class RaceTrackArchiveTest(unittest.TestCase):
         self.assertIsInstance(self.r.track_archive, race.TrackArchive)
 
     def test_add_track_archive(self):
-        self.r.event_publisher = mock.Mock()
         url = 'http://airtribune.com/22/asdf/tracs22-.zip'
         self.r.add_track_archive(url)
-        self.r.event_publisher.publish.assert_called_once_with(
+        self.r.event_store.persist.assert_called_once_with(
             ArchiveURLReceived(self.id, url))
 
 

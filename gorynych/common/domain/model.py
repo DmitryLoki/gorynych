@@ -94,6 +94,7 @@ class AggregateRoot(object):
     '''
     event_publisher = DomainEventsPublisher()
     _id = None
+    event_store = None
 
 
 @implementer(IEvent)

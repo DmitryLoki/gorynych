@@ -39,8 +39,11 @@ class IContestRepository(Interface):
 
 class ContestFactory(object):
 
-    def __init__(self, event_publisher=None):
+    def __init__(self, event_publisher=None, event_store=None):
         self.event_publisher = event_publisher
+        if not event_store:
+            event_store = persistence.event_store()
+        self.event_store = event_store
 
     def create_contest(self, title, start_time, end_time,
                contest_place, contest_country, hq_coords, timezone,
@@ -59,6 +62,7 @@ class ContestFactory(object):
         contest.timezone = timezone
         if self.event_publisher:
             contest.event_publisher = self.event_publisher
+        contest.event_store = self.event_store
         return contest
 
 
@@ -212,8 +216,8 @@ class Contest(AggregateRoot):
         if not self._invariants_are_correct():
             self._rollback_register_paraglider(paraglider_before, person_id)
             raise ValueError("Paraglider must have unique contest number.")
-        self.event_publisher.publish(ParagliderRegisteredOnContest(
-                                                        person_id, self.id))
+        self.event_store.persist(ParagliderRegisteredOnContest(person_id,
+                                                               self.id))
         return self
 
     def _invariants_are_correct(self):
@@ -251,6 +255,7 @@ class Contest(AggregateRoot):
         race_id = RaceID()
         race = Race(race_id)
         race.event_publisher = self.event_publisher
+        race.event_store = self.event_store
         race_type = ''.join(race_type.strip().lower().split())
         if race_type in RACETASKS.keys():
             race.task = RACETASKS[race_type]()

@@ -82,8 +82,11 @@ class TrackerService(Interface):
 
 
 class ApplicationService(Service):
-    def __init__(self, event_publisher=None):
+    def __init__(self, event_publisher=None, event_store=None):
         self.event_publisher = event_publisher
+        if not event_store:
+            event_store = persistence.event_store()
+        self.event_store = event_store
 
     def startService(self):
         Service.startService(self)
@@ -101,7 +104,8 @@ class ApplicationService(Service):
         @rtype: L{Contest}
         '''
         id = contest.ContestID()
-        contest_factory = contest.ContestFactory(self.event_publisher)
+        contest_factory = contest.ContestFactory(self.event_publisher,
+                                                 self.event_store)
         cont = contest_factory.create_contest(params['title'],
                                               params['start_time'],
                                               params['end_time'],

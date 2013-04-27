@@ -1,10 +1,10 @@
 from datetime import date
 import re
-from gorynych.common.domain.model import IdentifierObject
+from gorynych.common.domain.model import DomainIdentifier
 import uuid
 
 
-class ContestID(IdentifierObject):
+class ContestID(DomainIdentifier):
     def __init__(self):
         fmt = '%y%m%d'
         self.__creation_date = date.today().strftime(fmt)
@@ -25,17 +25,17 @@ class ContestID(IdentifierObject):
         return True
 
 
-class PersonID(IdentifierObject):
+class PersonID(DomainIdentifier):
     '''
     Person identificator is a uuid string.
     '''
     pass
 
 
-class RaceID(IdentifierObject):
+class RaceID(DomainIdentifier):
     pass
 
 
-class TrackerID(IdentifierObject):
+class TrackerID(DomainIdentifier):
     pass
 

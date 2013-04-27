@@ -1,14 +1,14 @@
 '''
 Transport Aggregate.
 '''
-from gorynych.common.domain.model import IdentifierObject, AggregateRoot
+from gorynych.common.domain.model import DomainIdentifier, AggregateRoot
 
 
 # Allowed transport types
 TYPES = frozenset(['bus', 'car', 'helicopter'])
 
 
-class TransportID(IdentifierObject):
+class TransportID(DomainIdentifier):
     pass
 
 

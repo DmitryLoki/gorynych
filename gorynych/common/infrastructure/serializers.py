@@ -2,18 +2,24 @@
 Serializers for system.
 '''
 import simplejson as json
+# XXX: try don't relate on info package
+from gorynych.info.domain import ids
 from gorynych.common import exceptions
 
-class IdentifierObjectSerializer(object):
+# TODO: do it properly
+class DomainIdentifierSerializer(object):
 
-    def __init__(self, id_class):
-        self.id_class = id_class
+    def __init__(self, klass_name):
+        if not hasattr(ids, klass_name):
+            raise exceptions.DeserializationError("No ID class %s"
+                                                  % klass_name)
+        self.klass_name = klass_name
 
     def to_bytes(self, value):
         return bytes(value)
 
     def from_bytes(self, value):
-        return self.id_class.fromstring(value)
+        return getattr(ids, self.klass_name).fromstring(value)
 
 
 class StringSerializer(object):
@@ -24,7 +30,7 @@ class StringSerializer(object):
         return value
 
 
-class GeoObjectListSerializer(object):
+class GeoObjectsListSerializer(object):
 
     def __init__(self, factory):
         self.factory = factory
@@ -34,10 +40,10 @@ class GeoObjectListSerializer(object):
         for value in values[1:]:
             result = ','.join((result,
                                bytes(json.dumps(value.__geo_interface__))))
-        return bytes(','.join((result, ']')))
+        return bytes(''.join((result, ']')))
 
     def from_bytes(self, byte_value):
-        values = json.loads(byte_value)
+        values = json.loads(str(byte_value))
         if not isinstance(values, list):
             raise exceptions.DeserializationError("I need a list.")
         result = []

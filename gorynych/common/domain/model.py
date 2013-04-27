@@ -22,7 +22,7 @@ class ValueObject(object):
     pass
 
 
-class IdentifierObject(object):
+class DomainIdentifier(object):
     '''
     Base class for aggregate IDs. By default use uuid4 as id.
     '''
@@ -52,14 +52,14 @@ class IdentifierObject(object):
         '''
         Make object comparable by id.
         '''
-        if issubclass(other.__class__, IdentifierObject):
+        if issubclass(other.__class__, DomainIdentifier):
             another = str(other.id)
         else:
             another = str(other)
         return str(self._id) == another
 
     def __ne__(self, other):
-        if issubclass(other.__class__, IdentifierObject):
+        if issubclass(other.__class__, DomainIdentifier):
             another = str(other.id)
         else:
             another = str(other)
@@ -67,7 +67,7 @@ class IdentifierObject(object):
 
     def __hash__(self):
         '''
-        Make IdentifierObject hashable.
+        Make DomainIdentifier hashable.
         '''
         return hash(self._id)
 
@@ -80,7 +80,7 @@ class IdentifierObject(object):
     def __str__(self):
         '''
         Make the usage of ID more comfort.
-        Id value can be received by str(IdentifierObject instance)
+        Id value can be received by str(DomainIdentifier instance)
         '''
         return str(self._id)
 
@@ -104,16 +104,16 @@ class DomainEvent(object):
 
     serializer = None
 
-    def __init__(self, aggregate_id, payload, aggregate_type=None,
+    def __init__(self, aggregate_id, payload=None, aggregate_type=None,
                  occured_on=None):
         self.aggregate_id = str(aggregate_id)
         if aggregate_type:
             self.aggregate_type = aggregate_type
-        elif issubclass(aggregate_id.__class__, IdentifierObject):
+        elif issubclass(aggregate_id.__class__, DomainIdentifier):
             self.aggregate_type = aggregate_id.__class__.__name__[:-2].lower()
         else:
             raise ValueError("Provide aggregate_type or instance of "
-                             "IdentifierObject subclass as id.")
+                             "DomainIdentifier subclass as id.")
         if occured_on:
             self.occured_on = int(occured_on)
         else:

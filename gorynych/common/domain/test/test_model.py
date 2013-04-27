@@ -11,7 +11,7 @@ from gorynych.common.infrastructure.messaging import DomainEventsPublisher
 
 class IdentifierObjectTest(unittest.TestCase):
     def _get_id(self):
-        return model.IdentifierObject()
+        return model.DomainIdentifier()
 
     def test_hash(self):
         id = self._get_id()
@@ -49,20 +49,20 @@ class IdentifierObjectTest(unittest.TestCase):
 
     def test_str(self):
         uid = str(uuid.uuid4())
-        id = model.IdentifierObject.fromstring(uid)
+        id = model.DomainIdentifier.fromstring(uid)
         self.assertEqual(str(id), uid)
 
     def test_create_from_string(self):
         string = str(uuid.uuid4())
-        id = model.IdentifierObject.fromstring(string)
-        self.assertIsInstance(id, model.IdentifierObject)
+        id = model.DomainIdentifier.fromstring(string)
+        self.assertIsInstance(id, model.DomainIdentifier)
         self.assertEqual(id.id, string)
 
     def test_create_from_string_bad_case(self):
-        self.assertRaises(ValueError, model.IdentifierObject.fromstring,
+        self.assertRaises(ValueError, model.DomainIdentifier.fromstring,
                           'hello')
 
-class TestID(model.IdentifierObject): pass
+class TestID(model.DomainIdentifier): pass
 
 class DomainEventTest(unittest.TestCase):
     def test_success_creation(self):

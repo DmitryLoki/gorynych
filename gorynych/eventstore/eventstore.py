@@ -1,7 +1,6 @@
 '''
 Store events in system according to Event Sourcing pattern.
 '''
-import sys
 from datetime import datetime
 import simplejson as json
 
@@ -16,19 +15,15 @@ class EventStore(object):
     def __init__(self, store):
         self.store = store
 
-    def load_events(self, id, from_version=0, to_version=sys.maxint):
+    def load_events(self, id):
         '''
 
         @param id:
         @type id:
-        @param from_version:
-        @type from_version:
-        @param to_version:
-        @type to_version:
         @return:
         @rtype: C{EventStream} subclass.
         '''
-        d = self.store.load_events(id, from_version, to_version)
+        d = self.store.load_events(id)
         return d.addCallback(self._construct_event_list)
 
     def _construct_event_list(self, stored_events):

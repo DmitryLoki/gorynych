@@ -5,15 +5,11 @@ class IAppendOnlyStore(Interface):
     '''
     I'm the store to which is only allowed ot append. I store the events.
     '''
-    def load_events(id, from_version, to_version):
+    def load_events(id):
         '''
-        Read stored records for name and in version range.
-        @param id:
+        Read stored records for aggregate with id
+        @param id: aggregate id.
         @type id: C{str}
-        @param from_version:
-        @type from_version: C{int}
-        @param to_version:
-        @type to_version: C{int}
         @return: None or iterable thing which handle stored records.
         @rtype: C{iterable}
         '''
@@ -30,11 +26,11 @@ class IEventStore(Interface):
     give it to you.
     '''
 
-    def load_events(stream_id, from_version, to_version):
+    def load_events(aggregate_id):
         '''
-        Load events for aggregate_id == stream_id
-        @param id:
-        @type id:
+        Load events for aggregate_id.
+        @param aggregate_id:
+        @type aggregate_id:
         @return:
         @rtype: C{list}
         '''

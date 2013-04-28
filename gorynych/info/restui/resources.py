@@ -72,7 +72,7 @@ class ContestRaceResourceCollection(APIResource):
 
     def _get_args(self, args):
         if args.has_key('checkpoints'):
-            args['checkpoints'] = json.loads(args['checkpoints'])
+            args['checkpoints'] = json.loads(args['checkpoints'])['features']
             for i, item in enumerate(args['checkpoints']):
                 args['checkpoints'][i] = types.checkpoint_from_geojson(item)
         return args

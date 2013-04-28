@@ -83,8 +83,7 @@ class TrackerService(Interface):
 
 
 class ApplicationService(Service):
-    def __init__(self, event_publisher=None, event_store=None):
-        self.event_publisher = event_publisher
+    def __init__(self, event_store=None):
         if not event_store:
             event_store = persistence.event_store()
         self.event_store = event_store
@@ -113,8 +112,7 @@ class ApplicationService(Service):
         @rtype: L{Contest}
         '''
         id = contest.ContestID()
-        contest_factory = contest.ContestFactory(self.event_publisher,
-                                                 self.event_store)
+        contest_factory = contest.ContestFactory(self.event_store)
         cont = contest_factory.create_contest(params['title'],
                                               params['start_time'],
                                               params['end_time'],
@@ -241,7 +239,7 @@ class ApplicationService(Service):
 
     ############## Person Service part ##############
     def create_new_person(self, params):
-        factory = person.PersonFactory(self.event_publisher)
+        factory = person.PersonFactory()
         year, month, day = params['reg_date'].split(',')
         pers = factory.create_person(params['name'], params['surname'],
                                      params['country'], params['email'], year,

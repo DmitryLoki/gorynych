@@ -14,7 +14,7 @@ def create_contest(start_time, end_time, id=None,
                    title='  Hello world  ',
                    place='Yrupinsk', country='rU', coords=(45.23, -23.22),
                    timezone='Europe/Moscow'):
-    factory = contest.ContestFactory(mock.MagicMock(), mock.MagicMock())
+    factory = contest.ContestFactory(mock.MagicMock())
     cont = factory.create_contest(title, start_time, end_time, place,
         country, coords, timezone, id)
     if not id:
@@ -41,15 +41,13 @@ class MockedPersonRepository(object):
 
 class ContestFactoryTest(unittest.TestCase):
     def test_creation(self):
-        factory = contest.ContestFactory(mock.MagicMock(), mock.MagicMock())
-        self.assertIsInstance(factory.event_publisher, mock.MagicMock)
+        factory = contest.ContestFactory(mock.MagicMock())
         self.assertIsInstance(factory.event_store, mock.MagicMock)
 
     @mock.patch('gorynych.common.infrastructure.persistence.event_store')
     def test_creation_without_event_store(self, patched):
         patched.return_value = 'event_store'
-        factory = contest.ContestFactory(mock.MagicMock())
-        self.assertIsInstance(factory.event_publisher, mock.MagicMock)
+        factory = contest.ContestFactory()
         self.assertEqual(factory.event_store, 'event_store')
 
     def test_contestid_successfull_contest_creation(self):
@@ -60,7 +58,6 @@ class ContestFactoryTest(unittest.TestCase):
         self.assertEqual(cont.timezone, 'Europe/Moscow')
         self.assertEqual(cont.place, 'Yrupinsk')
         self.assertEquals((cont.start_time, cont.end_time), (1, 2))
-        self.assertIsInstance(cont.event_publisher, mock.MagicMock)
         self.assertIsInstance(cont.id, contest.ContestID)
         self.assertIsNone(cont._id)
 
@@ -219,7 +216,6 @@ class ContestTestWithRegisteredParagliders(unittest.TestCase):
         self.assertEqual(race.checkpoints, [ch1, ch2, ch3, ch4])
         self.assertEqual(race.title, 'Task 4')
         self.assertTupleEqual((1, 15), race.timelimits)
-        self.assertEqual(race.event_publisher, cont.event_publisher)
         self.assertTupleEqual((race.start_time, race.end_time), (2, 8))
         self.assertEqual(race.timezone, cont.timezone)
         self.assertIsNone(race.bearing)

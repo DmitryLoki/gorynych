@@ -39,8 +39,7 @@ class IContestRepository(Interface):
 
 class ContestFactory(object):
 
-    def __init__(self, event_publisher=None, event_store=None):
-        self.event_publisher = event_publisher
+    def __init__(self, event_store=None):
         if not event_store:
             event_store = persistence.event_store()
         self.event_store = event_store
@@ -60,8 +59,6 @@ class ContestFactory(object):
         contest = Contest(id, start_time, end_time, address)
         contest.title = title
         contest.timezone = timezone
-        if self.event_publisher:
-            contest.event_publisher = self.event_publisher
         contest.event_store = self.event_store
         return contest
 
@@ -254,7 +251,6 @@ class Contest(AggregateRoot):
         '''
         race_id = RaceID()
         race = Race(race_id)
-        race.event_publisher = self.event_publisher
         race.event_store = self.event_store
         race_type = ''.join(race_type.strip().lower().split())
         if race_type in RACETASKS.keys():

@@ -8,7 +8,6 @@ import simplejson as json
 
 from zope.interface import implementer
 
-from gorynych.common.infrastructure.messaging import DomainEventsPublisher
 from gorynych.eventstore.interfaces import IEvent
 
 __author__ = 'Boris Tsema'
@@ -92,7 +91,6 @@ class AggregateRoot(object):
     '''
     Base class for aggregate roots.
     '''
-    event_publisher = DomainEventsPublisher()
     _id = None
     event_store = None
 

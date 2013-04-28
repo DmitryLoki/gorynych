@@ -7,7 +7,6 @@ from twisted.web import server
 
 from gorynych import OPTS
 from gorynych.info.application import ApplicationService
-from gorynych.common.infrastructure.messaging import DomainEventsPublisher
 from gorynych.info.restui import base_resource
 # import persistence staff
 from gorynych.info.domain.contest import IContestRepository
@@ -36,7 +35,7 @@ persistence.register_repository(IPersonRepository, PicklePersonRepository
     ('person_repo'))
 
 # Application Service init
-app_service = ApplicationService(DomainEventsPublisher(), event_store)
+app_service = ApplicationService(event_store)
 
 # REST API init
 api_tree = base_resource.resource_tree()

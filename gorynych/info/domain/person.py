@@ -82,8 +82,7 @@ class Person(AggregateRoot):
 
 
 class PersonFactory(object):
-    def __init__(self, event_publisher, event_store=None):
-        self.event_publisher = event_publisher
+    def __init__(self, event_store=None):
         if not event_store:
             event_store = persistence.event_store()
         self.event_store = event_store
@@ -126,7 +125,6 @@ class PersonFactory(object):
                         Country(country),
                         email,
                         datetime.date(year, month, day))
-        person.event_publisher = self.event_publisher
         person.event_store = self.event_store
         return person
 

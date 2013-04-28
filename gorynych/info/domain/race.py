@@ -41,6 +41,23 @@ class RaceID(IdentifierObject):
     pass
 
 
+class RaceFactory(object):
+    def __init__(self):
+        pass
+    
+    def create_race(self, title, race_type, timelimits, race_id=None):
+        if not race_id:
+            race_id = RaceID()
+        race = Race(race_id)
+        race.title = race_title
+        race.timelimits = timelimits
+        race_type = ''.join(race_type.strip().lower().split())
+        if race_type in RACETASKS.keys():
+            race.task = RACETASKS[race_type]()
+        else:
+            raise ValueError("Unknown race type.")
+        return race
+
 class CheckpointsAreAddedToRace(DomainEvent):
     '''
     Notify other systems (such as processor) about checkpoints change.

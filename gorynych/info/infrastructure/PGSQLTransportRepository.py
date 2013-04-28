@@ -1,16 +1,37 @@
 #! /usr/bin/python
 #coding=utf-8
+from twisted.internet import defer
 
 from zope.interface.declarations import implements
 from gorynych.info.domain.transport import ITransportRepository, TransportFactory
 from gorynych.common.exceptions import NoAggregate
 
-SQL_SELECT_TRANSPORT = "SELECT TRANSPORT_ID, TRANSPORT_TYPE, TITLE, \
-DESCRIPTION FROM TRANSPORT WHERE TRANSPORT_ID = %s"
-SQL_INSERT_TRANSPORT = "INSERT INTO TRANSPORT (TRANSPORT_TYPE, TITLE, \
-DESCRIPTION VALUES(%s, %s, %s) RETURNING TRANSPORT_ID"
-SQL_UPDATE_TRANSPORT = "UPDATE TRANSPORT SET TRANSPORT_TYPE = %s, TITLE = %s, \
-DESCRIPTION = %s WHERE TRANSPORT_ID = %s"
+SQL_SELECT_TRANSPORT = """
+SELECT 
+TRANSPORT_ID, 
+TRANSPORT_TYPE,  
+TITLE, 
+DESCRIPTION 
+FROM TRANSPORT 
+WHERE TRANSPORT_ID = %s
+"""
+
+SQL_INSERT_TRANSPORT = """
+INSERT INTO TRANSPORT (
+TRANSPORT_TYPE, 
+TITLE, 
+DESCRIPTION 
+VALUES(%s, %s, %s) 
+RETURNING TRANSPORT_ID
+"""
+
+SQL_UPDATE_TRANSPORT = """
+UPDATE TRANSPORT SET 
+TRANSPORT_TYPE = %s, 
+TITLE = %s, 
+DESCRIPTION = %s 
+WHERE TRANSPORT_ID = %s
+"""
 
 
 class PGSQLTransportRepository(object):

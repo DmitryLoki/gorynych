@@ -14,7 +14,7 @@ from gorynych.common.domain.model import ValueObject, DomainEvent
 from gorynych.common.domain.types import Address, Name, Country
 from gorynych.common.infrastructure import persistence
 # from gorynych.info.domain.tracker import TrackerID
-from gorynych.info.domain.race import RaceID, Race, RACETASKS
+from gorynych.info.domain.race import RaceID, Race, RACETASKS, RaceFactory
 from gorynych.info.domain.person import IPersonRepository
 
 
@@ -280,23 +280,14 @@ class Contest(AggregateRoot):
         @return: a new race for contest
         @rtype: Race
         '''
-        race_id = RaceID()
-        race = Race(race_id)
-        race.event_publisher = self.event_publisher
-        race_type = ''.join(race_type.strip().lower().split())
-        if race_type in RACETASKS.keys():
-            race.task = RACETASKS[race_type]()
-        else:
-            raise ValueError("Unknown race type.")
-
-        race.title = race_title
-        race.timelimits = (self.start_time, self.end_time)
+        factory = RaceFactory()
+        race = factory.create_race(race_title, race_type,
+            (self.start_time, self.end_time), checkpoints)
         race.timezone = self.timezone
         # Here Race is created and we start to fill it with useful
         # information.
         # TODO: the same for transport and organizers.
         race = self._fill_race_with_paragliders(race)
-        race.checkpoints = checkpoints
         self.race_ids.append(race_id)
         return race
 

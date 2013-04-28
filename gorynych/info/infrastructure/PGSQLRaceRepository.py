@@ -1,13 +1,52 @@
+#! /usr/bin/python
+#coding=utf-8
+from twisted.internet import defer
+
 from zope.interface.declarations import implements
-from gorynych.info.domain.race import IRaceRepository, Race
+from gorynych.info.domain.race import IRaceRepository, Race, RACETASKS
 from gorynych.common.exceptions import NoAggregate
 
-SQL_SELECT_RACE = "SELECT RACE_ID, TITLE, START_TIME, FINISH_TIME FROM RACE \
-WHERE RACE_ID = %s"
-SQL_INSERT_RACE = "INSERT INTO RACE (TITLE, START_TIME, FINISH_TIME) \
-VALUES (%s, %s, %s) RETURNING RACE_ID"
-SQL_UPDATE_RACE = "UPDATE RACE SET TITLE = %s, START_TIME = %s, \
-END_TIME = %s WHERE RACE_ID = %s"
+SQL_SELECT_RACE = """
+SELECT 
+RACE_ID, 
+TITLE, 
+START_TIME, 
+END_TIME,
+MIN_START_TIME, 
+MAX_END_TIME, 
+RACE_TYPE, 
+CHECKPOINTS, 
+ID 
+FROM RACE 
+WHERE RACE_ID = %s
+"""
+
+SQL_INSERT_RACE = """
+INSERT INTO RACE (
+TITLE, 
+START_TIME, 
+END_TIME, 
+MIN_START_TIME, 
+MAX_END_TIME, 
+RACE_TYPE, 
+CHECKPOINTS, 
+RACE_ID
+) 
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s) 
+RETURNING ID
+"""
+
+SQL_UPDATE_RACE = """
+UPDATE RACE SET 
+TITLE = %s, 
+START_TIME = %s, 
+END_TIME = %s, 
+MIN_START_TIME = %s, 
+MAX_END_TIME = %s, 
+RACE_TYPE = %s, 
+CHECKPOINTS = %s
+WHERE RACE_ID = %s
+"""
 
 
 class PGSQLRaceRepository(object):
@@ -15,38 +54,48 @@ class PGSQLRaceRepository(object):
 
     def __init__(self, pool):
         self.pool = pool
+        self.factory = RaceFactory()
 
-    def _process_select_result(self, data):
-        if len(data) >= 1:
-            data_row = data[0]
-            if data_row is not None:
-                result = Race(
-                    data_row[0],
-                    data_row[1],
-                    data_row[2],
-                    data_row[3]
-                )
-                return result
-        raise NoAggregate("Race")
-
-    def _process_insert_result(self, data, value):
-        if data is not None and value is not None:
-            inserted_id = data[0][0]
-            value.id = inserted_id
-            return value
-
-    def _params(self, value=None, with_id=False):
-        if value is None:
-            return ()
-        if with_id:
-            return (value.title, value.timelimits[0], value.timelimits[1],
-                    value.id)
-        return (value.title, value.timelimits[0], value.timelimits[1])
-
+    @defer.inlineCallbacks
     def get_by_id(self, race_id):
-        d = self.pool.runQuery(SQL_SELECT_RACE, (race_id,))
-        d.addBoth(self._process_select_result)
-        return d
+        data = yield self.pool.runQuery(SQL_SELECT_RACE, (race_id,))
+        if not data:
+            raise NoAggregate("Race")
+        result = self._create_race(data[0])
+        defer.returnValue(result)
+
+    def _create_race(self, data_row):
+        result = self.factory.create_race(
+            data_row[1],  # TITLE
+            data_row[6],  # RACE_TYPE
+            (data_row[4], data_row[5]),  # MIN_START_TIME, MAX_END_TIME
+            data_row[0]   # RACE_ID
+        )
+        result._start_time = data_row[2]  # START_TIME
+        result._end_time = data_row[3]  # END_TIME
+        self._load_checkpoints_from_json(result, data_row[7])  # CHECKPOINTS
+        result._id = data_row[8]  # ID
+        return result
+
+    def _load_checkpoints_from_json(self, race, text_value):
+        d = json.loads(text_value)
+        # TODO перебрать все записи JSON и из каждой сформировать Checkpoint
+        pass
+
+    def store_checkpoints_to_json(self, race):
+        result = json()
+        for checkpoint in race.checkpoints:
+            # TODO перебрать все и сформировать из каждого JSON
+            pass
+        return str(result)
+
+    def _params(self, race=None):
+        if race is None:
+            return ()
+        return (race.title, race._start_time, race._end_time,
+            race.timelimits[0], race.timelimits[1], race.type(),
+            race.checkpoints()
+        )
 
     def save(self, value):
         d = None

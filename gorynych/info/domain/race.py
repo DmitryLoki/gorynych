@@ -2,14 +2,16 @@
 Aggregate Race.
 '''
 from copy import deepcopy
-import pytz
 import decimal
+import re
 
+import pytz
 from zope.interface.interfaces import Interface
 
-from gorynych.common.domain.model import AggregateRoot, IdentifierObject, ValueObject, DomainEvent
+from gorynych.common.domain.model import AggregateRoot, ValueObject
 from gorynych.common.domain.types import Checkpoint
 from gorynych.common.exceptions import BadCheckpoint
+from gorynych.info.domain.events import RaceCheckpointsChanged, ArchiveURLReceived
 
 
 class RaceTask(ValueObject):
@@ -37,22 +39,12 @@ RACETASKS = {'speedrun': SpeedRunTask,
              'racetogoal': RaceToGoalTask,
              'opendistance': OpenDistanceTask}
 
-class RaceID(IdentifierObject):
-    pass
 
-
-class CheckpointsAreAddedToRace(DomainEvent):
+class TrackArchiveAlreadyExist(Exception):
     '''
-    Notify other systems (such as processor) about checkpoints change.
-    @todo: think about more explicit name for this event.
+    Raised when someone try to add track archive after it has been parsed.
     '''
-    def __init__(self, id, checkpoints):
-        self.checkpoints = checkpoints
-        DomainEvent.__init__(self, id)
 
-    def __eq__(self, other):
-        # TODO: do correct event comparison
-        return self.id == other.id and self.timestamp == other.timestamp
 
 
 class Race(AggregateRoot):
@@ -135,7 +127,7 @@ class Race(AggregateRoot):
     def checkpoints(self, checkpoints):
         '''
         Replace race checkpoints with a new list. Publish L{
-        CheckpointsAreAddedToRace} event with race id and checkpoints list.
+        RaceCheckpointsChanged} event with race id and checkpoints list.
         @param checkpoints: list of L{Checlpoint} instances.
         @type checkpoints: C{list}
         '''
@@ -151,7 +143,7 @@ class Race(AggregateRoot):
             raise e
         self._get_times_from_checkpoints(self._checkpoints)
         # Notify other systems about checkpoints changing.
-        self.event_publisher.publish(CheckpointsAreAddedToRace(self.id,
+        self.event_store.persist(RaceCheckpointsChanged(self.id,
                                                                 checkpoints))
 
     def _invariants_are_correct(self):
@@ -176,6 +168,49 @@ class Race(AggregateRoot):
             self._end_time = end_time
         else:
             raise BadCheckpoint("Wrong or absent times in checkpoints.")
+
+    @property
+    def track_archive(self):
+        events = self.event_store.load_events(self.id)
+        track_archive = TrackArchive(events)
+        return track_archive
+
+    def add_track_archive(self, url):
+        if not self.track_archive.state == 'new':
+            raise TrackArchiveAlreadyExist("Track archive with url %s "
+                                           "already parsed.")
+        url_pattern = r'https?://airtribune.com/\w+'
+        if re.match(url_pattern, url):
+            self.event_store.persist(ArchiveURLReceived(self.id, url))
+        else:
+            raise ValueError("Received URL doesn't match allowed pattern.")
+
+
+
+class TrackArchive(object):
+    def __init__(self, events):
+        self.state = 'new'
+        self.progress = 'nothing has been done'
+        for event in events:
+            self.apply(event)
+
+    def apply(self, event):
+        '''
+        Apply event from list one by one.
+        @param event: event from list
+        @type event: subclasses of L{DomainEvent}
+        @return:
+        @rtype:
+        '''
+        try:
+            getattr(self, '_'.join(('when', event.__class__.__name__.lower(
+                ))))(event)
+        except AttributeError:
+            pass
+
+    def when_archiveurlreceived(self, event):
+        self.state = 'work is started'
+
 
 
 class IRaceRepository(Interface):

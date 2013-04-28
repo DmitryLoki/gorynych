@@ -6,6 +6,9 @@ from shapely.geometry import Point
 from gorynych.info.domain import race
 from gorynych.common.domain.types import Checkpoint
 from gorynych.common.exceptions import BadCheckpoint
+from gorynych.info.domain.events import RaceCheckpointsChanged, ArchiveURLReceived
+from gorynych.info.domain.ids import RaceID
+
 
 
 def create_checkpoints():
@@ -25,8 +28,8 @@ def create_checkpoints():
 class RaceTest(unittest.TestCase):
 
     def setUp(self):
-        self.race = race.Race(race.RaceID())
-        self.race.event_publisher = mock.MagicMock()
+        self.race = race.Race(RaceID())
+        self.race.event_store = mock.MagicMock()
 
     def tearDown(self):
         del self.race
@@ -58,8 +61,8 @@ class RaceTest(unittest.TestCase):
         self.race.task = race.OpenDistanceTask()
         good_checkpoints = create_checkpoints()
         self.race.checkpoints = good_checkpoints
-        self.race.event_publisher.publish.assert_called_once_with(
-            race.CheckpointsAreAddedToRace(self.race.id, good_checkpoints))
+        self.race.event_store.persist.assert_called_once_with(
+            RaceCheckpointsChanged(self.race.id, good_checkpoints))
 
     def test_rollback_checkpoints(self):
         # make race happy with it's invariants:
@@ -74,8 +77,8 @@ class RaceTest(unittest.TestCase):
         except:
             pass
         self.assertEqual(self.race._checkpoints, good_checkpoints)
-        self.race.event_publisher.publish.assert_called_once_with(
-            race.CheckpointsAreAddedToRace(self.race.id, good_checkpoints))
+        self.race.event_store.persist.assert_called_once_with(
+            RaceCheckpointsChanged(self.race.id, good_checkpoints))
 
     def test_get_times_from_checkpoints(self):
         chs = create_checkpoints()
@@ -88,6 +91,51 @@ class RaceTest(unittest.TestCase):
         ch2.open_time, ch2.close_time = 4, None
         self.assertRaises(BadCheckpoint,
                           self.race._get_times_from_checkpoints, [ch2])
+
+
+class RaceTrackArchiveTest(unittest.TestCase):
+    def setUp(self):
+        self.id = RaceID()
+        r = race.Race(self.id)
+        event_store = mock.Mock()
+        event_store.load_events = mock.Mock()
+        event_store.load_events.return_value = [1, 2]
+        r.event_store = event_store
+        self.r = r
+
+    def test_track_archive(self):
+        self.assertIsInstance(self.r.track_archive, race.TrackArchive)
+
+    def test_add_track_archive(self):
+        url = 'http://airtribune.com/22/asdf/tracs22-.zip'
+        self.r.add_track_archive(url)
+        self.r.event_store.persist.assert_called_once_with(
+            ArchiveURLReceived(self.id, url))
+
+
+class TrackArchiveTest(unittest.TestCase):
+    def test_creation(self):
+        ta = race.TrackArchive([])
+        self.assertEqual(ta.state, 'new')
+        self.assertEqual(ta.progress, 'nothing has been done')
+
+    def test_apply(self):
+        class AClass(object): pass
+        aclass = AClass()
+        ta = race.TrackArchive([])
+        ta.when_aclass = mock.Mock()
+        ta.apply(aclass)
+        ta.when_aclass.assert_called_once_with(aclass)
+
+    def test_creation_from_events(self):
+        with mock.patch('gorynych.info.domain.race.TrackArchive.apply') as \
+                        tap:
+            ta = race.TrackArchive([1])
+            tap.assert_called_once_with(1)
+
+    def test_archiveurlreceived(self):
+        ta = race.TrackArchive([ArchiveURLReceived(RaceID(), 'http://')])
+        self.assertEqual(ta.state, 'work is started')
 
 
 class RaceTaskTest(unittest.TestCase):

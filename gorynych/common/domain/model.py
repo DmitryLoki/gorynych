@@ -3,8 +3,13 @@ DDD-model specific base classes.
 '''
 import time
 import uuid
+import simplejson as json
+
+
+from zope.interface import implementer
 
 from gorynych.common.infrastructure.messaging import DomainEventsPublisher
+from gorynych.eventstore.interfaces import IEvent
 
 __author__ = 'Boris Tsema'
 
@@ -17,7 +22,7 @@ class ValueObject(object):
     pass
 
 
-class IdentifierObject(object):
+class DomainIdentifier(object):
     '''
     Base class for aggregate IDs. By default use uuid4 as id.
     '''
@@ -47,14 +52,14 @@ class IdentifierObject(object):
         '''
         Make object comparable by id.
         '''
-        if issubclass(other.__class__, IdentifierObject):
+        if issubclass(other.__class__, DomainIdentifier):
             another = str(other.id)
         else:
             another = str(other)
         return str(self._id) == another
 
     def __ne__(self, other):
-        if issubclass(other.__class__, IdentifierObject):
+        if issubclass(other.__class__, DomainIdentifier):
             another = str(other.id)
         else:
             another = str(other)
@@ -62,7 +67,7 @@ class IdentifierObject(object):
 
     def __hash__(self):
         '''
-        Make IdentifierObject hashable.
+        Make DomainIdentifier hashable.
         '''
         return hash(self._id)
 
@@ -71,6 +76,13 @@ class IdentifierObject(object):
         Make object human-readable in logs.
         '''
         return self._id
+
+    def __str__(self):
+        '''
+        Make the usage of ID more comfort.
+        Id value can be received by str(DomainIdentifier instance)
+        '''
+        return str(self._id)
 
     def __len__(self):
         return len(str(self._id))
@@ -82,15 +94,66 @@ class AggregateRoot(object):
     '''
     event_publisher = DomainEventsPublisher()
     _id = None
+    event_store = None
 
 
+@implementer(IEvent)
 class DomainEvent(object):
     '''
     Base class for domain events.
     '''
-    def __init__(self, id=None):
-        if not id:
-            raise AttributeError("No event owner id.")
+
+    serializer = None
+
+    def __init__(self, aggregate_id, payload=None, aggregate_type=None,
+                 occured_on=None):
+        self.aggregate_id = str(aggregate_id)
+        if aggregate_type:
+            self.aggregate_type = aggregate_type
+        elif issubclass(aggregate_id.__class__, DomainIdentifier):
+            self.aggregate_type = aggregate_id.__class__.__name__[:-2].lower()
         else:
-            self.id = id
-        self.timestamp = int(time.time())
+            raise ValueError("Provide aggregate_type or instance of "
+                             "DomainIdentifier subclass as id.")
+        if occured_on:
+            self.occured_on = int(occured_on)
+        else:
+            self.occured_on = int(time.time())
+
+        self.payload = payload
+
+    def __eq__(self, other):
+        return self.occured_on == other.occured_on and (
+            self.aggregate_id == other.aggregate_id) and (
+            self.payload == other.payload) and (
+            self.aggregate_type == other.aggregate_type)
+
+    def __ne__(self, other):
+        return self.occured_on != other.occured_on or (
+            self.aggregate_id != other.aggregate_id) or (
+            self.payload != other.payload) or (
+            self.aggregate_type != other.aggregate_type)
+
+    def __repr__(self):
+        try:
+            payload = repr(self.payload)
+        except Exception:
+            payload = ''
+        return '<DomainEvent: name=%s, aggregate_id=%s, aggregate_type=%s, ' \
+               'occured_on=%s, payload=%s >' % (self.__class__.__name__,
+                self.aggregate_id, self.aggregate_type, self.occured_on,
+                payload)
+
+    def __str__(self):
+        '''
+        Represent event as string which can be jsonifyed in a dict with keys
+         equal to column names in EventStore PostgreSQL realization.
+        @return: a string which can be dumped by json.
+        @rtype: C{str}
+        '''
+        result = dict(event_name=self.__class__.__name__,
+                      aggregate_id=self.aggregate_id,
+                      aggregate_type=self.aggregate_type,
+                      event_payload=repr(self.payload),
+                      occured_on=self.occured_on)
+        return json.dumps(result)

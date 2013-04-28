@@ -7,6 +7,9 @@ import os
 __version__ = 0.1
 config_file = 'config.yaml'
 
+if 10 * __version__ % 2:
+    os.environ['GOR_ENV'] = 'develop'
+
 path_join = os.path.join(os.path.dirname(__file__), config_file)
 if os.path.isfile(path_join):
     with open(path_join, 'r') as f:

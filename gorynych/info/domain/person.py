@@ -156,3 +156,8 @@ class IPersonRepository(Interface):
         @return:
         @rtype:
         '''
+
+#     def get_list(limit, offset):  # @NoSelf
+#         '''
+#         Return list of a person 
+#         '''

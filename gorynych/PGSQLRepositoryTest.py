@@ -122,6 +122,7 @@ class PGSQLContestRepository(object):
         return d
 
     def parse_select_result(self, data):
+        print "data: " % (data,)
         if len(data) == 1:
             data_row = data[0]
             factory = ContestFactory()
@@ -188,6 +189,8 @@ def run_test():
 def connect_ok(pool):
     print pool
     rep = PGSQLContestRepository(pool)
+    d1 = rep.get_by_id(10000)
+    d1.addCallback(load_ok)
     for i in xrange(10):
         d1 = rep.get_by_id(i)
         d1.addCallback(load_ok)

@@ -1,8 +1,9 @@
 import unittest
 import mock
 
-from gorynych.info.domain.tracker import Tracker, TrackerHasOwner, TrackerAssigned, TrackerUnAssigned
+from gorynych.info.domain.tracker import Tracker, TrackerHasOwner
 from gorynych.info.domain.tracker import TrackerID, TrackerFactory, TrackerDontHasOwner
+from gorynych.info.domain.events import TrackerAssigned, TrackerUnAssigned
 
 
 def create_tracker(id, device_id, device_type, event_publisher=None):

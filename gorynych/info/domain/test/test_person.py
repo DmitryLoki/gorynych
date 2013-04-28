@@ -1,19 +1,14 @@
 import unittest
 import datetime
 
-import mock
-
 from gorynych.info.domain import person
-from gorynych.info.domain.tracker import TrackerID
-from gorynych.info.domain.contest import ContestID
+from gorynych.info.domain.ids import TrackerID, ContestID
 
 def create_person(name='John', surname='Doe',
                   country='UA', email='johndoe@example.com', reg_year=None,
                   reg_month=None,
-                  reg_day=None, event_publisher=None, id=None):
-    if not event_publisher:
-        event_publisher = mock.MagicMock()
-    factory = person.PersonFactory(event_publisher)
+                  reg_day=None, id=None):
+    factory = person.PersonFactory()
     pers = factory.create_person(name, surname, country, email, reg_year,
         reg_month, reg_day, id)
     return pers
@@ -30,7 +25,6 @@ class PersonFactoryTest(unittest.TestCase):
         self.assertEqual(len(pers.id), 36)
         self.assertEqual(pers.email, 'boss@gmail.com')
         self.assertEqual(pers.regdate, datetime.date(2012, 11, 30))
-        self.assertIsInstance(pers.event_publisher, mock.MagicMock)
         self.assertIsNone(pers._id)
 
         another_pers = create_person('Harold', 'erzen', 'DE',
@@ -46,7 +40,6 @@ class PersonFactoryTest(unittest.TestCase):
         self.assertEqual(pers.country, 'DE')
         self.assertEqual(len(pers.id), 36)
         self.assertEqual(pers.regdate, datetime.date.today())
-        self.assertIsInstance(pers.event_publisher, mock.MagicMock)
 
     def test_bad_init(self):
         self.assertRaises(ValueError, create_person, 'Harold', 'Herzen',

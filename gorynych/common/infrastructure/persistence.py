@@ -6,6 +6,8 @@ Clients register a repository instance which implement corresponding interface.
 For retreiving repository instance client use interface class as id.
 
 '''
+from gorynych.eventstore.interfaces import IEventStore
+
 global_repository_registry = dict()
 
 
@@ -33,3 +35,10 @@ def get_repository(interface):
     '''
     return global_repository_registry.get(interface.__name__)
 
+
+def add_event_store(event_store):
+    register_repository(IEventStore, event_store)
+
+
+def event_store():
+    return get_repository(IEventStore)

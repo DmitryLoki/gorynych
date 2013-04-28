@@ -1,21 +1,20 @@
 '''
 Contest Aggregate.
 '''
-import uuid
-import re
-from datetime import date
 from copy import deepcopy
 
 import pytz
 from zope.interface.interfaces import Interface
 
-from gorynych.common.domain.model import IdentifierObject, AggregateRoot
-from gorynych.common.domain.model import ValueObject, DomainEvent
+from gorynych.common.domain.model import AggregateRoot
+from gorynych.common.domain.model import ValueObject
 from gorynych.common.domain.types import Address, Name, Country
 from gorynych.common.infrastructure import persistence
-# from gorynych.info.domain.tracker import TrackerID
-from gorynych.info.domain.race import RaceID, Race, RACETASKS
+from gorynych.info.domain.race import Race, RACETASKS
 from gorynych.info.domain.person import IPersonRepository
+from gorynych.info.domain.events import ParagliderRegisteredOnContest
+from gorynych.info.domain.ids import ContestID, RaceID
+
 
 
 class IContestRepository(Interface):
@@ -38,31 +37,7 @@ class IContestRepository(Interface):
         '''
 
 
-class ContestID(IdentifierObject):
-    def __init__(self):
-        fmt = '%y%m%d'
-        self.__creation_date = date.today().strftime(fmt)
-        self.__aggregate_type = 'cnts'
-        self.__random = uuid.uuid4().fields[0]
-        self._id = '-'.join((self.__aggregate_type, self.__creation_date,
-                              str(self.__random)))
-
-    def _string_is_valid_id(self, string):
-        agr_type, creation_date, random_number = string.split('-')
-        assert agr_type == 'cnts', "Wrong aggregate type in id string."
-        assert re.match('[0-9]{6}', creation_date), "Wrong creation date in " \
-                                                    "id string."
-        try:
-            int(random_number)
-        except ValueError as error:
-            raise ValueError("Wrong third part of id string: %r" % error)
-        return True
-
-
 class ContestFactory(object):
-
-    def __init__(self, event_publisher=None):
-        self.event_publisher = event_publisher
 
     def create_contest(self, title, start_time, end_time,
                contest_place, contest_country, hq_coords, timezone,
@@ -79,19 +54,7 @@ class ContestFactory(object):
         contest = Contest(id, start_time, end_time, address)
         contest.title = title
         contest.timezone = timezone
-        if self.event_publisher:
-            contest.event_publisher = self.event_publisher
         return contest
-
-
-class ParagliderRegisteredOnContest(DomainEvent):
-    def __init__(self, id, contest_id):
-        self.contest_id = contest_id
-        DomainEvent.__init__(self, id)
-
-    def __eq__(self, other):
-        return self.id == other.id and self.timestamp == other.timestamp and (
-            self.contest_id == other.contest_id)
 
 
 class Contest(AggregateRoot):
@@ -244,8 +207,8 @@ class Contest(AggregateRoot):
         if not self._invariants_are_correct():
             self._rollback_register_paraglider(paraglider_before, person_id)
             raise ValueError("Paraglider must have unique contest number.")
-        self.event_publisher.publish(ParagliderRegisteredOnContest(
-                                                        person_id, self.id))
+        persistence.event_store().persist(ParagliderRegisteredOnContest(
+                            person_id, self.id))
         return self
 
     def _invariants_are_correct(self):
@@ -282,7 +245,6 @@ class Contest(AggregateRoot):
         '''
         race_id = RaceID()
         race = Race(race_id)
-        race.event_publisher = self.event_publisher
         race_type = ''.join(race_type.strip().lower().split())
         if race_type in RACETASKS.keys():
             race.task = RACETASKS[race_type]()

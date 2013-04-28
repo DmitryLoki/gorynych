@@ -6,6 +6,7 @@ import simplejson as json
 from zope.interface import Interface
 from twisted.application.service import Service
 from twisted.internet import defer
+from twisted.python import log
 
 from gorynych.info.domain import contest, person, race
 from gorynych.common.infrastructure import persistence
@@ -82,14 +83,24 @@ class TrackerService(Interface):
 
 
 class ApplicationService(Service):
-    def __init__(self, event_publisher=None):
-        self.event_publisher = event_publisher
+    def __init__(self, event_store=None):
+        if not event_store:
+            event_store = persistence.event_store()
+        self.event_store = event_store
+        self.pool = self.event_store.store.pool
 
     def startService(self):
-        Service.startService(self)
+        log.msg("Starting DB pool.")
+        d = self.pool.start()
+        d.addCallback(lambda _: log.msg("Pool started successfully."))
+        d.addCallbacks(lambda _:log.msg("Connection established."))
+        d.addCallback(lambda _:self.event_store.store.initialize())
+        d.addCallback(lambda _:Service.startService(self))
+        return d.addCallback(lambda _: log.msg("Service started."))
 
     def stopService(self):
         Service.stopService(self)
+        return self.pool.close()
 
     ############## Contest Service part #############
     def create_new_contest(self, params):
@@ -101,7 +112,7 @@ class ApplicationService(Service):
         @rtype: L{Contest}
         '''
         id = contest.ContestID()
-        contest_factory = contest.ContestFactory(self.event_publisher)
+        contest_factory = contest.ContestFactory()
         cont = contest_factory.create_contest(params['title'],
                                               params['start_time'],
                                               params['end_time'],
@@ -181,7 +192,7 @@ class ApplicationService(Service):
         d = self._get_aggregate(params['contest_id'],
                                 contest.IContestRepository)
         d.addCallback(lambda cont: cont.register_paraglider(
-            params['person_id'], params['glider'],
+            person.PersonID.fromstring(params['person_id']), params['glider'],
             params['contest_number']))
         d.addCallback(
             persistence.get_repository(contest.IContestRepository).save)
@@ -228,7 +239,7 @@ class ApplicationService(Service):
 
     ############## Person Service part ##############
     def create_new_person(self, params):
-        factory = person.PersonFactory(self.event_publisher)
+        factory = person.PersonFactory()
         year, month, day = params['reg_date'].split(',')
         pers = factory.create_person(params['name'], params['surname'],
                                      params['country'], params['email'], year,

@@ -14,7 +14,7 @@ def create_contest(start_time, end_time, id=None,
                    title='  Hello world  ',
                    place='Yrupinsk', country='rU', coords=(45.23, -23.22),
                    timezone='Europe/Moscow'):
-    factory = contest.ContestFactory(mock.MagicMock())
+    factory = contest.ContestFactory()
     cont = factory.create_contest(title, start_time, end_time, place,
         country, coords, timezone, id)
     if not id:
@@ -22,7 +22,7 @@ def create_contest(start_time, end_time, id=None,
     return cont, id
 
 
-class MockedPersonRepository(object):
+class MockedPersonRepository(mock.Mock):
     '''
     Necessary only for tracker assignment.
     '''
@@ -40,15 +40,6 @@ class MockedPersonRepository(object):
 
 
 class ContestFactoryTest(unittest.TestCase):
-    def test_creation(self):
-        factory = contest.ContestFactory(mock.MagicMock())
-        self.assertIsInstance(factory.event_store, mock.MagicMock)
-
-    @mock.patch('gorynych.common.infrastructure.persistence.event_store')
-    def test_creation_without_event_store(self, patched):
-        patched.return_value = 'event_store'
-        factory = contest.ContestFactory()
-        self.assertEqual(factory.event_store, 'event_store')
 
     def test_contestid_successfull_contest_creation(self):
         cont, cont_id = create_contest(1, 2)
@@ -89,7 +80,10 @@ class ParagliderTest(unittest.TestCase):
 
 
 class ContestTest(unittest.TestCase):
-    def test_register_paraglider(self):
+    @mock.patch('gorynych.common.infrastructure.persistence.event_store')
+    def test_register_paraglider(self, patched):
+        event_store = mock.Mock()
+        patched.return_value = event_store
         cont, cont_id = create_contest(1, 2)
         p1 = person.PersonID()
         c = cont.register_paraglider(p1, 'mantrA 9', '747')
@@ -113,10 +107,8 @@ class ContestTest(unittest.TestCase):
         self.assertRaises(ValueError, cont.register_paraglider, 'person3',
             'mantrA 9', '757')
 
-        mock_calls = cont.event_store.mock_calls
-        # len(mock_calls) == 3 because of call.__nonzero()__ call after
-        # contest creation.
-        self.assertEqual(len(mock_calls), 3)
+        mock_calls = event_store.mock_calls
+        self.assertEqual(len(mock_calls), 2)
         self.assertEqual(mock_calls[-1], mock.call.persist(
             ParagliderRegisteredOnContest(p2, cont_id)))
         self.assertEqual(mock_calls[-2], mock.call.persist(
@@ -158,12 +150,17 @@ class ContestTestWithRegisteredParagliders(unittest.TestCase):
         self.p1_id = person.PersonID()
         self.p2_id = person.PersonID()
         self.p3_id = person.PersonID()
+        @mock.patch('gorynych.common.infrastructure.persistence.event_store')
+        def fixture(patched):
+            patched.return_value = mock.Mock()
+            cont, cont_id = create_contest(1, 15)
+            cont.register_paraglider(self.p2_id, 'mantrA 9', '757')
+            cont.register_paraglider(self.p1_id, 'gIn 9', '747')
+            person1 = cont._participants[self.p1_id]
+            person2 = cont._participants[self.p2_id]
+            return cont, person1, person2
         try:
-            self.cont, cont_id = create_contest(1, 15)
-            self.cont.register_paraglider(self.p2_id, 'mantrA 9', '757')
-            self.cont.register_paraglider(self.p1_id, 'gIn 9', '747')
-            self.person1 = self.cont._participants[self.p1_id]
-            self.person2 = self.cont._participants[self.p2_id]
+            self.cont, self.person1, self.person2 = fixture()
         except:
             raise unittest.SkipTest("ERROR: need contest with paragliders "
                                     "for test.")
@@ -199,17 +196,17 @@ class ContestTestWithRegisteredParagliders(unittest.TestCase):
     @mock.patch('gorynych.common.infrastructure.persistence.get_repository')
     def test_new_race(self, patched):
         patched.return_value = MockedPersonRepository()
-        cont, cont_id = create_contest(1, 15)
-        cont.register_paraglider(self.p2_id, 'mantrA 9', '757')
-        cont.register_paraglider(self.p1_id, 'gIn 9', '747')
+        # cont, cont_id = create_contest(1, 15)
+        # cont.register_paraglider(self.p2_id, 'mantrA 9', '757')
+        # cont.register_paraglider(self.p1_id, 'gIn 9', '747')
         # person without tracker
-        cont.register_paraglider(self.p3_id, 'gIn 9', '777')
+        # cont.register_paraglider(self.p3_id, 'gIn 9', '777')
 
         ch1 = Checkpoint('A01', Point(42.502, 0.798), 'TO', (2, None), 2)
         ch2 = Checkpoint('A01', Point(42.502, 0.798), 'ss', (4, 6), 3)
         ch3 = Checkpoint('B02', Point(1, 2), 'es', radius=3)
         ch4 = Checkpoint('g10', Point(2, 2), 'goal', (None, 8), 3)
-        race = cont.new_race('Speed Run', [ch1, ch2, ch3, ch4], 'task 4')
+        race = self.cont.new_race('Speed Run', [ch1, ch2, ch3, ch4], 'task 4')
 
         ### test Race aggregate ###
         self.assertEqual(race.type, 'speedrun')
@@ -217,14 +214,14 @@ class ContestTestWithRegisteredParagliders(unittest.TestCase):
         self.assertEqual(race.title, 'Task 4')
         self.assertTupleEqual((1, 15), race.timelimits)
         self.assertTupleEqual((race.start_time, race.end_time), (2, 8))
-        self.assertEqual(race.timezone, cont.timezone)
+        self.assertEqual(race.timezone, self.cont.timezone)
         self.assertIsNone(race.bearing)
 
         ### test Contest aggregate ###
-        self.assertEqual(len(cont.race_ids), 1)
-        self.assertIsInstance(cont.race_ids[0], RaceID)
+        self.assertEqual(len(self.cont.race_ids), 1)
+        self.assertIsInstance(self.cont.race_ids[0], RaceID)
 
-        self.assertEqual(len(race.paragliders), 3)
+        self.assertEqual(len(race.paragliders), 2)
         p1 = race.paragliders[747]
         p2 = race.paragliders[757]
         self.assertEqual((str(p1.person_id), p1.name,

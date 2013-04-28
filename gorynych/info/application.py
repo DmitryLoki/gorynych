@@ -112,7 +112,7 @@ class ApplicationService(Service):
         @rtype: L{Contest}
         '''
         id = contest.ContestID()
-        contest_factory = contest.ContestFactory(self.event_store)
+        contest_factory = contest.ContestFactory()
         cont = contest_factory.create_contest(params['title'],
                                               params['start_time'],
                                               params['end_time'],

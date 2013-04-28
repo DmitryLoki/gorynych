@@ -92,7 +92,6 @@ class AggregateRoot(object):
     Base class for aggregate roots.
     '''
     _id = None
-    event_store = None
 
 
 @implementer(IEvent)

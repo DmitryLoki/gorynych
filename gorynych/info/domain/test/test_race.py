@@ -29,7 +29,6 @@ class RaceTest(unittest.TestCase):
 
     def setUp(self):
         self.race = race.Race(RaceID())
-        self.race.event_store = mock.MagicMock()
 
     def tearDown(self):
         del self.race
@@ -55,16 +54,22 @@ class RaceTest(unittest.TestCase):
         self.race.paragliders = dict()
         self.assertFalse(self.race._invariants_are_correct())
 
-    def test_set_checkpoints(self):
+    @mock.patch('gorynych.common.infrastructure.persistence.event_store')
+    def test_set_checkpoints(self, patched):
+        event_store = mock.Mock()
+        patched.return_value = event_store
         # make race happy with it's invariants:
         self.race.paragliders[1] = 2
         self.race.task = race.OpenDistanceTask()
         good_checkpoints = create_checkpoints()
         self.race.checkpoints = good_checkpoints
-        self.race.event_store.persist.assert_called_once_with(
+        event_store.persist.assert_called_once_with(
             RaceCheckpointsChanged(self.race.id, good_checkpoints))
 
-    def test_rollback_checkpoints(self):
+    @mock.patch('gorynych.common.infrastructure.persistence.event_store')
+    def test_rollback_checkpoints(self, patched):
+        event_store = mock.Mock()
+        patched.return_value = event_store
         # make race happy with it's invariants:
         self.race.paragliders[1] = 2
         self.race.task = race.OpenDistanceTask()
@@ -77,7 +82,7 @@ class RaceTest(unittest.TestCase):
         except:
             pass
         self.assertEqual(self.race._checkpoints, good_checkpoints)
-        self.race.event_store.persist.assert_called_once_with(
+        event_store.persist.assert_called_once_with(
             RaceCheckpointsChanged(self.race.id, good_checkpoints))
 
     def test_get_times_from_checkpoints(self):
@@ -100,16 +105,20 @@ class RaceTrackArchiveTest(unittest.TestCase):
         event_store = mock.Mock()
         event_store.load_events = mock.Mock()
         event_store.load_events.return_value = [1, 2]
-        r.event_store = event_store
         self.r = r
+        self.event_store = event_store
 
-    def test_track_archive(self):
+    @mock.patch('gorynych.common.infrastructure.persistence.event_store')
+    def test_track_archive(self, patched):
+        patched.return_value = self.event_store
         self.assertIsInstance(self.r.track_archive, race.TrackArchive)
 
-    def test_add_track_archive(self):
+    @mock.patch('gorynych.common.infrastructure.persistence.event_store')
+    def test_add_track_archive(self, patched):
+        patched.return_value = self.event_store
         url = 'http://airtribune.com/22/asdf/tracs22-.zip'
         self.r.add_track_archive(url)
-        self.r.event_store.persist.assert_called_once_with(
+        self.event_store.persist.assert_called_once_with(
             ArchiveURLReceived(self.id, url))
 
 

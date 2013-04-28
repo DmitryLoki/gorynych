@@ -128,7 +128,6 @@ class AggregateRootTest(unittest.TestCase):
     def test_init(self):
         ar = model.AggregateRoot()
         self.assertIsNone(ar._id)
-        self.assertIsNone(ar.event_store)
         ar._id = 1
         self.assertIsNotNone(ar._id)
 

@@ -12,6 +12,7 @@ from gorynych.common.domain.model import AggregateRoot, ValueObject
 from gorynych.common.domain.types import Checkpoint
 from gorynych.common.exceptions import BadCheckpoint
 from gorynych.info.domain.events import RaceCheckpointsChanged, ArchiveURLReceived
+from gorynych.common.infrastructure import persistence
 
 
 class RaceTask(ValueObject):
@@ -143,7 +144,7 @@ class Race(AggregateRoot):
             raise e
         self._get_times_from_checkpoints(self._checkpoints)
         # Notify other systems about checkpoints changing.
-        self.event_store.persist(RaceCheckpointsChanged(self.id,
+        persistence.event_store().persist(RaceCheckpointsChanged(self.id,
                                                                 checkpoints))
 
     def _invariants_are_correct(self):
@@ -171,7 +172,7 @@ class Race(AggregateRoot):
 
     @property
     def track_archive(self):
-        events = self.event_store.load_events(self.id)
+        events = persistence.event_store().load_events(self.id)
         track_archive = TrackArchive(events)
         return track_archive
 
@@ -181,7 +182,8 @@ class Race(AggregateRoot):
                                            "already parsed.")
         url_pattern = r'https?://airtribune.com/\w+'
         if re.match(url_pattern, url):
-            self.event_store.persist(ArchiveURLReceived(self.id, url))
+            persistence.event_store().persist(ArchiveURLReceived(self.id,
+                                                                 url))
         else:
             raise ValueError("Received URL doesn't match allowed pattern.")
 

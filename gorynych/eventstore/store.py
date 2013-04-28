@@ -1,6 +1,7 @@
 # coding=utf-8
 from zope.interface import implementer
 from twisted.internet import defer
+from twisted.python import log
 
 from gorynych.eventstore.interfaces import IAppendOnlyStore
 
@@ -71,17 +72,30 @@ class PGSQLAppendOnlyStore(object):
     def __init__(self, pool):
         self.pool = pool
 
-    @defer.inlineCallbacks
     def initialize(self):
-        yield self.pool.runOperation(CREATE_EVENTS_TABLE.format(
+        def interaction(cur):
+            log.msg("Creating events table if not exists...")
+            d = cur.execute(CREATE_EVENTS_TABLE.format(
                                                 events_table=EVENTS_TABLE))
-        yield self.pool.runOperation(CREATE_DISPATCH_TABLE.format(
-            dispatch_table=DISPATCH_TABLE))
-        yield self.pool.runOperation(CREATE_TRIGGER.format(
-            func_name=FUNC_NAME, dispatch_table=DISPATCH_TABLE))
-        yield self.pool.runOperation(ADD_TRIGGER.format(
-            trigger_name=TRIGGER_NAME, func_name=FUNC_NAME,
-            events_table=EVENTS_TABLE))
+            d.addCallback(lambda _:
+                log.msg("Creating dispatch table if not exists..."))
+            d.addCallback(lambda _: cur.execute(CREATE_DISPATCH_TABLE.format(
+                dispatch_table=DISPATCH_TABLE)))
+            d.addCallback(lambda _:
+                log.msg("Creating or replacing function if not exists..."))
+            d.addCallback(lambda _:cur.execute(CREATE_TRIGGER.format(
+                func_name=FUNC_NAME, dispatch_table=DISPATCH_TABLE)))
+            d.addCallback(lambda _:log.msg("Dropping trigger if exists..."))
+            d.addCallback(lambda _:cur.execute(
+                "drop trigger if exists {trigger_name} "
+                   "on {events_table}".format(trigger_name=TRIGGER_NAME,
+                                              events_table=EVENTS_TABLE)))
+            d.addCallback(lambda _:log.msg("Adding trigger to events table..."))
+            d.addCallback(lambda _: cur.execute(ADD_TRIGGER.format(
+                trigger_name=TRIGGER_NAME, func_name=FUNC_NAME,
+                events_table=EVENTS_TABLE)))
+            return d.addCallback(lambda _: log.msg("PGSQL store initialized."))
+        return self.pool.runInteraction(interaction)
 
     def append(self, serialized_event):
         '''

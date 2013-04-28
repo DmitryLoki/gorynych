@@ -6,6 +6,7 @@ import simplejson as json
 from zope.interface import Interface
 from twisted.application.service import Service
 from twisted.internet import defer
+from twisted.python import log
 
 from gorynych.info.domain import contest, person, race
 from gorynych.common.infrastructure import persistence
@@ -87,12 +88,20 @@ class ApplicationService(Service):
         if not event_store:
             event_store = persistence.event_store()
         self.event_store = event_store
+        self.pool = self.event_store.store.pool
 
     def startService(self):
-        Service.startService(self)
+        log.msg("Starting DB pool.")
+        d = self.pool.start()
+        d.addCallback(lambda _: log.msg("Pool started successfully."))
+        d.addCallbacks(lambda _:log.msg("Connection established."))
+        d.addCallback(lambda _:self.event_store.store.initialize())
+        d.addCallback(lambda _:Service.startService(self))
+        return d.addCallback(lambda _: log.msg("Service started."))
 
     def stopService(self):
         Service.stopService(self)
+        return self.pool.close()
 
     ############## Contest Service part #############
     def create_new_contest(self, params):

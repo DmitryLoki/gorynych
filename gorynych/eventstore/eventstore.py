@@ -2,6 +2,7 @@
 Store events in system according to Event Sourcing pattern.
 '''
 from datetime import datetime
+import time
 import simplejson as json
 
 from zope.interface import implementer
@@ -49,11 +50,11 @@ class EventStore(object):
         @return:
         @rtype: instance of L{DomainEvent} subclass
         '''
-        _, name, aggrid, aggrtype, payload, ts, _ = stored_event
+        id, name, aggrid, aggrtype, payload, ts = stored_event
         event_class = getattr(events, name)
         if event_class:
             event = event_class(aggrid, aggregate_type=aggrtype,
-                                occured_on=ts)
+                        occured_on=int(time.mktime(ts.timetuple())))
             event.payload = event.serializer.from_bytes(payload)
             return event
 

@@ -32,6 +32,9 @@ contest:
                 paraglider:
                   leaf: RaceParagliderResourceCollection
                   package: *gorynych
+                track_archive:
+                  leaf: TrackArchiveResource
+                  package: *gorynych
 person:
   leaf: PersonResourceCollection
   package: *gorynych

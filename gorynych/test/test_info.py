@@ -258,6 +258,12 @@ class ContestRaceTest(unittest.TestCase):
         self.assertEqual(r.json()['checkpoints']['features'],
                          json.loads(json.dumps(new_ch_list)))
 
+        # Test POST /contest/{id}/race/{id}/track_archive
+        r = requests.post('/'.join((URL, 'contest', c_id, 'race', race_id,
+                   'track_archive')), data={'url':'http://airtribune.com/1'})
+        self.assertEqual(r.json()['status'],
+            "Archive with url http://airtribune.com/1 added.")
+
     def test_get_race_paragliders(self):
         try:
             c_id = create_contest(title='Contest with checkpoints and race')

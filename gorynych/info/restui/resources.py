@@ -259,3 +259,15 @@ class Placeholder(APIResource):
     Resource which just a placeholder for children resources.
     '''
     pass
+
+
+class TrackArchiveResource(APIResource):
+    '''
+    contest/{id}/race/{id}/trackarchive
+    '''
+    name = 'track_archive'
+    service_command = dict(POST='add_track_archive')
+
+    def read_POST(self, smth, p=None):
+        if smth:
+            return dict(status=str(smth))

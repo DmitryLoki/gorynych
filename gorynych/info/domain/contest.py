@@ -10,14 +10,14 @@ from gorynych.common.domain.model import AggregateRoot
 from gorynych.common.domain.model import ValueObject
 from gorynych.common.domain.types import Address, Name, Country
 from gorynych.common.infrastructure import persistence
-from gorynych.info.domain.race import Race, RACETASKS
+from gorynych.info.domain.race import RaceFactory
 from gorynych.info.domain.person import IPersonRepository
 from gorynych.info.domain.events import ParagliderRegisteredOnContest
-from gorynych.info.domain.ids import ContestID, RaceID
+from gorynych.info.domain.ids import ContestID
 
 
 class IContestRepository(Interface):
-    def get_by_id(id):  # @NoSelf
+    def get_by_id(contest_id):  # @NoSelf
         '''
 
         @param id:
@@ -196,7 +196,6 @@ class Contest(AggregateRoot):
     def title(self, value):
         self._title = value.strip().title()
 
-
     def register_paraglider(self, person_id, glider, contest_number):
         paraglider_before = deepcopy(self._participants.get(person_id))
 
@@ -250,7 +249,7 @@ class Contest(AggregateRoot):
         # information.
         # TODO: the same for transport and organizers.
         race = self._fill_race_with_paragliders(race)
-        self.race_ids.append(race_id)
+        self.race_ids.append(race.id)
         return race
 
     def _fill_race_with_paragliders(self, race):
@@ -258,7 +257,7 @@ class Contest(AggregateRoot):
             if self._participants[key]['role'] == 'paraglider':
                 person = persistence.get_repository(IPersonRepository
                                                     ).get_by_id(key)
-                if person: # TODO: do this later: and person.tracker:
+                if person:  # TODO: do this later: and person.tracker:
                     race.paragliders[
                       self._participants[key]['contest_number']] = Paraglider(
                         key,

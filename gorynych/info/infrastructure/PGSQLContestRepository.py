@@ -21,6 +21,17 @@ SELECT
  WHERE ID = %s
 """
 
+SQL_SELECT_PARTICIPANTS = """
+SELECT
+ CID
+, PARTICIPANT_ID
+, GLIDER
+, ROLE
+, CONTEST_NUMBER
+, DESCRIPTION
+ WHERE CID = %s
+"""
+
 SQL_INSERT_CONTEST = """
 INSERT INTO CONTEST(
  TITLE
@@ -70,6 +81,27 @@ class PGSQLContestRepository(object):
             return result
         return None
 
+    def _load_participants(self, contest, participants):
+        result = dict()
+        for data_row in participants:
+            item = dict()
+            contest_id = data_row[0]
+            person_id = data_row[1]
+            role = data_row[2]
+            glider = data_row[3]
+            contest_number = data_row[4]
+            description = data_row[5]
+
+            item["contest_id"] = contest_id
+            item["person_id"] = person_id
+            item["role"] = role
+            item["glider"] = glider
+            item["contest_number"] = contest_number
+            item["description"] = description
+
+            result[person_id] = item
+        contest._participants = result
+
     def _process_insert_result(self, data, value):
         if data is not None and value is not None:
             inserted_id = data[0][0]
@@ -90,6 +122,11 @@ class PGSQLContestRepository(object):
         if not data:
             raise NoAggregate("Contest")
         result = self._process_select_result(data)
+
+        participants = yield self.pool.runQuery(SQL_SELECT_PARTICIPANTS,
+                                                (contest_id,))
+        if participants:
+            self._load_participants(result, participants)
         defer.returnValue(result)
 
     def save(self, value):

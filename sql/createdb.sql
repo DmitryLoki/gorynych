@@ -142,7 +142,9 @@ CREATE TABLE RACE(
 	END_TIME TIMESTAMPTZ NOT NULL,
 	-- Время окончания - с учетом часового пояса
 	MAX_END_TIME TIMESTAMPTZ NOT NULL,
+	-- Тип гонки - из справочника RACE_TYPE
 	RACE_TYPE BIGINT REFERENCES RACE_TYPE(ID),
+	-- Информация о чекпойнтах в гонке, в виде JSON
 	CHECKPOINTS TEXT
 );
 -- Добавляем тестовую гонку

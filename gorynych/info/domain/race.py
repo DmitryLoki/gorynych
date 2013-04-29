@@ -37,6 +37,7 @@ RACETASKS = {'speedrun': SpeedRunTask,
              'racetogoal': RaceToGoalTask,
              'opendistance': OpenDistanceTask}
 
+
 class RaceID(IdentifierObject):
     pass
 
@@ -44,12 +45,12 @@ class RaceID(IdentifierObject):
 class RaceFactory(object):
     def __init__(self):
         pass
-    
+
     def create_race(self, title, race_type, timelimits, race_id=None):
         if not race_id:
             race_id = RaceID()
         race = Race(race_id)
-        race.title = race_title
+        race.title = title
         race.timelimits = timelimits
         race_type = ''.join(race_type.strip().lower().split())
         if race_type in RACETASKS.keys():
@@ -58,14 +59,15 @@ class RaceFactory(object):
             raise ValueError("Unknown race type.")
         return race
 
+
 class CheckpointsAreAddedToRace(DomainEvent):
     '''
     Notify other systems (such as processor) about checkpoints change.
     @todo: think about more explicit name for this event.
     '''
-    def __init__(self, id, checkpoints):
+    def __init__(self, event_id, checkpoints):
         self.checkpoints = checkpoints
-        DomainEvent.__init__(self, id)
+        DomainEvent.__init__(self, event_id)
 
     def __eq__(self, other):
         # TODO: do correct event comparison
@@ -73,8 +75,8 @@ class CheckpointsAreAddedToRace(DomainEvent):
 
 
 class Race(AggregateRoot):
-    def __init__(self, id):
-        self.id = id
+    def __init__(self, race_id):
+        self.id = race_id
 
         self.task = None
         self._checkpoints = []

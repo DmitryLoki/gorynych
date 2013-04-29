@@ -1,51 +1,53 @@
 #! /usr/bin/python
 #coding=utf-8
 from twisted.internet import defer
+import simplejson as json
 
 from zope.interface.declarations import implements
-from gorynych.info.domain.race import IRaceRepository, Race, RACETASKS
+from gorynych.info.domain.race import IRaceRepository, RaceFactory
 from gorynych.common.exceptions import NoAggregate
+from gorynych.common.domain.types import Checkpoint
 
 SQL_SELECT_RACE = """
-SELECT 
-RACE_ID, 
-TITLE, 
-START_TIME, 
-END_TIME,
-MIN_START_TIME, 
-MAX_END_TIME, 
-RACE_TYPE, 
-CHECKPOINTS, 
-ID 
-FROM RACE 
-WHERE RACE_ID = %s
+SELECT
+ RACE_ID,
+ TITLE,
+ START_TIME,
+ END_TIME,
+ MIN_START_TIME,
+ MAX_END_TIME,
+ RACE_TYPE,
+ CHECKPOINTS,
+ ID
+ FROM RACE
+ WHERE RACE_ID = %s
 """
 
 SQL_INSERT_RACE = """
 INSERT INTO RACE (
-TITLE, 
-START_TIME, 
-END_TIME, 
-MIN_START_TIME, 
-MAX_END_TIME, 
-RACE_TYPE, 
-CHECKPOINTS, 
-RACE_ID
-) 
-VALUES (%s, %s, %s, %s, %s, %s, %s, %s) 
-RETURNING ID
+ TITLE,
+ START_TIME,
+ END_TIME,
+ MIN_START_TIME,
+ MAX_END_TIME,
+ RACE_TYPE,
+ CHECKPOINTS,
+ RACE_ID
+)
+ VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+ RETURNING ID
 """
 
 SQL_UPDATE_RACE = """
-UPDATE RACE SET 
-TITLE = %s, 
-START_TIME = %s, 
-END_TIME = %s, 
-MIN_START_TIME = %s, 
-MAX_END_TIME = %s, 
-RACE_TYPE = %s, 
-CHECKPOINTS = %s
-WHERE RACE_ID = %s
+UPDATE RACE SET
+ TITLE = %s,
+ START_TIME = %s,
+ END_TIME = %s,
+ MIN_START_TIME = %s,
+ MAX_END_TIME = %s,
+ RACE_TYPE = %s,
+ CHECKPOINTS = %s
+ WHERE RACE_ID = %s
 """
 
 
@@ -78,16 +80,23 @@ class PGSQLRaceRepository(object):
         return result
 
     def _load_checkpoints_from_json(self, race, text_value):
-        d = json.loads(text_value)
+        items = json.loads(text_value)
         # TODO перебрать все записи JSON и из каждой сформировать Checkpoint
-        pass
+        checkpoint_list = items["features"]
+        for item in checkpoint_list:
+            checkpoint = Checkpoint()
+            checkpoint.from_geojson(item)
+            race.checkpoints.append(checkpoint)
 
     def store_checkpoints_to_json(self, race):
-        result = json()
+        checkpoints = []
         for checkpoint in race.checkpoints:
+            checkpoints.append(checkpoint.__geo_interface__())
             # TODO перебрать все и сформировать из каждого JSON
-            pass
-        return str(result)
+        result = dict()
+        result["type"] = "FeatureCollection"
+        result["features"] = checkpoints
+        return json.dumps(result)
 
     def _params(self, race=None):
         if race is None:

@@ -6,6 +6,7 @@ import simplejson as json
 from shapely.geometry import shape
 from gorynych.common.domain.model import ValueObject
 
+
 class Name(ValueObject):
     '''
     A type for names.
@@ -131,7 +132,8 @@ class Checkpoint(ValueObject):
     def from_geojson(value):
         '''
         Create Checkpoints intsance from GeoJSON string or dict.
-        @param value: string or dict which looks like correct GeoJSON thing: http://geojson.org/geojson-spec.html#examples
+        @param value: string or dict which looks like correct GeoJSON thing:
+        http://geojson.org/geojson-spec.html#examples
         @param type: C{str} or C{dict}
         '''
         if isinstance(value, str):

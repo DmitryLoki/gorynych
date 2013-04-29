@@ -214,7 +214,8 @@ class PersonResource(APIResource):
 
 class RaceParagliderResourceCollection(APIResource):
     '''
-    Resource /contest/{id}/race/{id}/paraglider
+    Resource /contest/{id}/race/{id}/paraglider,
+    /race/{id}/paragliders
     '''
     name = 'race_paraglider_collection'
     service_command = dict(GET='get_race_paragliders')
@@ -229,3 +230,32 @@ class RaceParagliderResourceCollection(APIResource):
                                    person_id=r.paragliders[key].person_id,
                                    country=r.paragliders[key].country))
             return result
+
+
+class RaceResource(APIResource):
+    '''
+    /race/{id} resource
+    '''
+    name = 'race'
+    service_command = dict(GET='get_race')
+
+    def read_GET(self, r, request_params=None):
+        if r:
+            result = dict()
+            result['race_title'] = r.title
+            result['race_type'] = r.type
+            result['start_time'] = r.start_time
+            result['end_time'] = r.end_time
+            result['bearing'] = r.bearing
+            checkpoints = {'type': 'FeatureCollection', 'features': []}
+            for ch in r.checkpoints:
+                checkpoints['features'].append(ch.__geo_interface__)
+            result['checkpoints'] = json.dumps(checkpoints)
+            return result
+
+
+class Placeholder(APIResource):
+    '''
+    Resource which just a placeholder for children resources.
+    '''
+    pass

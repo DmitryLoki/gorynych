@@ -5,23 +5,15 @@ import datetime
 
 from zope.interface.interfaces import Interface
 
-from gorynych.common.domain.model import IdentifierObject, AggregateRoot
+from gorynych.common.domain.model import AggregateRoot
 from gorynych.common.domain.types import Name, Country
-from gorynych.info.domain.tracker import TrackerID
+from gorynych.info.domain.ids import PersonID, TrackerID
 
 # First registration was occured in 2012 year.
 MINYEAR = 2012
 
 # Person can participate in contest with one of this roles.
 ROLES = frozenset(['paraglider', 'organizator'])
-
-
-class PersonID(IdentifierObject):
-    '''
-    Person identificator is a uuid string.
-    '''
-    pass
-
 
 class Person(AggregateRoot):
     def __init__(self, person_id, name, country, email, regdate):
@@ -93,8 +85,6 @@ class Person(AggregateRoot):
 
 
 class PersonFactory(object):
-    def __init__(self, event_publisher):
-        self.event_publisher = event_publisher
 
     def create_person(self, name, surname, country, email, year=None,
                       month=None, day=None, person_id=None):
@@ -134,7 +124,6 @@ class PersonFactory(object):
                         Country(country),
                         email,
                         datetime.date(year, month, day))
-        person.event_publisher = self.event_publisher
         return person
 
 

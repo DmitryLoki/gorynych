@@ -7,8 +7,10 @@ import os
 __version__ = 0.1
 config_file = 'config.yaml'
 
-if __version__ * 10 % 2:
-    os.environ['GOR_ENV'] = 'develop'
+# Set GOR_ENV to develop if version is odd and not environment variable is set.
+if 10 * __version__ % 2:
+    if not os.getenv('GOR_ENV', None):
+        os.environ['GOR_ENV'] = 'develop'
 
 path_join = os.path.join(os.path.dirname(__file__), config_file)
 if os.path.isfile(path_join):

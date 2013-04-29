@@ -9,3 +9,8 @@ class BadCheckpoint(Exception):
     '''
     Raise when checkpoints don't satisfy some conditions.
     '''
+
+class DeserializationError(Exception):
+    '''
+    Wrapper for errors in serializers.
+    '''

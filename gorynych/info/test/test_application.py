@@ -16,7 +16,7 @@ from gorynych.info import domain
 from gorynych.info.domain.test.test_race import create_checkpoints
 
 
-class GoodRepository:
+class GoodRepository():
     store = dict()
     def is_store_empty(self):
         return len(self.store) == 0
@@ -38,6 +38,9 @@ class GoodRepository:
             return results[:limit]
         else:
             return results
+
+    def persist(self, event):
+        pass
 
 
 class BadContestRepository:
@@ -324,7 +327,9 @@ class ContestParagliderRaceTest(unittest.TestCase):
         expected_call_list.append(mock.call(domain.person.IPersonRepository))
         expected_call_list.append(mock.call(domain.race.IRaceRepository))
         expected_call_list.append(mock.call(domain.contest.IContestRepository))
-        self.assertTrue(expected_call_list == patched.mock_calls)
+        mock_calls = patched.mock_calls
+        mock_calls.pop(2)
+        self.assertTrue(expected_call_list == mock_calls)
         # Check contest
         saved_contest = self.repository.get_by_id(self.cont_id)
         self.assertEqual(saved_contest.race_ids[0], race.id,

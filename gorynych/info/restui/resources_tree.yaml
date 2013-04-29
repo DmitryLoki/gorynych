@@ -39,3 +39,15 @@ person:
     *uuid:
       leaf: PersonResource
       package: *gorynych
+
+race:
+  leaf: Placeholder
+  package: *gorynych
+  tree:
+    *uuid:
+      leaf: RaceResource
+      package: *gorynych
+      tree:
+        paragliders:
+          leaf: RaceParagliderResourceCollection
+          package: *gorynych

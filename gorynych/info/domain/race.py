@@ -204,7 +204,9 @@ class Race(AggregateRoot):
 
     @property
     def track_archive(self):
-        events = persistence.event_store().load_events(self.id)
+        events = persistence.event_store().load_events(str(self.id))
+        # and now events is Deferred instance :(
+        # TODO: pass list to TrackArchive, not deferred.
         track_archive = TrackArchive(events)
         return track_archive
 
@@ -216,6 +218,7 @@ class Race(AggregateRoot):
         if re.match(url_pattern, url):
             persistence.event_store().persist(ArchiveURLReceived(self.id,
                                                                  url))
+            return "Archive with url %s added." % url
         else:
             raise ValueError("Received URL doesn't match allowed pattern.")
 
@@ -224,8 +227,8 @@ class TrackArchive(object):
     def __init__(self, events):
         self.state = 'new'
         self.progress = 'nothing has been done'
-        for event in events:
-            self.apply(event)
+        # for event in events:
+        #     self.apply(event)
 
     def apply(self, event):
         '''

@@ -346,6 +346,10 @@ class ApplicationService(Service):
     def get_race(self, params):
         return self._get_aggregate(params['race_id'], race.IRaceRepository)
 
+    def add_track_archive(self, params):
+        d = self._get_aggregate(params['race_id'], race.IRaceRepository)
+        return d.addCallback(lambda r: r.add_track_archive(params['url']))
+
     ############## common methods ###################
     def _get_aggregate(self, id, repository):
         d = defer.succeed(id)

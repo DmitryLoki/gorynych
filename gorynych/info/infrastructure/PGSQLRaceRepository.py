@@ -20,7 +20,7 @@ SELECT
  CHECKPOINTS,
  ID
  FROM RACE
- WHERE RACE_ID = %s
+ WHERE ID = %s
 """
 
 SQL_INSERT_RACE = """
@@ -88,7 +88,7 @@ class PGSQLRaceRepository(object):
             checkpoint.from_geojson(item)
             race.checkpoints.append(checkpoint)
 
-    def store_checkpoints_to_json(self, race):
+    def _store_checkpoints_to_json(self, race):
         checkpoints = []
         for checkpoint in race.checkpoints:
             checkpoints.append(checkpoint.__geo_interface__())
@@ -102,16 +102,23 @@ class PGSQLRaceRepository(object):
             return ()
         return (race.title, race._start_time, race._end_time,
             race.timelimits[0], race.timelimits[1], race.type(),
-            self.store_checkpoints_to_json(race)
+            self._store_checkpoints_to_json(race), race.id
         )
 
     def save(self, value):
         d = None
         if value._id is not None:
             d = self.pool.runOperation(SQL_UPDATE_RACE,
-                                       self._params(value, True))
+                                       self._params(value))
             d.addCallback(lambda _: value)
         else:
             d = self.pool.runQuery(SQL_INSERT_RACE, self._params(value))
             d.addCallback(self._process_insert_result, value)
         return d
+
+    def _process_insert_result(self, data, value):
+        if data is not None and value is not None:
+            inserted_id = data[0][0]
+            value._id = inserted_id
+            return value
+        return None

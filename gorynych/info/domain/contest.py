@@ -16,9 +16,8 @@ from gorynych.info.domain.events import ParagliderRegisteredOnContest
 from gorynych.info.domain.ids import ContestID, RaceID
 
 
-
 class IContestRepository(Interface):
-    def get_by_id(id): # @NoSelf
+    def get_by_id(id):  # @NoSelf
         '''
 
         @param id:
@@ -27,7 +26,7 @@ class IContestRepository(Interface):
         @rtype:
         '''
 
-    def save(obj): # @NoSelf
+    def save(obj):  # @NoSelf
         '''
 
         @param obj:
@@ -41,17 +40,17 @@ class ContestFactory(object):
 
     def create_contest(self, title, start_time, end_time,
                contest_place, contest_country, hq_coords, timezone,
-               id=None):
+               contest_id=None):
         address = Address(contest_place, contest_country, hq_coords)
-        if not int(start_time) <  int(end_time):
+        if not int(start_time) < int(end_time):
             raise ValueError("Start time must be less then end time.")
-        if not id:
-            id = ContestID()
-        elif not isinstance(id, ContestID):
-            id = ContestID.fromstring(id)
+        if not contest_id:
+            contest_id = ContestID()
+        elif not isinstance(contest_id, ContestID):
+            contest_id = ContestID.fromstring(contest_id)
         if not timezone in pytz.all_timezones_set:
             raise pytz.exceptions.UnknownTimeZoneError("Wrong timezone.")
-        contest = Contest(id, start_time, end_time, address)
+        contest = Contest(contest_id, start_time, end_time, address)
         contest.title = title
         contest.timezone = timezone
         return contest
@@ -59,8 +58,8 @@ class ContestFactory(object):
 
 class Contest(AggregateRoot):
 
-    def __init__(self, id, start_time, end_time, address):
-        self.id = id
+    def __init__(self, contest_id, start_time, end_time, address):
+        self.id = contest_id
         self._title = ''
         self._timezone = ''
         self._start_time = start_time

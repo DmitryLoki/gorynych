@@ -92,7 +92,6 @@ class PGSQLRaceRepository(object):
         checkpoints = []
         for checkpoint in race.checkpoints:
             checkpoints.append(checkpoint.__geo_interface__())
-            # TODO перебрать все и сформировать из каждого JSON
         result = dict()
         result["type"] = "FeatureCollection"
         result["features"] = checkpoints
@@ -103,7 +102,7 @@ class PGSQLRaceRepository(object):
             return ()
         return (race.title, race._start_time, race._end_time,
             race.timelimits[0], race.timelimits[1], race.type(),
-            race.checkpoints()
+            self.store_checkpoints_to_json(race)
         )
 
     def save(self, value):

@@ -8,11 +8,14 @@ import re
 import pytz
 from zope.interface.interfaces import Interface
 
-from gorynych.common.domain.model import AggregateRoot, ValueObject
+from gorynych.common.domain.model import AggregateRoot, ValueObject,\
+                                        DomainEvent
 from gorynych.common.domain.types import Checkpoint
 from gorynych.common.exceptions import BadCheckpoint
-from gorynych.info.domain.events import RaceCheckpointsChanged, ArchiveURLReceived
+from gorynych.info.domain.events import RaceCheckpointsChanged,\
+                                        ArchiveURLReceived
 from gorynych.common.infrastructure import persistence
+from gorynych.info.domain.ids import RaceID
 
 
 class RaceTask(ValueObject):
@@ -30,16 +33,18 @@ class RaceTask(ValueObject):
 class SpeedRunTask(RaceTask):
     type = 'speedrun'
 
+
 class RaceToGoalTask(RaceTask):
     type = 'racetogoal'
+
 
 class OpenDistanceTask(RaceTask):
     type = 'opendistance'
 
+
 RACETASKS = {'speedrun': SpeedRunTask,
              'racetogoal': RaceToGoalTask,
              'opendistance': OpenDistanceTask}
-
 
 
 class RaceFactory(object):
@@ -68,6 +73,11 @@ class CheckpointsAreAddedToRace(DomainEvent):
         self.checkpoints = checkpoints
         DomainEvent.__init__(self, event_id)
 
+
+class TrackArchiveAlreadyExist(Exception):
+    '''
+    Raised when someone try to add track archive after it has been parsed.
+    '''
 
 
 class Race(AggregateRoot):
@@ -210,7 +220,6 @@ class Race(AggregateRoot):
             raise ValueError("Received URL doesn't match allowed pattern.")
 
 
-
 class TrackArchive(object):
     def __init__(self, events):
         self.state = 'new'
@@ -232,13 +241,12 @@ class TrackArchive(object):
         except AttributeError:
             pass
 
-    def when_archiveurlreceived(self, event):
+    def when_archiveurlreceived(self, event):  # @UnusedVariable
         self.state = 'work is started'
 
 
-
 class IRaceRepository(Interface):
-    def get_by_id(id):
+    def get_by_id(race_id):  # @NoSelf
         '''
 
         @param id:
@@ -247,7 +255,7 @@ class IRaceRepository(Interface):
         @rtype:
         '''
 
-    def save(obj):
+    def save(obj):  # @NoSelf
         '''
 
         @param obj:

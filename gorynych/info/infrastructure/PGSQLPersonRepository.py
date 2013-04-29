@@ -7,31 +7,32 @@ from gorynych.info.domain.person import PersonFactory, IPersonRepository
 from gorynych.common.exceptions import NoAggregate
 
 SQL_SELECT_PERSON = """
-SELECT 
-FIRSTNAME 
-, LASTNAME, 
+SELECT
+ FIRSTNAME
+, LASTNAME
 , COUNTRY
-, EMAIL 
-, REGDATE 
-, PERSON_ID 
-, ID 
-FROM PERSON WHERE ID = %s
+, EMAIL
+, REGDATE
+, PERSON_ID
+, ID
+ FROM PERSON
+ WHERE ID = %s
 """
 
 SQL_INSERT_PERSON = """
 INSERT INTO PERSON(
-LASTNAME 
-, FIRSTNAME 
-, REGDATE 
+LASTNAME
+, FIRSTNAME
+, REGDATE
 , COUNTRY
-, EMAIL 
-, PERSON_ID 
-)VALUES(%s, %s, %s, %s, %s, %s) 
-RETURNING ID
+, EMAIL
+, PERSON_ID
+)VALUES(%s, %s, %s, %s, %s, %s)
+ RETURNING ID
 """
 
 SQL_UPDATE_PERSON = """
-UPDATE PERSON SET 
+UPDATE PERSON SET
   LASTNAME = %s
 , FIRSTNAME = %s
 , REGDATE = %s
@@ -40,16 +41,14 @@ UPDATE PERSON SET
 WHERE PERSON_ID = %s
 """
 
-#SQL_GET_PERSON_TRACKS = """
-#    SELECT TRACK_ID FROM {tracks_table} WHERE PID = %s
-#"""
 
 class PGSQLPersonRepository(object):
     implements(IPersonRepository)
 
     def __init__(self, pool):
         self.pool = pool
-        # Пока пусть там будет никакое значение - всё равно от event_publisher'а отказываемся
+        # Пока пусть там будет никакое значение -
+        # всё равно от event_publisher'а отказываемся
         self.factory = PersonFactory(1)
 
     @defer.inlineCallbacks
@@ -58,7 +57,7 @@ class PGSQLPersonRepository(object):
         if not data:
             raise NoAggregate("Person")
         result = self._create_person(data[0])
-        
+
 #        tracks_data = yield self.pool.runQuery(SQL_GET_PERSON_TRACKS.format(
 #        tracks_table=TRACKS_TABLE), (person_id,))
 #        result = self._insert_tracks(result, tracks_data)
@@ -79,7 +78,7 @@ class PGSQLPersonRepository(object):
                 data_row[5])
             result._id = data_row[6]
             return result
-    
+
 #    def _insert_tracks(self, person, tracks):
 #        # Not ready yet.
 #        return person
@@ -103,7 +102,7 @@ class PGSQLPersonRepository(object):
                                        self._extract_sql_fields(pers))
             d.addCallback(lambda _: pers)
         else:
-            d = self.pool.runQuery(SQL_INSERT_PERSON, 
+            d = self.pool.runQuery(SQL_INSERT_PERSON,
                                    self._extract_sql_fields(pers))
             d.addCallback(self._process_insert_result, pers)
         return d
@@ -120,4 +119,3 @@ class PGSQLPersonRepository(object):
             pers._id = inserted_id
             return pers
         return None
-

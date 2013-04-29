@@ -76,7 +76,6 @@ class Parser(object):
         for i in bads:
             del self.datalist[i]
 
-
     def _kml_parse(self, filename):
         element = find_element(filename)
         times, gl_num = get_times_and_gl_num(element, filename)
@@ -467,8 +466,8 @@ def get_pilots_from_resource(race_id):
         di = {}
         di['_id'] = p['contest_number']
         di['glider_number'] = int(p['contest_number'])
-        di['name'] = str(p['name'])
-        di['surname'] = str(p['surname'])
+        di['name'] = str(p['name']).split(' ')[0]
+        di['surname'] = str(p['surname']).split(' ')[1]
         di['glider'] = str(p['glider'])
         di['country'] = str(p['country'])
         di['nid'] = p['person_id']

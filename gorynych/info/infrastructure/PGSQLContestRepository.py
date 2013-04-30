@@ -1,7 +1,9 @@
 #! /usr/bin/python
 #coding=utf-8
 from twisted.internet import defer
-
+import pytz
+import time
+from datetime import datetime
 from zope.interface.declarations import implements
 from gorynych.info.domain.contest import ContestFactory, IContestRepository
 from gorynych.common.exceptions import NoAggregate
@@ -11,8 +13,8 @@ SELECT
  ID
 , CONTEST_ID
 , TITLE
-, START_DATE
-, END_DATE
+, START_TIME
+, END_TIME
 , PLACE
 , COUNTRY
 , HQ_LAT
@@ -29,14 +31,15 @@ SELECT
 , ROLE
 , CONTEST_NUMBER
 , DESCRIPTION
+ FROM PARTICIPANT
  WHERE CID = %s
 """
 
 SQL_INSERT_CONTEST = """
 INSERT INTO CONTEST(
  TITLE
-, START_DATE
-, END_DATE
+, START_TIME
+, END_TIME
 , PLACE
 , COUNTRY
 , HQ_LAT
@@ -49,8 +52,8 @@ INSERT INTO CONTEST(
 SQL_UPDATE_CONTEST = """
 UPDATE CONTEST SET
  TITLE = %s
-, START_DATE = %s
-, END_DATE = %s
+, START_TIME = %s
+, END_TIME = %s
 , PLACE = %s
 , COUNTRY = %s
 , HQ_LAT = %s
@@ -69,15 +72,29 @@ class PGSQLContestRepository(object):
         if len(data) == 1:
             data_row = data[0]
             factory = ContestFactory()
+            storage_id = data_row[0]
+            contest_uuid = data_row[1]
+            title = data_row[2]
+            # Время у нас в Contest лежит в виде целого, а из БД тянется
+            # в виде даты
+            start_time = time.mktime(data_row[3].timetuple())
+            end_time = time.mktime(data_row[4].timetuple())
+            place = data_row[5]
+            country = data_row[6]
+            hq_lat = data_row[7]
+            hq_lon = data_row[8]
+
             result = factory.create_contest(
-                data_row[0],
-                data_row[1],
-                data_row[2],
-                data_row[3],
-                data_row[4],
-                data_row[5],
-                [data_row[6], data_row[7]]
+                title,
+                start_time,
+                end_time,
+                place,
+                country,
+                (hq_lat, hq_lon),
+                'GMT0',
+                contest_uuid
             )
+            result._id = storage_id
             return result
         return None
 
@@ -87,8 +104,8 @@ class PGSQLContestRepository(object):
             item = dict()
             contest_id = data_row[0]
             person_id = data_row[1]
-            role = data_row[2]
-            glider = data_row[3]
+            glider = data_row[2]
+            role = data_row[3]
             contest_number = data_row[4]
             description = data_row[5]
 

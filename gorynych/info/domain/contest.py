@@ -42,7 +42,7 @@ class ContestFactory(object):
                contest_place, contest_country, hq_coords, timezone,
                contest_id=None):
         address = Address(contest_place, contest_country, hq_coords)
-        if not int(start_time) < int(end_time):
+        if end_time < start_time:
             raise ValueError("Start time must be less then end time.")
         if not contest_id:
             contest_id = ContestID()

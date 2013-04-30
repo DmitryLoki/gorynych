@@ -1,16 +1,28 @@
 # coding=utf-8
+import psycopg2
 from twisted.application.service import Service
 from twisted.python import log
 from twisted.internet import task, reactor, threads, defer
+import numpy as np
+from io import BytesIO
+from struct import pack
 
 from gorynych.common.infrastructure import persistence
 from gorynych.processor import trfltfs
-
+from gorynych.common.domain.model import DomainIdentifier
+from gorynych.processor import events
+from gorynych import OPTS
 
 GET_EVENTS = """
     SELECT e.event_name, e.aggregate_id, e.event_payload
     FROM events e, dispatch d
     WHERE (event_name = %s OR event_name = %s) AND e.event_id = d.event_id;
+    """
+
+NEW_TRACK = """
+    INSERT INTO track (start_time, end_time, track_type, track_id)
+    VALUES (%s, %s, (SELECT id FROM track_type WHERE name=%s), %s)
+    RETURNING ID;
     """
 
 class TrackService(Service):
@@ -74,23 +86,76 @@ class TrackService(Service):
         corrected_data = trfltfs.correct_data(parsed_data)
         pic(corrected_data, race_id, 'corrected')
         del parsed_data
-        log.msg("$" * 80)
-        log.msg("$" * 80)
-        log.msg("$" * 80)
         log.msg("Data corrected")
-        log.msg("$" * 80)
-        log.msg("$" * 80)
         # calculate speeds and distance to Goal
         calculator = trfltfs.BatchProcessor(task, race_id)
         calculated_values = calculator.calculate(corrected_data)
         del calculator
-        log.msg("$" * 80)
-        log.msg("$" * 80)
         log.msg("Values calculated")
-        log.msg("$" * 80)
-        pic(corrected_data, race_id, 'processed')
-        log.msg("$" * 80)
+        pic(calculated_values, race_id, 'processed')
         log.msg("Prepared for inserting")
+        return self.insert_offline_tracks(calculated_values, race_id)
+
+    def insert_offline_tracks(self, tracksdata, race_id):
+        '''
+        @param tracksdata: list of dicts which looks like
+        {'_id': 'contest_number', 'name': 'name', 'surname': 'surname',
+        'country': 'country', 'nid': 'person_id',
+        'glider_number': glider_number,
+        'alt':[int], 'lon': [str], 'lat':[str], 'times':[int],
+        'v_speed':float, 'h_speed':float, 'left_distance':int}
+        '''
+        # psycopg2 can't user copy_from in async mode. This is a SashaGrey
+        # workaround
+        conn = psycopg2.connect(database=OPTS['db']['database'],
+                                host=OPTS['db']['host'],
+                                user=OPTS['db']['user'],
+                                password=OPTS['db']['password'])
+        cur = conn.cursor()
+        for i, item in enumerate(tracksdata):
+            track_id = str(DomainIdentifier())
+            cur.execute(NEW_TRACK, (item['times'][0],item['times'][-1],
+                                   'competition aftertask', track_id))
+            dbid = cur.fetchone()
+            cur.copy_expert("COPY track_data FROM STDIN WITH BINARY",
+                            prepare_binary(dbid, item))
+            persistence.event_store().persist(
+                events.PersonGotTrack(item['nid'], track_id, 'person'))
+            persistence.event_store().persist(
+                 events.TrackAddedToRace(race_id, track_id, 'race'))
+            print "INSERTED", i
+        conn.commit()
+        return conn.close()
+        # log.msg("Start data inserting.")
+        # print "INSERTING"
+        # def inserting_transaction(cur):
+        #     d = defer.Deferred()
+        #     log.msg("In transaction function.")
+        #     print "IN TRANSACTION"
+        #     for i, item in enumerate(tracksdata):
+        #         print "ITEM", i
+        #         this create new track and return it's id
+                # track_id = str(DomainIdentifier())
+                # d.addCallback(lambda _: cur.execute(NEW_TRACK,
+                #                                   (item['times'][0],
+                #                            item['times'][-1],
+                #                            'competition aftertask',
+                #                            track_id)))
+                # d.addCallback(lambda _: cur.fetchone())
+
+                # d.addCallback(prepare_binary, item)
+                # d.addCallback(lambda x: cur.copy_expert(
+                #     "COPY track_data FROM STDIN WITH BINARY", x))
+                # Inform person and race about new tracks.
+                # d.addCallback(lambda _: persistence.event_store().persist(
+                #     events.PersonGotTrack(item['nid'], track_id, 'person')))
+                # d.addCallback(lambda _: persistence.event_store().persist(
+                #     events.TrackAddedToRace(race_id, track_id, 'race')))
+
+                # d.addCallback(lambda _:log.msg("Track inserted."))
+                # d.callback(1)
+            # return d
+        # return self.pool.runInteraction(inserting_transaction)
 
 
     # def create_track_archive(self, race_id, payload):
@@ -140,4 +205,50 @@ def pic(x, name, suf):
         f.close()
     except Exception as e:
         print "in pic", str(e)
+
+def prepare_binary(trackdb_id, item):
+    '''
+    Prepare binary file for inserting into PostgreSQL.
+    Was taken from http://stackoverflow.com/questions/8144002/use-binary-copy-table-from-with-psycopg2/8150329#8150329
+    '''
+    print "PREPARING"
+    log.msg("Preparing binary for ", trackdb_id)
+    dtype = [('id', 'i8'), ('timestamp', 'i4'), ('lat', 'f4'),
+                ('lon', 'f4'),
+             ('alt', 'i2'), ('g_speed', 'f4'), ('v_speed', 'f4'),
+             ('distance', 'i4')]
+    # rows, columns
+    shape = len(item['times'])
+    # creating numpy data
+    data = np.empty(shape, dtype)
+    data['id'] = np.ones(shape) * long(trackdb_id[0])
+    data['timestamp'] = np.array(item['times'])
+    data['lat'] = np.array(item['lat'])
+    data['lon'] = np.array(item['lon'])
+    data['alt'] = np.array(item['alt'])
+    data['g_speed'] = np.array(item['h_speed'])
+    data['v_speed'] = np.array(item['v_speed'])
+    data['distance'] = np.array(item['left_distance'])
+
+    # Preparing binary data for inserting into db.
+    pgcopy_dtype = [('num_fields', '>i2')]
+    for field, dtype in data.dtype.descr:
+        pgcopy_dtype += [(field + '_length', '>i4'),
+                         (field, dtype.replace('<', '>'))]
+    pgcopy = np.empty(data.shape, pgcopy_dtype)
+    pgcopy['num_fields'] = len(data.dtype)
+    for i in range(len(data.dtype)):
+        field = data.dtype.names[i]
+        # field length in bytes
+        pgcopy[field + '_length'] = data.dtype[i].alignment
+        pgcopy[field] = data[field]
+    log.msg("Binary prepared")
+
+    cpy = BytesIO()
+    # Write as specified: http://www.postgresql.org/docs/current/interactive/sql-copy.html
+    cpy.write(pack('!11sii', b'PGCOPY\n\377\r\n\0', 0, 0))
+    cpy.write(pgcopy.tostring()) # all rows
+    cpy.write(pack('!h', -1)) # file trailer
+    print "PREPARED"
+    return (cpy)
 

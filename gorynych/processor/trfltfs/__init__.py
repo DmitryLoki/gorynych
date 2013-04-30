@@ -454,7 +454,7 @@ def calculate_distances(ch_list):
 
 def get_pilots_from_resource(race_id):
     """Fullfill list with dicts:
-    {'_id': 'glider_number', 'name': 'name', 'surname': 'surname',
+    {'_id': 'contest_number', 'name': 'name', 'surname': 'surname',
     'country': 'country', 'nid': 'nid', 'glider_number': glider_number}
 
     """
@@ -1078,7 +1078,7 @@ class BatchProcessor(object):
 
         log.msg("start and finish times for: %s, %s",
                   dic.get('ss_time'), dic.get('finish_time'))
-        log.info("Pilot %s processed", dic['_id'])
+        log.msg("Pilot %s processed", dic['_id'])
         return dic
 
     def _make_clean(self, dic):

@@ -6,3 +6,9 @@ class TrackArchiveParsed(DomainEvent):
     Fired with pickled track data after archive parsing.
     '''
     serializer = serializers.StringSerializer()
+
+class PersonGotTrack(DomainEvent):
+    serializer = serializers.StringSerializer()
+
+class TrackAddedToRace(DomainEvent):
+    serializer = serializers.StringSerializer()

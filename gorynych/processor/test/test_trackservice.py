@@ -1,13 +1,20 @@
 import json
+import cPickle
+import mock
+from twisted.internet import defer
 from twisted.trial import unittest
 import requests
 import os
 import sys
 from shapely.geometry import Point
 
+from txpostgres import txpostgres
+
 from gorynych.test.test_info import create_geojson_checkpoints
 from gorynych.common.domain.types import Checkpoint
 from gorynych.processor import trfltfs
+from gorynych.processor.services import trackservice
+from gorynych import OPTS
 
 
 URL = 'http://localhost:8085'
@@ -74,7 +81,7 @@ def create_race(contest_id, checkpoints=None):
                          data=params)
 
 
-class TestCase(unittest.TestCase):
+class ParsingTest(unittest.TestCase):
     def test_parsing(self):
         # create contest, person, register paragliders, create race:
         cont_id = create_contest()
@@ -97,6 +104,32 @@ class TestCase(unittest.TestCase):
         self.assertTrue(task.has_key('window_is_open'))
 
 
+class TracksInsertionTest(unittest.TestCase):
+    def setUp(self):
+        self.pool = txpostgres.ConnectionPool(None, host=OPTS['db']['host'],
+                                              database=OPTS['db']['database'],
+                                              user=OPTS['db']['user'],
+                                              password=OPTS['db']['password'], min=5)
+        filename = '/Users/asumch2n/PycharmProjects/gorynych/8bec41ac-d96d-41c9-8f45-9ed74890c12a.processed.pickle'
+        f = open(filename, 'rb')
+        self.tracs = cPickle.load(f)
+        f.close()
+        return self.pool.start()
 
-if __name__ == '__main__':
-    unittest.main()
+    def tearDown(self):
+        return self.pool.close()
+
+    def test_prepare_binary(self):
+        trackdb = self.tracs[4]
+        a = trackservice.prepare_binary('12', trackdb)
+        print type(a)
+
+    @defer.inlineCallbacks
+    def test_insert_offline_tracks(self):
+        race_id = '8bec41ac-d96d-41c9-8f45-9ed74890c12a'
+        trac = [self.tracs[4]]
+
+        serv = trackservice.TrackService(self.pool)
+        serv.poll_for_events = mock.Mock()
+        # yield serv.startService()
+        yield serv.insert_offline_tracks(trac, race_id)

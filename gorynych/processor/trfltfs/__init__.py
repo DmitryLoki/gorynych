@@ -51,8 +51,8 @@ class Parser(object):
         log.msg("datalist is %s", self.datalist)
 
     def get_filelist(self):
-        return filter(lambda x : (x.endswith('.igc') or x.endswith('.kml') ,
-                      archive_processor(self.unpack_dir, self.ext)))
+        return filter(lambda x : x.endswith('.igc') or x.endswith('.kml'),
+                      archive_processor(self.unpack_dir, 'zip'))
 
     def parse(self, filename):
         if filename.endswith('.igc'):
@@ -245,8 +245,8 @@ class Parser(object):
             t = (yield)
             ts = get_timestamp(t)
             if ts < self.task['start']:
-                log.msg("time %s before task start time %s for %s",
-                          t, self.task['start'], self.datalist[num]['_id'])
+                # log.msg("time %s before task start time %s for %s",
+                #           t, self.task['start'], self.datalist[num]['_id'])
                 # Point before start - wrong point. Delete everything.
                 self._delete_index(num, 0)
             else:
@@ -256,12 +256,12 @@ class Parser(object):
                 t = (yield)
                 ts = get_timestamp(t)
                 if ts <= last_ts:
-                    log.msg("bad or reverse time for %s: %s",
-                              self.datalist[num]['_id'], t)
+                    # log.msg("bad or reverse time for %s: %s",
+                    #           self.datalist[num]['_id'], t)
                     self._delete_index(num, len(self.datalist[num]['lat']) - 1)
                 elif ts - last_ts > MAX_TIME_DIF:
-                    log.msg("time > MAX_TIME_DIF for %s: %s",
-                              self.datalist[num]['_id'], t)
+                    # log.msg("time > MAX_TIME_DIF for %s: %s",
+                    #           self.datalist[num]['_id'], t)
                     if ts > self.task['window_is_open']:
                         self._delete_index(num, len(self.datalist[num]['lat']) - 1)
                     else:
@@ -362,7 +362,7 @@ def archive_processor(unpack_dir, ext):
         try:
             os.mkdir(unpack_dir)
         except OSError as value:
-            log.err("Can't create dir %s: %s", unpack_dir, value)
+            log.err("Can't create dir %s: %s" % (unpack_dir, value))
         for fd in arc.infolist():
             try:
                 fn = fd.filename
@@ -370,12 +370,12 @@ def archive_processor(unpack_dir, ext):
                     #fnd = fn.decode('utf-8', 'ignore')
                     fnd = unicode(fn, 'utf-8', 'replace')
                 except Exception as e:
-                    log.err("while decoding filename: %s", e)
+                    log.err("while decoding filename: %s" % e)
                     fnd = fn
                 try:
                     fne = fnd.encode(enc, errors)
                 except Exception as e:
-                    log.err("while encoding filename: %s", e)
+                    log.err("while encoding filename: %s"% e)
                 if os.sep in fne:
                     path = os.path.join(unpack_dir, fne[:fne.rindex(os.sep)])
                     #log.msg('nested directory found in %s, path is %s', fne, path)
@@ -390,8 +390,8 @@ def archive_processor(unpack_dir, ext):
                 namelist.append(fne)
             except Exception as value:
                 log.err(
-                    "Archive %s.%s can't be extracted: %s",
-                    unpack_dir, ext, value)
+                    "Archive %s.%s can't be extracted: %s" %
+                    (unpack_dir, ext, value))
     else:
         log.err("Bad archive %s", unpack_dir)
     log.msg("files: %s", namelist)
@@ -410,7 +410,9 @@ def init_task(race_id):
     result['end'] = int(a['end_time'])
     result['start'] = int(a['start_time'])
     result['racetype'] = a['race_type']
-    result['bearing'] = int(a['bearing'])
+    result['bearing'] = a['bearing']
+    if not result['bearing'] == 'None':
+        result['bearing'] = int(result['bearing'])
     a['dists'] = calculate_distances(a['checkpoints']['features'])
     result['p_amount'] = len(a['checkpoints']['features'])
 
@@ -441,10 +443,10 @@ def calculate_distances(ch_list):
     ch_list.reverse()
     result = [0]
     for i, ch in enumerate(ch_list):
-        result.append(point_dist(ch['properties']['coordinates'][0],
-                                 ch['properties']['coordinates'][1],
-                                 ch_list[i]['properties']['coordinates'][0],
-                                 ch_list[i]['properties']['coordinates'][1])
+        result.append(point_dist(ch['geometry']['coordinates'][0],
+                                 ch['geometry']['coordinates'][1],
+                                 ch_list[i]['geometry']['coordinates'][0],
+                                 ch_list[i]['geometry']['coordinates'][1])
                       + result[i])
     result.reverse()
     return result
@@ -467,7 +469,7 @@ def get_pilots_from_resource(race_id):
         di['_id'] = p['contest_number']
         di['glider_number'] = int(p['contest_number'])
         di['name'] = str(p['name']).split(' ')[0]
-        di['surname'] = str(p['surname']).split(' ')[1]
+        di['surname'] = str(p['name']).split(' ')[1]
         di['glider'] = str(p['glider'])
         di['country'] = str(p['country'])
         di['nid'] = p['person_id']
@@ -545,8 +547,8 @@ def correct_data(datalist):
             y = np.delete(y, bads)
             #print "for %s y[260] is %s after bads deleting" % (dif[0], y[260])
             if len(y) - len(x):
-                log.err("len(times): %s, len(%s): %s for %s",
-                             len(x), dif[0], len(y), item['_id'])
+                log.err("len(times): %s, len(%s): %s for %s" %
+                        (len(x), dif[0], len(y), item['_id']))
                 raise SystemExit("badbadbad")
             try:
                 exc = track_looker(y, dif[1], kern_size)
@@ -555,54 +557,54 @@ def correct_data(datalist):
                           dif[0], e)
                 continue
             if exc:
-                log.msg("exc points in %s: %s",
-                          item['_id'], exc)
+                # log.msg("exc points in %s: %s",
+                #           item['_id'], exc)
                 try:
                     #there was some bug, TODO: test it and delete
                     if len(y) < 10: continue
                     smoothed = smoother(y, x, exc)
                 except Exception as e:
-                    log.err("error while smoothing y: %r, x: %r, exc: %s, error: %r",
-                              y, x, exc, e)
+                    log.err("error while smoothing y: %r, x: %r, exc: %s, error: %r"
+                            % (y, x, exc, e))
                     # pic((y, x, exc),  item['_id'], 'smoother')
                 while (exc and counter < 15):
                     exc = track_looker(smoothed, dif[1],
                                        kern_size + int(counter / 5) * 2)
                     smoothed = smoother(smoothed, x, exc)
                     counter += 1
-                    log.msg("smoothed while exc=%s in %s",
-                              exc, item['_id'])
+                    # log.msg("smoothed while exc=%s in %s",
+                    #           exc, item['_id'])
                 if exc:
                     log.msg("still can't smooth %s[%s], exc=%s",
                              item['_id'], dif[0], exc)
                 try:
                     tck = interpolate.splrep(x, smoothed, s=0)
-                    log.msg("prepared for interpolation with exc %s",
-                              item['_id'])
+                    # log.msg("prepared for interpolation with exc %s",
+                    #           item['_id'])
                 except Exception as e:
                     log.err("while preparing for interpolating %s[%s]: %s"
-                        , item['_id'], dif[0], e)
+                        % (item['_id'], dif[0], e))
                     continue
                 try:
                     result = interpolate.splev(item['times'], tck, der=0)
-                    log.msg("interpolated with exc %s", item['_id'])
+                    # log.msg("interpolated with exc %s", item['_id'])
                 except Exception as e:
-                    log.err("while interpolating %s[%s]: %s",
-                              item['_id'], dif[0], e)
+                    log.err("while interpolating %s[%s]: %s" %
+                            (item['_id'], dif[0], e))
                     continue
                 if dif[0] == 'alt':
                     result = place_alt_in_corridor(result)
                 item[dif[0]] = result
 
             elif len(bads) > 0:
-                log.msg("bads points in %s: %s",
-                          item['_id'], bads)
+                # log.msg("bads points in %s: %s",
+                #           item['_id'], bads)
                 tck = interpolate.splrep(x, y, s=0)
                 result = interpolate.splev(item['times'], tck, der=0)
                 if dif[0] == 'alt':
                     result = place_alt_in_corridor(result)
-                log.msg("listed while bads=%s in %s",
-                          bads, item['_id'])
+                # log.msg("listed while bads=%s in %s",
+                #           bads, item['_id'])
                 item[dif[0]] = result
             elif len(extra_bads) > 0:
                 item[dif[0]] = y
@@ -633,7 +635,7 @@ def get_times_and_gl_num(element, filename):
                     time.strptime(text_time,
                                   "%Y-%m-%dT%H:%M:%SZ"))
             except ValueError as e:
-                log.err("Time conversion error for pilot %s: %r", gl_num, e)
+                log.err("Time conversion error for pilot %s: %r"% (gl_num, e))
                 return None, None
             times_list = l.getchildren()[0]
             has = True
@@ -1048,7 +1050,7 @@ class BatchProcessor(object):
         return result
 
     def _calculate_values(self, dic):
-        log.debug("got %s", dic['_id'])
+        log.msg("got %s", dic['_id'])
 
         dic['times'] = np.array(dic['times'], dtype=int)
         dic['v_speed'] = self._calc_vspeed(dic['alt'], dic['times'])
@@ -1062,7 +1064,7 @@ class BatchProcessor(object):
             ld, last_wp = self.race.process_point((dic['lat'][i],
                                                    dic['lon'][i]), last_wp)
             dic['left_distance'].append(ld)
-        log.debug("last from left_distance for %s: %s",
+        log.msg("last from left_distance for %s: %s",
                   dic['_id'], dic['left_distance'][len(dic['left_distance']) - 1])
 
         # new intersection time calculation
@@ -1074,7 +1076,7 @@ class BatchProcessor(object):
             dic['finish_time'] = finish_time
             # intersection time calculation
 
-        log.debug("start and finish times for: %s, %s",
+        log.msg("start and finish times for: %s, %s",
                   dic.get('ss_time'), dic.get('finish_time'))
         log.info("Pilot %s processed", dic['_id'])
         return dic
@@ -1085,7 +1087,7 @@ class BatchProcessor(object):
         @param dic:
         @type dic:
         """
-        log.debug("cleaning...")
+        log.msg("cleaning...")
         types = {'alt': int, 'times': int, 'left_distance': int,
                  'lat': str, 'lon': str, 'v_speed': float, 'h_speed': float}
         dic['_id'] = '_'.join((dic['_id'], str(self.race_id)))
@@ -1101,7 +1103,7 @@ class BatchProcessor(object):
             for i, elem in enumerate(dic[key]):
                 dic[key][i] = types[key](elem)
 
-        log.debug("cleaned")
+        log.msg("cleaned")
         return dic
 
     def _calc_hspeed(self, lat, lon, times):
@@ -1116,8 +1118,6 @@ class BatchProcessor(object):
         @return horizontal speeds
         @rtype list
         """
-        if __debug__:
-            log.debug("start hspeed calculation")
         result = [1]
         for i in xrange(len(times) - 1):
             result.append(point_dist(lat[i], lon[i], lat[i+1],
@@ -1126,8 +1126,8 @@ class BatchProcessor(object):
         np.around(result, decimals=1, out=result)
 
         if max(result) > MAX_VERT_SPEED:
-            log.error("max and min of v_speed: %s %s",
-                      max(result), min(result))
+            log.err("max and min of v_speed: %s %s" %
+                    (max(result), min(result)))
         return  result
 
     def _calc_vspeed(self, alt, times):
@@ -1138,15 +1138,13 @@ class BatchProcessor(object):
         @param times:
         @type times:
         """
-        if __debug__:
-            log.debug("start vspeed calculation")
         result = np.ediff1d(alt, to_begin=1) / np.ediff1d(times,
                                                           to_begin=1)
         np.around(result, decimals=2, out=result)
 
         if max(result) > MAX_VERT_SPEED:
-            log.error("max and min of v_speed: %s %s",
-                      max(result), min(result))
+            log.err("max and min of v_speed: %s %s" %
+                    (max(result), min(result)))
         return result
 
 def intersect(times, lat, lon, wp_lat, wp_lon, wp_rad):
@@ -1190,12 +1188,13 @@ def intersect(times, lat, lon, wp_lat, wp_lon, wp_rad):
                     l_time = times[p_index]
                     f_time = times[p_index - 1]
                     if l_range == f_range:
-                        log.error("l_range is equal f_range and is %s for time %s", l_range, l_time)
+                        log.err("l_range is equal f_range and is %s for time %s"
+                        % (l_range, l_time))
                         try:
                             f_range = ranges[last_point - 2]
-                            log.debug("will use f_range = %s instead", f_range)
+                            log.msg("will use f_range = %s instead", f_range)
                         except IndexError:
-                            log.error("Can't do anything, continue")
+                            log.err("Can't do anything, continue")
                             continue
                     k = abs(f_range / (l_range - f_range) )
                     ks.append(k)
@@ -1205,5 +1204,5 @@ def intersect(times, lat, lon, wp_lat, wp_lon, wp_rad):
             else:
                 ranges = []
                 ss_times_temp = []
-    log.debug("intersection times, real_times, ks: %s %s %s", intersection_times, real_times, ks)
+    # log.msg("intersection times, real_times, ks: %s %s %s", intersection_times, real_times, ks)
     return (intersection_times, real_times, ks)

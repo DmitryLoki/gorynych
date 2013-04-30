@@ -33,11 +33,11 @@ class TrackService(Service):
         return d.addCallback(lambda _: Service.stopService(self))
 
     def poll_for_events(self):
-        log.msg("polling...")
+        # log.msg("polling...")
         d = self.pool.runQuery(GET_EVENTS, ('ArchiveURLReceived',
                                                         'TrackArchiveParsed'))
         d.addCallback(self.process_events)
-        return d
+        return d.addCallback(lambda _:self.event_poller.stop())
 
     def process_events(self, events):
         while events:
@@ -74,13 +74,22 @@ class TrackService(Service):
         corrected_data = trfltfs.correct_data(parsed_data)
         pic(corrected_data, race_id, 'corrected')
         del parsed_data
+        log.msg("$" * 80)
+        log.msg("$" * 80)
+        log.msg("$" * 80)
         log.msg("Data corrected")
+        log.msg("$" * 80)
+        log.msg("$" * 80)
         # calculate speeds and distance to Goal
         calculator = trfltfs.BatchProcessor(task, race_id)
         calculated_values = calculator.calculate(corrected_data)
         del calculator
+        log.msg("$" * 80)
+        log.msg("$" * 80)
         log.msg("Values calculated")
+        log.msg("$" * 80)
         pic(corrected_data, race_id, 'processed')
+        log.msg("$" * 80)
         log.msg("Prepared for inserting")
 
 
@@ -116,6 +125,7 @@ class TrackService(Service):
         @rtype: C{str}
         '''
         log.msg("I'VE GOT URL!!!", url)
+        return '/Users/asumch2n/PycharmProjects/gorynych/1120-5321.zip'
         # return filename
 
     # def unarchive(self, filename):

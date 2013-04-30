@@ -7,6 +7,7 @@ from shapely.geometry import Point
 
 from gorynych.test.test_info import create_geojson_checkpoints
 from gorynych.common.domain.types import Checkpoint
+from gorynych.processor import trfltfs
 
 
 URL = 'http://localhost:8085'
@@ -25,16 +26,17 @@ def create_checkpoints():
         open_time = int(DATA['task_start'])
         close_time = int(DATA['task_end'])
         ch_type = 'ordinal'
-        if ch[6]:
+        if int(ch[6]):
             open_time = int(ch[5])
             ch_type = 'ss'
-        if ch[7]:
+        elif int(ch[7]):
             ch_type = 'es'
         if int(key) == 1:
             ch_type = 'to'
         if int(key) == 7:
             ch_type = 'goal'
-        result.append(Checkpoint(ch[3], Point(ch[0], ch[1]), ch_type,
+        result.append(Checkpoint(ch[3], Point(float(ch[0]), float(ch[1])),
+                                 ch_type,
             (open_time, close_time), int(ch[2])))
     return result
 
@@ -54,7 +56,7 @@ def register_paragliders_on_contest(cont_id):
         params = dict(name=pilots[key]['name'].split(' ')[0],
                            surname=pilots[key]['name'].split(' ')[1],
                            country='ru',
-                           email='s@s.ru')
+                           email='s@s.ru', reg_date='2012,12,12')
         r = requests.post(URL + '/person', data=params)
         pers_id = r.json()['id']
         params = dict(person_id=pers_id, glider='mantra',
@@ -77,7 +79,23 @@ class TestCase(unittest.TestCase):
         # create contest, person, register paragliders, create race:
         cont_id = create_contest()
         register_paragliders_on_contest(cont_id)
-        create_race(cont_id, create_checkpoints())
+        race = create_race(cont_id,
+                           create_geojson_checkpoints(create_checkpoints()))
+        print race.text
+        race_id = race.json()['id']
+        self.init_task(race_id)
+        r = requests.post('/'.join((URL, 'contest', cont_id, 'race',
+                                    race_id, 'track_archive')),
+                                      data={'url': 'http://airtribune.com/1'})
+        print r.text
+        print r.status_code
+
+    def init_task(self, race_id):
+        task = trfltfs.init_task(race_id)
+        print task
+        self.assertIsInstance(task, dict)
+        self.assertTrue(task.has_key('window_is_open'))
+
 
 
 if __name__ == '__main__':

@@ -25,8 +25,9 @@ def create_persons():
     return r.json()['id']
 
 
-def create_geojson_checkpoints():
-    ch_list = create_checkpoints()
+def create_geojson_checkpoints(ch_list=None):
+    if not ch_list:
+        ch_list = create_checkpoints()
     for i, item in enumerate(ch_list):
         ch_list[i] = item.__geo_interface__
     return json.dumps(dict(type='FeatureCollection',

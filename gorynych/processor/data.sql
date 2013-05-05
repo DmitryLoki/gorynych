@@ -23,7 +23,7 @@ INSERT INTO track_type (name) VALUES ('competition aftertask');
 CREATE TABLE IF NOT EXISTS track_data
 (
   ID BIGINT REFERENCES TRACK (ID) ON DELETE CASCADE,
-  TIMESTAMP TIMESTAMP NOT NULL,
+  TIMESTAMP INTEGER NOT NULL,
   LAT REAL NOT NULL,
   LON REAL NOT NULL,
   -- Высота в метрах. 32767 метра более чем достаточно
@@ -33,9 +33,7 @@ CREATE TABLE IF NOT EXISTS track_data
   -- Вертикальная скорость м/с
   V_SPEED REAL,
   -- Дистанция в метрах
-  DISTANCE INTEGER
+  DISTANCE INTEGER,
+  PRIMARY KEY (id, timestamp)
 ) WITH (OIDS=FALSE);
 
-
-
--- Вставить данные в таблицу с треками.

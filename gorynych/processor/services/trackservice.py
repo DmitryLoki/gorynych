@@ -93,7 +93,7 @@ class TrackService(Service):
         del calculator
         log.msg("Values calculated")
         pic(calculated_values, race_id, 'processed')
-        log.msg("Prepared for inserting")
+        log.msg("Ready for inserting")
         return self.insert_offline_tracks(calculated_values, race_id)
 
     def insert_offline_tracks(self, tracksdata, race_id):
@@ -117,14 +117,15 @@ class TrackService(Service):
             cur.execute(NEW_TRACK, (item['times'][0],item['times'][-1],
                                    'competition aftertask', track_id))
             dbid = cur.fetchone()
-            cur.copy_expert("COPY track_data FROM STDIN WITH BINARY",
-                            prepare_binary(dbid, item))
+            data = prepare_text(prepare_data(dbid, item))
+            cur.copy_expert("COPY track_data FROM STDIN ", data)
             persistence.event_store().persist(
                 events.PersonGotTrack(item['nid'], track_id, 'person'))
             persistence.event_store().persist(
                  events.TrackAddedToRace(race_id, track_id, 'race'))
-            print "INSERTED", i
+            log.msg("Inserted track ", i)
         conn.commit()
+        log.msg('Tracks has been inserted successfully.')
         return conn.close()
         # log.msg("Start data inserting.")
         # print "INSERTING"
@@ -206,15 +207,19 @@ def pic(x, name, suf):
     except Exception as e:
         print "in pic", str(e)
 
-def prepare_binary(trackdb_id, item):
+def prepare_data(trackdb_id, item):
     '''
-    Prepare binary file for inserting into PostgreSQL.
-    Was taken from http://stackoverflow.com/questions/8144002/use-binary-copy-table-from-with-psycopg2/8150329#8150329
+    Convert data from dict to numpy array for inserting into db.
+    @param trackdb_id:
+    @type trackdb_id:
+    @param item:
+    @type item:
+    @return: 2d-array which looks like table in DB.
+    @rtype: numpy.array
     '''
-    print "PREPARING"
-    log.msg("Preparing binary for ", trackdb_id)
+    log.msg("Preparing for ", trackdb_id)
     dtype = [('id', 'i8'), ('timestamp', 'i4'), ('lat', 'f4'),
-                ('lon', 'f4'),
+             ('lon', 'f4'),
              ('alt', 'i2'), ('g_speed', 'f4'), ('v_speed', 'f4'),
              ('distance', 'i4')]
     # rows, columns
@@ -229,6 +234,13 @@ def prepare_binary(trackdb_id, item):
     data['g_speed'] = np.array(item['h_speed'])
     data['v_speed'] = np.array(item['v_speed'])
     data['distance'] = np.array(item['left_distance'])
+    return data
+
+def prepare_binary(data):
+    '''
+    Prepare binary file for inserting into PostgreSQL.
+    Was taken from http://stackoverflow.com/questions/8144002/use-binary-copy-table-from-with-psycopg2/8150329#8150329
+    '''
 
     # Preparing binary data for inserting into db.
     pgcopy_dtype = [('num_fields', '>i2')]
@@ -249,6 +261,12 @@ def prepare_binary(trackdb_id, item):
     cpy.write(pack('!11sii', b'PGCOPY\n\377\r\n\0', 0, 0))
     cpy.write(pgcopy.tostring()) # all rows
     cpy.write(pack('!h', -1)) # file trailer
-    print "PREPARED"
-    return (cpy)
+    cpy.seek(0)
+    return(cpy)
 
+def prepare_text(data):
+    cpy = BytesIO()
+    for row in data:
+        cpy.write('\t'.join([repr(x) for x in row]) + '\n')
+    cpy.seek(0)
+    return(cpy)

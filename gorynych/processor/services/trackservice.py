@@ -122,7 +122,9 @@ class TrackService(Service):
             persistence.event_store().persist(
                 events.PersonGotTrack(item['nid'], track_id, 'person'))
             persistence.event_store().persist(
-                 events.TrackAddedToRace(race_id, track_id, 'race'))
+                 events.TrackAddedToRace(race_id,
+                                         (track_id, item['glider_number']),
+                                         'race'))
             log.msg("Inserted track ", i)
         conn.commit()
         log.msg('Tracks has been inserted successfully.')

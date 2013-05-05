@@ -50,3 +50,24 @@ class GeoObjectsListSerializer(object):
         for item in values:
             result.append(self.factory(item))
         return result
+
+
+# TODO: classes for serializing collections.
+class TupleOf(object):
+    def __init__(self, serializer):
+        self.serializer = serializer
+
+    def to_bytes(self, values):
+        result = '(' + self.serializer.to_bytes(values[0])
+        for value in values[1:]:
+            result = ','.join((result, self.serializer.to_bytes(value)))
+        return bytes(''.join((result, ')')))
+
+    def from_bytes(self, byte_value):
+        byte_values = byte_value[1:-1].split(',')
+        result = []
+        for v in byte_values:
+            result.append(self.serializer.from_bytes(v))
+        return tuple(result)
+
+

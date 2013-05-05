@@ -40,9 +40,9 @@ class TrackService(Service):
         return d.addCallback(lambda _: Service.startService(self))
 
     def stopService(self):
-        d = self.pool.close()
-        d.addCallback(lambda _: self.event_poller.stop())
-        return d.addCallback(lambda _: Service.stopService(self))
+        self.event_poller.stop()
+        Service.stopService(self)
+        return self.pool.close()
 
     def poll_for_events(self):
         # log.msg("polling...")

@@ -14,7 +14,7 @@ from gorynych.processor import events
 from gorynych import OPTS
 
 GET_EVENTS = """
-    SELECT e.event_name, e.aggregate_id, e.event_payload
+    SELECT e.event_name, e.aggregate_id, e.event_payload, e.event_id
     FROM events e, dispatch d
     WHERE (event_name = %s OR event_name = %s) AND e.event_id = d.event_id;
     """
@@ -45,7 +45,6 @@ class TrackService(Service):
         return self.pool.close()
 
     def poll_for_events(self):
-        # log.msg("polling...")
         d = self.pool.runQuery(GET_EVENTS, ('ArchiveURLReceived',
                                                         'TrackArchiveParsed'))
         d.addCallback(self.process_events)
@@ -53,11 +52,11 @@ class TrackService(Service):
 
     def process_events(self, events):
         while events:
-            name, aggrid, payload = events.pop()
+            name, aggrid, payload, event_id = events.pop()
             reactor.callLater(0, getattr(self, 'process_'+str(name)),
-                aggrid, payload)
+                aggrid, payload, event_id)
 
-    def process_ArchiveURLReceived(self, aggregate_id, payload):
+    def process_ArchiveURLReceived(self, aggregate_id, payload, event_id):
         # d = self.create_track_archive(aggregate_id, payload)
         # d.addCallback(lambda ta: (ta, ta.download()))
         # d.addCallback(lambda ta, filename: (ta, ta.unarchive(filename)))

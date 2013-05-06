@@ -2,6 +2,7 @@
 This application service return tracks data to visualisation.
 '''
 from twisted.internet import defer
+from twisted.python import log
 
 __author__ = 'Boris Tsema'
 
@@ -11,19 +12,31 @@ from twisted.application.service import Service
 
 
 SELECT_DATA = """
-select
-t.timestamp,
-string_agg(concat_ws(',', tr.contest_number, t.lat::text, t.lon::text, t.alt::text, t.v_speed::text, t.g_speed::text, t.distance::text), ';')
-from track_data as t JOIN
-	(
-	select r1.track_id, r2.id as id, r1.contest_number
-	from race_tracks as r1 JOIN track as r2 on r1.track_id = r2.track_id
-	where r1."RID" = %s
-	) tr
- on (t.id = tr.id)
-where t.timestamp between %s and %s
-group by t.timestamp
-order by t.timestamp;
+    SELECT
+      t.timestamp,
+      string_agg(
+        concat_ws(',', tr.contest_number, t.lat::text, t.lon::text, t.alt::text, t.v_speed::text, t.g_speed::text, t.distance::text),
+      ';')
+    FROM track_data AS t JOIN
+        (
+        SELECT
+          r2.id AS id, r1.contest_number
+        FROM
+          race_tracks r1,
+          track r2,
+          race
+        WHERE
+          race.race_id = %s AND
+          r1."RID" = race.id AND
+          r1.track_id = r2.track_id
+        ) tr
+     ON (t.id = tr.id)
+    WHERE
+      t.timestamp BETWEEN %s AND %s
+    GROUP BY
+      t.timestamp
+    ORDER BY
+      t.timestamp;
     """
 
 GET_HEADERS_DATA = """
@@ -32,16 +45,18 @@ GET_HEADERS_DATA = """
           tr.id AS id,
           race_tracks.contest_number
         FROM
-          public.track tr,
-          public.race_tracks
+          track tr,
+          race_tracks,
+          race
         WHERE
           race_tracks.track_id = tr.track_id AND
-          race_tracks."RID" = %s),
+          race_tracks."RID" = race.id AND
+          race.race_id = %s),
 
           tdata AS (
             SELECT
               timestamp,
-              concat_ws(',', lat::text, lon::text, alt::text, g_speed::text, v_speed::text, distance::text) as data,
+              concat_ws(',', lat::text, lon::text, alt::text, v_speed::text, g_speed::text, distance::text) as data,
               id,
               row_number() OVER(PARTITION BY td.id ORDER BY td.timestamp DESC) AS rk
             FROM track_data td
@@ -66,19 +81,22 @@ GET_HEADERS_SNAPSHOTS = """
           race_tracks.contest_number
         FROM
           track tr,
-          race_tracks
+          race_tracks,
+          race
         WHERE
           race_tracks.track_id = tr.track_id AND
-          race_tracks."RID" = %s),
+          race_tracks."RID" = race.id AND
+          race.race_id = %s),
           snaps AS (
         SELECT
           snapshot,
+          timestamp,
           ts.trid AS id,
           row_number() OVER(PARTITION BY ts.trid ORDER BY ts.timestamp DESC) AS rk
         FROM track_snapshot ts
         WHERE
-          ts.trid in (SELECT id FROM ids))
-          AND ts.timestamp <= %s
+          ts.trid in (SELECT id FROM ids)
+          AND ts.timestamp <= %s)
     SELECT
       i.contest_number, s.snapshot, s.timestamp
     FROM
@@ -89,12 +107,21 @@ GET_HEADERS_SNAPSHOTS = """
       AND s.id = i.id;
     """
 
-class TrackDataService(Service):
+class TrackVisualizationService(Service):
     # don't show pilots earlier then time - track_gap. In seconds
     track_gap = 10800
 
     def __init__(self, pool):
         self.pool = pool
+
+    def startService(self):
+        Service.startService(self)
+        log.msg("Starting DB pool")
+        return self.pool.start()
+
+    def stopService(self):
+        Service.stopService(self)
+        return self.pool.close()
 
     @defer.inlineCallbacks
     def get_track_data(self, params):
@@ -108,13 +135,12 @@ class TrackDataService(Service):
         result['timeline'] = self.prepare_result(tracks)
         if start_positions:
             hdata = yield self.pool.runQuery(GET_HEADERS_DATA, (race_id,
-                                from_time, from_time - self.track_gap))
+                                from_time - self.track_gap, from_time))
             hsnaps = yield self.pool.runQuery(GET_HEADERS_SNAPSHOTS,
                                               (race_id, from_time))
             start_data = self.prepare_start_data(hdata, hsnaps)
             result['start'] = start_data
         defer.returnValue(result)
-
 
     def prepare_start_data(self, hdata, hsnaps):
         '''
@@ -130,7 +156,7 @@ class TrackDataService(Service):
         result = defaultdict(dict)
         # Add last coords and speeds to result.
         for row in hdata:
-            result[str(row[0])]['data'] = row[1].split(',')
+            result[str(row[0])]['data'] = parse_result(row[1].split(','))
 
         # Add last state to result.
         for row in hsnaps:
@@ -155,9 +181,18 @@ class TrackDataService(Service):
         for row in tracks:
             for data in row[1].split(';'):
                 result[int(row[0])][str(data.split(',')[0])
-                                    ] = data.split(',')[1:]
+                                    ] = parse_result(data.split(',')[1:])
         return result
 
 
 
+def parse_result(data):
+    res = dict()
+    res['lat'], res['lon'], res['alt'], res['vspd'], res['gspd'], \
+    res['dist'] = data
 
+    formats = dict(lat=float, lon=float, alt=int, gspd=float, vspd=float,
+                   dist=int)
+    for key in res:
+        res[key] = formats[key](res[key])
+    return res

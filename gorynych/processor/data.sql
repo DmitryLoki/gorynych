@@ -38,19 +38,31 @@ CREATE TABLE IF NOT EXISTS track_data
 ) WITH (OIDS=FALSE);
 
 -- select tracks data
-select
-t.timestamp,
-string_agg(concat_ws(',', tr.contest_number, t.lat::text, t.lon::text, t.alt::text, t.v_speed::text, t.g_speed::text, t.distance::text), ';')
-from track_data as t JOIN
+SELECT
+  t.timestamp,
+  string_agg(
+	concat_ws(',', tr.contest_number, t.lat::text, t.lon::text, t.alt::text, t.v_speed::text, t.g_speed::text, t.distance::text),
+  ';')
+FROM track_data AS t JOIN
 	(
-	select r1.track_id, r2.id as id, r1.contest_number
-	from race_tracks as r1 JOIN track as r2 on r1.track_id = r2.track_id
-	where r1."RID" = '15'
+	SELECT
+	  r2.id AS id, r1.contest_number
+	FROM
+	  race_tracks r1,
+	  track r2,
+	  race
+	WHERE
+	  race.race_id = %s AND
+	  r1."RID" = race.id AND
+	  r1.track_id = r2.track_id
 	) tr
- on (t.id = tr.id)
-where t.timestamp between 1347704575 and 1347704585
-group by t.timestamp
-order by t.timestamp;
+ ON (t.id = tr.id)
+WHERE
+  t.timestamp BETWEEN %s AND %s
+GROUP BY
+  t.timestamp
+ORDER BY
+  t.timestamp;
 
 -- Попытка выбрать данные для заголовка селектом, не используя функцию.
 -- Попытка успешная, но не разделяются финишировавшие и севшие пилоты,
@@ -122,7 +134,8 @@ WITH ids AS (
 	  race_tracks.contest_number
 	FROM
 	  track tr,
-	  race_tracks
+	  race_tracks,
+    race
 	WHERE
 	  race_tracks.track_id = tr.track_id AND
 	  race_tracks."RID" = 15),

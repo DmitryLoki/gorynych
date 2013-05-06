@@ -273,6 +273,7 @@ class TrackArchiveResource(APIResource):
             return dict(status=str(smth))
 
 
+# TODO: this resource should be in processor package.
 class RaceTracksResource(APIResource):
     '''
     /race/{id}/tracks

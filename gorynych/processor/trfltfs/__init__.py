@@ -1065,13 +1065,13 @@ class BatchProcessor(object):
                                                    dic['lon'][i]), last_wp)
             dic['left_distance'].append(ld)
         log.msg("last from left_distance for %s: %s",
-                  dic['_id'], dic['left_distance'][len(dic['left_distance']) - 1])
+              dic['_id'], dic['left_distance'][len(dic['left_distance']) - 1])
 
         # new intersection time calculation
         dic['ss_time'] = self.race.get_ss_time(dic['times'], dic['lat'],
                                                dic['lon'])
         finish_time = self.race.get_finish_time(dic['times'], dic['lat'],
-                                                dic['lon'], dic['left_distance'])
+                                            dic['lon'], dic['left_distance'])
         if finish_time:
             dic['finish_time'] = finish_time
             # intersection time calculation

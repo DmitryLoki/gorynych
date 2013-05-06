@@ -101,7 +101,6 @@ class ParsingTest(unittest.TestCase):
 
     def init_task(self, race_id):
         task = trfltfs.init_task(race_id)
-        print task
         self.assertIsInstance(task, dict)
         self.assertTrue(task.has_key('window_is_open'))
 

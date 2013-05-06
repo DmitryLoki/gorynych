@@ -271,3 +271,17 @@ class TrackArchiveResource(APIResource):
     def read_POST(self, smth, p=None):
         if smth:
             return dict(status=str(smth))
+
+
+# TODO: this resource should be in processor package.
+class RaceTracksResource(APIResource):
+    '''
+    /race/{id}/tracks
+    Return track data and state.
+    '''
+    service_command = dict(GET='get_track_data')
+
+    def read_GET(self, trs, params=None):
+        if trs:
+            return json.dumps(trs)
+

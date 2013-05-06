@@ -321,3 +321,12 @@ class Paraglider(ValueObject):
         self.glider = glider.strip().split(' ')[0].lower()
         self.contest_number = int(contest_number)
         self.tracker_id = tracker_id
+        self._contest_track_id = None
+
+    @property
+    def contest_track_id(self):
+        return self._contest_track_id
+
+    @contest_track_id.setter
+    def contest_track_id(self, value):
+        self._contest_track_id = str(value)

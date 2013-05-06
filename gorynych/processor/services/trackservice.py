@@ -14,7 +14,7 @@ from gorynych.processor import events
 from gorynych import OPTS
 
 GET_EVENTS = """
-    SELECT e.event_name, e.aggregate_id, e.event_payload
+    SELECT e.event_name, e.aggregate_id, e.event_payload, e.event_id
     FROM events e, dispatch d
     WHERE (event_name = %s OR event_name = %s) AND e.event_id = d.event_id;
     """
@@ -24,6 +24,25 @@ NEW_TRACK = """
     VALUES (%s, %s, (SELECT id FROM track_type WHERE name=%s), %s)
     RETURNING ID;
     """
+INSERT_SNAPSHOT = """
+    INSERT INTO track_snapshot (timestamp, trid, snapshot) VALUES(%s, %s, %s)
+    """
+
+
+def find_snapshots(item, dbid):
+    result = []
+    if item.has_key('finish_time'):
+        sn = dict(timestamp=int(item['finish_time']),
+                  id=long(dbid),
+                  snapshot="finished")
+        result.append(sn)
+    else:
+        sn = dict(timestamp=int(item['times'][-1]),
+                  id=long(dbid),
+                  snapshot="landed")
+        result.append(sn)
+    return result
+
 
 class TrackService(Service):
     '''
@@ -45,19 +64,18 @@ class TrackService(Service):
         return self.pool.close()
 
     def poll_for_events(self):
-        # log.msg("polling...")
         d = self.pool.runQuery(GET_EVENTS, ('ArchiveURLReceived',
                                                         'TrackArchiveParsed'))
         d.addCallback(self.process_events)
-        return d.addCallback(lambda _:self.event_poller.stop())
+        return d
 
     def process_events(self, events):
         while events:
-            name, aggrid, payload = events.pop()
+            name, aggrid, payload, event_id = events.pop()
             reactor.callLater(0, getattr(self, 'process_'+str(name)),
-                aggrid, payload)
+                aggrid, payload, event_id)
 
-    def process_ArchiveURLReceived(self, aggregate_id, payload):
+    def process_ArchiveURLReceived(self, aggregate_id, payload, event_id):
         # d = self.create_track_archive(aggregate_id, payload)
         # d.addCallback(lambda ta: (ta, ta.download()))
         # d.addCallback(lambda ta, filename: (ta, ta.unarchive(filename)))
@@ -94,9 +112,10 @@ class TrackService(Service):
         log.msg("Values calculated")
         pic(calculated_values, race_id, 'processed')
         log.msg("Ready for inserting")
-        return self.insert_offline_tracks(calculated_values, race_id)
+        return self.insert_offline_tracks(calculated_values, race_id,
+                                          event_id)
 
-    def insert_offline_tracks(self, tracksdata, race_id):
+    def insert_offline_tracks(self, tracksdata, race_id, event_id):
         '''
         @param tracksdata: list of dicts which looks like
         {'_id': 'contest_number', 'name': 'name', 'surname': 'surname',
@@ -118,12 +137,19 @@ class TrackService(Service):
                                    'competition aftertask', track_id))
             dbid = cur.fetchone()
             data = prepare_text(prepare_data(dbid, item))
+            snaps = find_snapshots(item, dbid[0])
+            for snap in snaps:
+                cur.execute(INSERT_SNAPSHOT, (snap['timestamp'], snap['id'],
+                snap['snapshot']))
             cur.copy_expert("COPY track_data FROM STDIN ", data)
             persistence.event_store().persist(
                 events.PersonGotTrack(item['nid'], track_id, 'person'))
             persistence.event_store().persist(
-                 events.TrackAddedToRace(race_id, track_id, 'race'))
+                 events.TrackAddedToRace(race_id,
+                                         (track_id, item['glider_number']),
+                                         'race'))
             log.msg("Inserted track ", i)
+        cur.execute("DELETE FROM dispatch WHERE event_id=%s", (event_id,))
         conn.commit()
         log.msg('Tracks has been inserted successfully.')
         return conn.close()

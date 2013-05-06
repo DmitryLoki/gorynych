@@ -39,30 +39,24 @@ CREATE TABLE IF NOT EXISTS track_data
 
 -- select tracks data
 SELECT
-  t.timestamp,
-  string_agg(
-	concat_ws(',', tr.contest_number, t.lat::text, t.lon::text, t.alt::text, t.v_speed::text, t.g_speed::text, t.distance::text),
-  ';')
-FROM track_data AS t JOIN
-	(
-	SELECT
-	  r2.id AS id, r1.contest_number
-	FROM
-	  race_tracks r1,
-	  track r2,
-	  race
-	WHERE
-	  race.race_id = %s AND
-	  r1."RID" = race.id AND
-	  r1.track_id = r2.track_id
-	) tr
- ON (t.id = tr.id)
-WHERE
-  t.timestamp BETWEEN %s AND %s
-GROUP BY
-  t.timestamp
-ORDER BY
-  t.timestamp;
+      t.timestamp,
+      string_agg(
+        concat_ws(',', rt.contest_number, t.lat::text, t.lon::text, t.alt::text, t.v_speed::text, t.g_speed::text, t.distance::text),
+      ';')
+    FROM
+      track_data t,
+      race r,
+      race_tracks rt,
+      track tr
+    WHERE
+      r.race_id = %s AND
+      rt.rid = r.id AND
+      rt.track_id = tr.track_id AND
+      t.timestamp BETWEEN %s AND %s
+    GROUP BY
+      t.timestamp
+    ORDER BY
+      t.timestamp;
 
 -- Попытка выбрать данные для заголовка селектом, не используя функцию.
 -- Попытка успешная, но не разделяются финишировавшие и севшие пилоты,

@@ -13,30 +13,24 @@ from twisted.application.service import Service
 
 SELECT_DATA = """
     SELECT
-      t.timestamp,
-      string_agg(
-        concat_ws(',', tr.contest_number, t.lat::text, t.lon::text, t.alt::text, t.v_speed::text, t.g_speed::text, t.distance::text),
-      ';')
-    FROM track_data AS t JOIN
-        (
-        SELECT
-          r2.id AS id, r1.contest_number
+          t.timestamp,
+          string_agg(
+            concat_ws(',', rt.contest_number, t.lat::text, t.lon::text, t.alt::text, t.v_speed::text, t.g_speed::text, t.distance::text),
+          ';')
         FROM
-          race_tracks r1,
-          track r2,
-          race
+          track_data t,
+          race r,
+          race_tracks rt,
+          track tr
         WHERE
-          race.race_id = %s AND
-          r1."RID" = race.id AND
-          r1.track_id = r2.track_id
-        ) tr
-     ON (t.id = tr.id)
-    WHERE
-      t.timestamp BETWEEN %s AND %s
-    GROUP BY
-      t.timestamp
-    ORDER BY
-      t.timestamp;
+          r.race_id = %s AND
+          rt.rid = r.id AND
+          rt.track_id = tr.track_id AND
+          t.timestamp BETWEEN %s AND %s
+        GROUP BY
+          t.timestamp
+        ORDER BY
+          t.timestamp;
     """
 
 GET_HEADERS_DATA = """
@@ -50,18 +44,18 @@ GET_HEADERS_DATA = """
           race
         WHERE
           race_tracks.track_id = tr.track_id AND
-          race_tracks."RID" = race.id AND
+          race_tracks.rid = race.id AND
           race.race_id = %s),
 
           tdata AS (
             SELECT
               timestamp,
               concat_ws(',', lat::text, lon::text, alt::text, v_speed::text, g_speed::text, distance::text) as data,
-              id,
-              row_number() OVER(PARTITION BY td.id ORDER BY td.timestamp DESC) AS rk
+              trid as id,
+              row_number() OVER(PARTITION BY td.trid ORDER BY td.timestamp DESC) AS rk
             FROM track_data td
             WHERE
-              td.id in (SELECT id FROM ids)
+              td.trid in (SELECT id FROM ids)
               AND td."timestamp" BETWEEN %s AND %s)
 
     SELECT
@@ -85,7 +79,7 @@ GET_HEADERS_SNAPSHOTS = """
           race
         WHERE
           race_tracks.track_id = tr.track_id AND
-          race_tracks."RID" = race.id AND
+          race_tracks.rid = race.id AND
           race.race_id = %s),
           snaps AS (
         SELECT

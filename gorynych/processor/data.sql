@@ -37,3 +37,111 @@ CREATE TABLE IF NOT EXISTS track_data
   PRIMARY KEY (id, timestamp)
 ) WITH (OIDS=FALSE);
 
+-- select tracks data
+select
+t.timestamp,
+string_agg(concat_ws(',', tr.contest_number, t.lat::text, t.lon::text, t.alt::text, t.v_speed::text, t.g_speed::text, t.distance::text), ';')
+from track_data as t JOIN
+	(
+	select r1.track_id, r2.id as id, r1.contest_number
+	from race_tracks as r1 JOIN track as r2 on r1.track_id = r2.track_id
+	where r1."RID" = '15'
+	) tr
+ on (t.id = tr.id)
+where t.timestamp between 1347704575 and 1347704585
+group by t.timestamp
+order by t.timestamp;
+
+-- Попытка выбрать данные для заголовка селектом, не используя функцию.
+-- Попытка успешная, но не разделяются финишировавшие и севшие пилоты,
+-- плюс ещё не стартовавшие пилоты не показываются,
+-- плюс перебирается большое количество строк.
+WITH rows as (
+SELECT
+  td."timestamp",
+  concat_ws(',',rt.contest_number, td.lat::text, td.lon::text, td.alt::text, td.g_speed::text, td.v_speed::text, td.distance::text,
+	case
+		when td."timestamp">=tr.end_time then 'landed'
+		else 'flying'
+	end
+	),
+  row_number() over(partition by tr.track_id ORDER BY td.timestamp DESC) AS rk
+  --tr.track_id
+FROM
+  public.track tr,
+  public.track_data td,
+  race_tracks rt
+WHERE
+  rt."RID" = 15 AND
+  rt.track_id = tr.track_id AND
+  tr.id = td.id AND
+  td."timestamp" < 1347717342
+)
+select r.timestamp, string_agg(r.concat_ws, ';')
+from rows r
+where r.rk=1
+group by r.timestamp;
+
+-- Выбор треков из временного диапазона.
+-- Вернёт (timestamp, data, contest_number)
+WITH ids AS (
+	SELECT
+	  tr.id AS id,
+	  race_tracks.contest_number
+	FROM
+	  public.track tr,
+	  public.race_tracks
+	WHERE
+	  race_tracks.track_id = tr.track_id AND
+	  race_tracks."RID" = 15),
+
+      tdata AS (
+        SELECT
+          timestamp,
+          concat_ws(',', lat::text, lon::text, alt::text, g_speed::text, v_speed::text) as data,
+          id,
+          row_number() OVER(PARTITION BY td.id ORDER BY td.timestamp DESC) AS rk
+        FROM track_data td
+        WHERE
+          td.id in (SELECT id FROM ids)
+          AND td."timestamp" BETWEEN 1347717300 AND 1347717342)
+
+SELECT
+  t.timestamp, t.data, i.contest_number
+FROM
+  tdata t,
+  ids i
+WHERE
+  t.rk = 1 AND
+  i.id = t.id;
+
+-- Выбор последних снимков для треков. Вернёт (contest_number, snapshot)
+WITH ids AS (
+	SELECT
+	  tr.id AS id,
+	  race_tracks.contest_number
+	FROM
+	  track tr,
+	  race_tracks
+	WHERE
+	  race_tracks.track_id = tr.track_id AND
+	  race_tracks."RID" = 15),
+
+      snaps AS (
+	SELECT
+	  snapshot,
+	  ts.trid AS id,
+	  row_number() OVER(PARTITION BY ts.trid ORDER BY ts.timestamp DESC) AS rk
+	FROM track_snapshot ts
+	WHERE
+	  ts.trid in (SELECT id FROM ids))
+    AND ts.timestamp <= %s
+
+SELECT
+  i.contest_number, s.snapshot
+FROM
+  snaps s,
+  ids i
+WHERE
+  s.rk = 1
+  AND s.id = i.id;

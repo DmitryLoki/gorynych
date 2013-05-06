@@ -49,6 +49,9 @@ def json_renderer(template_values, template_name,
     # render empty result
     if not template_values:
         return "{}"
+    if isinstance(template_values, str):
+        return template_values
+
     # get template from a dict
     template = templates_dict.get(template_name)
     if not template:

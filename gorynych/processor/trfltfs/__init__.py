@@ -44,7 +44,7 @@ class Parser(object):
 
     def __init__(self, task, archive_file, race_id):
         self.race_id = str(race_id)
-        self.unpack_dir = archive_file.split('.')[0]
+        self.unpack_dir = archive_file[:-4]
         self.datalist = get_pilots_from_resource(race_id)
         self.task = task
         log.msg("Task is %s", self.task)
@@ -353,6 +353,9 @@ def archive_processor(unpack_dir, ext):
     errors = 'replace'
     namelist = []
     #log.msg("Will check zipfile %s", '.'.join((unpack_dir, ext)))
+    print "@"*80
+    print "ARCHIVE IS"
+    print unpack_dir + '.' + ext
     if zipfile.is_zipfile(unpack_dir + '.' + ext):
         arc = zipfile.ZipFile(unpack_dir + '.' + ext)
         try:
@@ -393,7 +396,7 @@ def archive_processor(unpack_dir, ext):
                     "Archive %s.%s can't be extracted: %s" %
                     (unpack_dir, ext, value))
     else:
-        log.err("Bad archive %s", unpack_dir)
+        log.err("Bad archive %s" % unpack_dir)
     log.msg("files: %s", namelist)
     return [os.path.join(unpack_dir, name) for name in namelist]
 

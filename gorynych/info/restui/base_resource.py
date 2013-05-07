@@ -168,10 +168,10 @@ class APIResource(resource.Resource):
             self._handle_error(request, 404, "No such resource",
                 "Aggregate wasn't found in repository %s. " % error.message)
             defer.returnValue('')
-         except Exception as error:
-             self._handle_error(request, 500, "Error while executing service "
+        except Exception as error:
+            self._handle_error(request, 500, "Error while executing service "
                                   "command", repr(error))
-             defer.returnValue('')
+            defer.returnValue('')
 
         # use service result as supposed
         request, body = yield method_func(service_result, request,

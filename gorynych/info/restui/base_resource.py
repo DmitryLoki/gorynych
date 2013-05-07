@@ -49,6 +49,9 @@ def json_renderer(template_values, template_name,
     # render empty result
     if not template_values:
         return "{}"
+    if isinstance(template_values, str):
+        return template_values
+
     # get template from a dict
     template = templates_dict.get(template_name)
     if not template:
@@ -165,10 +168,10 @@ class APIResource(resource.Resource):
             self._handle_error(request, 404, "No such resource",
                 "Aggregate wasn't found in repository %s. " % error.message)
             defer.returnValue('')
-        # except Exception as error:
-        #     self._handle_error(request, 500, "Error while executing service "
-        #                          "command", repr(error))
-        #     defer.returnValue('')
+        except Exception as error:
+            self._handle_error(request, 500, "Error while executing service "
+                                  "command", repr(error))
+            defer.returnValue('')
 
         # use service result as supposed
         request, body = yield method_func(service_result, request,

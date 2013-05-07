@@ -222,6 +222,13 @@ class Race(AggregateRoot):
         else:
             raise ValueError("Received URL doesn't match allowed pattern.")
 
+    @property
+    def contest_tracks(self):
+        result = []
+        for p in self.paragliders:
+            if p.contest_track_id:
+                result.append(p)
+        return result
 
 class TrackArchive(object):
     def __init__(self, events):

@@ -36,27 +36,17 @@ CREATE TABLE IF NOT EXISTS dispatch (
 
 );
 
-CREATE TABLE IF NOT EXISTS streams (
-  -- stream system id
-  ID bigserial PRIMARY KEY,
-  -- тип агрегата он же имя потока
-  AGGREGATE_TYPE TEXT NOT NULL,
-  -- идентификатор агрегата он же доменный идентификатор потока
-  AGGREGATE_ID TEXT NOT NULL UNIQUE,
-
-  UNIQUE (AGGREGATE_ID, AGGREGATE_TYPE)
-
-);
-
--- Шаг 0: при создании нового потока добавить его в streams.
-INSERT INTO streams (AGGREGATE_ID, AGGREGATE_TYPE) VALUES (%s, %s);
-
--- Шаг 2: добавляем событие.
+-- Добавляем событие.
 INSERT INTO events
 (EVENT_NAME, AGGREGATE_ID, AGGREGATE_TYPE, EVENT_PAYLOAD, OCCURED_ON)
 VALUES (%s, %s, %s, %s, %s);
 
--- Select event stream.
+-- Select events.
 SELECT * FROM events
   WHERE AGGREGATE_ID = %s
   ORDER BY EVENT_ID;
+
+-- Выбрать из таблицы события определённых типов, которые ещё не были обработаны.
+SELECT e.aggregate_id, e.event_payload
+FROM events e, dispatch d
+WHERE (event_name = 'RaceCheckpointsChanged' OR event_name = 'ParagliderRegisteredOnContest') AND e.event_id = d.event_id;

@@ -5,13 +5,26 @@ import simplejson as json
 
 from zope.interface import Interface
 from twisted.application.service import Service
-from twisted.internet import defer
+from twisted.internet import defer, reactor, task
 from twisted.python import log
 
 from gorynych.info.domain import contest, person, race
 from gorynych.common.infrastructure import persistence
 from gorynych.common.domain.types import checkpoint_from_geojson
 
+GET_EVENTS = """
+    SELECT e.event_name, e.aggregate_id, e.event_payload, e.event_id
+    FROM events e, dispatch d
+    WHERE event_name = %s AND e.event_id = d.event_id;
+    """
+
+EVENT_DISPATCHED = """
+    DELETE FROM dispatch WHERE event_id = %s
+    """
+
+ADD_TRACK_TO_RACE = """
+    INSERT INTO race_tracks (rid, contest_number, track_id) VALUES(%s, %s, %s)
+    """
 
 class TrackerService(Interface):
     '''
@@ -88,6 +101,45 @@ class ApplicationService(Service):
             event_store = persistence.event_store()
         self.event_store = event_store
         self.pool = self.event_store.store.pool
+        self.event_poller = task.LoopingCall(self.poll_for_events)
+
+    def poll_for_events(self):
+        log.msg("polling")
+        d = self.pool.runQuery(GET_EVENTS, ('TrackAddedToRace',))
+        d.addCallback(self.process_events)
+        return d.addCallback(lambda _:self.event_poller.stop())
+
+    def process_events(self, events):
+        while events:
+            name, aggrid, payload, event_id = events.pop()
+            reactor.callLater(0, getattr(self, 'process_'+str(name)),
+                              aggrid, payload, event_id)
+
+    @defer.inlineCallbacks
+    def process_TrackAddedToRace(self, race_id, payload, event_id):
+        payload = str(payload[1:-1]).split(',')
+        track_id, contest_number = payload[0], payload[1]
+
+        # d = self._get_aggregate(str(race_id), race.IRaceRepository)
+        # d.addCallback(lambda r:
+        # (setattr(r.paragliders[int(contest_number)],
+        #          'contest_track_id', track_id), r)[1])
+        # d.addCallback(persistence.get_repository(race.IRaceRepository).save)
+        # log.msg("Processed race_id %s track_id %s" %(race_id, track_id))
+        # d.addCallback(lambda _:self.pool.runOperation(EVENT_DISPATCHED,
+        #                                               (event_id,)))
+        # XXX: this is workaround. Remove then PGSQLRaceRepository will be
+        # implemented.
+        try:
+            yield self.pool.runOperation("INSERT into race (id, "
+                                       "race_id) VALUES (1, %s)", (race_id,))
+        except:
+            pass
+        log.msg("Inserting track %s for race" % track_id)
+        yield self.pool.runOperation(ADD_TRACK_TO_RACE, (1, contest_number,
+                                                       track_id))
+        yield self.pool.runOperation(
+            "DELETE FROM dispatch WHERE event_id=%s", (event_id,))
 
     def startService(self):
         log.msg("Starting DB pool.")
@@ -96,6 +148,7 @@ class ApplicationService(Service):
         d.addCallbacks(lambda _:log.msg("Connection established."))
         d.addCallback(lambda _:self.event_store.store.initialize())
         d.addCallback(lambda _:Service.startService(self))
+        d.addCallback(lambda _: self.event_poller.start(2))
         return d.addCallback(lambda _: log.msg("Service started."))
 
     def stopService(self):

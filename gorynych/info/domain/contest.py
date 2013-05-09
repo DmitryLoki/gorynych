@@ -7,17 +7,15 @@ import pytz
 from zope.interface.interfaces import Interface
 
 from gorynych.common.domain.model import AggregateRoot
-from gorynych.common.domain.model import ValueObject
-from gorynych.common.domain.types import Address, Name, Country
+from gorynych.common.domain.types import Address, Country
 from gorynych.common.infrastructure import persistence
 from gorynych.info.domain.race import RaceFactory
-from gorynych.info.domain.person import IPersonRepository
 from gorynych.info.domain.events import ParagliderRegisteredOnContest
 from gorynych.info.domain.ids import ContestID
 
 
 class IContestRepository(Interface):
-    def get_by_id(contest_id):  # @NoSelf
+    def get_by_id(id):
         '''
 
         @param id:
@@ -26,7 +24,7 @@ class IContestRepository(Interface):
         @rtype:
         '''
 
-    def save(obj):  # @NoSelf
+    def save(obj):
         '''
 
         @param obj:
@@ -243,29 +241,10 @@ class Contest(AggregateRoot):
         '''
         factory = RaceFactory()
         race = factory.create_race(race_title, race_type,
-            (self.start_time, self.end_time), checkpoints)
-        race.timezone = self.timezone
-        # Here Race is created and we start to fill it with useful
-        # information.
-        # TODO: the same for transport and organizers.
-        race = self._fill_race_with_paragliders(race)
-        self.race_ids.append(race.id)
-        return race
+            (self.start_time, self.end_time), self.timezone, checkpoints,
+            self._participants)
 
-    def _fill_race_with_paragliders(self, race):
-        for key in self._participants.keys():
-            if self._participants[key]['role'] == 'paraglider':
-                person = persistence.get_repository(IPersonRepository
-                                                    ).get_by_id(key)
-                if person:  # TODO: do this later: and person.tracker:
-                    race.paragliders[
-                      self._participants[key]['contest_number']] = Paraglider(
-                        key,
-                        person.name,
-                        person.country,
-                        self._participants[key]['glider'],
-                        self._participants[key]['contest_number'],
-                        person.tracker)
+        self.race_ids.append(race.id)
         return race
 
     def change_participant_data(self, person_id, **kwargs):
@@ -288,35 +267,3 @@ class Contest(AggregateRoot):
             raise ValueError("Paraglider must have unique contest number.")
 
 
-class Paraglider(ValueObject):
-
-    def __init__(self, person_id, name, country, glider, contest_number,
-                 tracker_id=None):
-        # TODO: remove tracker_id=None when tracker assignment will work.
-        from gorynych.info.domain.person import PersonID
-
-        if not isinstance(person_id, PersonID):
-            person_id = PersonID().fromstring(person_id)
-        if not isinstance(name, Name):
-            raise TypeError("Name must be an instance of Name class.")
-        if not isinstance(country, Country):
-            country = Country(country)
-        # TODO: uncomment this when tracker assignment will work.
-        # if not isinstance(tracker_id, TrackerID):
-        #     tracker_id = TrackerID(tracker_id)
-
-        self.person_id = person_id
-        self.name = name.short()
-        self.country = country.code()
-        self.glider = glider.strip().split(' ')[0].lower()
-        self.contest_number = int(contest_number)
-        self.tracker_id = tracker_id
-        self._contest_track_id = None
-
-    @property
-    def contest_track_id(self):
-        return self._contest_track_id
-
-    @contest_track_id.setter
-    def contest_track_id(self, value):
-        self._contest_track_id = str(value)

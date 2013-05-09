@@ -1,6 +1,8 @@
 '''
 Transport Aggregate.
 '''
+from zope.interface import Interface
+
 from gorynych.common.domain.model import DomainIdentifier, AggregateRoot
 
 
@@ -36,7 +38,7 @@ class TransportFactory(object):
             description = description.strip().capitalize()
 
         if not isinstance(transport_id, TransportID):
-            transport_id = TransportID(id)
+            transport_id = TransportID()
         if not type in TYPES:
             raise ValueError("Unknown transport type.")
         return Transport(id, type, title, description)

@@ -4,10 +4,10 @@ import mock
 from shapely.geometry import Point
 
 from gorynych.info.domain import race
-from gorynych.common.domain.types import Checkpoint
+from gorynych.common.domain.types import Checkpoint, Name, Country
 from gorynych.common.exceptions import BadCheckpoint
 from gorynych.info.domain.events import RaceCheckpointsChanged, ArchiveURLReceived
-from gorynych.info.domain.ids import RaceID
+from gorynych.info.domain.ids import RaceID, PersonID
 
 
 
@@ -23,6 +23,10 @@ def create_checkpoints():
     ch4 = Checkpoint('g10', Point(43.9658, 6.5578), 'goal',
                      (1347714900, 1347732000), 1000)
     return [ch1, ch2, ch2_ordinal, ch3, ch4]
+
+
+# class RaceFactoryTest(unittest.TestCase):
+
 
 
 class RaceTest(unittest.TestCase):
@@ -164,6 +168,18 @@ class RaceTaskTest(unittest.TestCase):
             chs[1]]))
         self.assertRaises(ValueError, task.checkpoints_are_good, [])
         self.assertRaises(TypeError, task.checkpoints_are_good, [1, 2])
+
+
+class ParagliderTest(unittest.TestCase):
+    def test_success_creation(self):
+        p_id = PersonID()
+        p = race.Paraglider(p_id, Name('Vasya', 'Pupkin'),
+                               Country('RU'), 'Mantra 9', 15, 16)
+        self.assertEqual(p.person_id, p_id)
+        self.assertEqual(p.glider, 'mantra')
+        self.assertEqual(p.contest_number, 15)
+        # TODO: uncomment then TrackerID will be implemented.
+        # self.assertEqual(p.tracker_id, TrackerID())
 
 
 if __name__ == '__main__':

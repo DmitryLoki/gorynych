@@ -24,7 +24,6 @@ class IdentifierObjectTest(unittest.TestCase):
     def test_equal_string(self):
         id = self._get_id()
         other = id.id
-        print other
         self.assertEqual(id, other)
 
     def test_not_equal_identifier_object(self):

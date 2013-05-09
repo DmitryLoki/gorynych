@@ -2,7 +2,7 @@ import unittest
 import datetime
 
 from gorynych.info.domain import person
-from gorynych.info.domain.ids import TrackerID, ContestID
+from gorynych.info.domain.ids import TrackerID, ContestID, PersonID
 
 def create_person(name='John', surname='Doe',
                   country='UA', email='johndoe@example.com', reg_year=None,
@@ -97,8 +97,9 @@ class PersonTest(unittest.TestCase):
         self.assertEqual(self.person.country, 'RU')
 
     def test_equality(self):
-        p1 = create_person()
-        p2 = create_person()
+        pid = PersonID()
+        p1 = create_person(id=pid)
+        p2 = create_person(id=pid)
         self.assertEqual(p1, p2)
 
 

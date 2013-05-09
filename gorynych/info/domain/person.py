@@ -76,12 +76,9 @@ class Person(AggregateRoot):
             pass
 
     def __eq__(self, other):
-        if self.name.full() != other.name.full():
-            return False
-        if self.email.full() != other.email.full():
-            return False
-        # TODO: do aggregate root comparison
-        return True
+        return self.id == other.id and (
+            self.name.full() == other.name.full()) and (
+            self.email == other.email)
 
 
 class PersonFactory(object):
@@ -128,7 +125,7 @@ class PersonFactory(object):
 
 
 class IPersonRepository(Interface):
-    def get_by_id(person_id):  # @NoSelf
+    def get_by_id(id):
         '''
         Return a person with id.
         @param id:

@@ -1,4 +1,3 @@
-import uuid
 import unittest
 
 import mock
@@ -65,18 +64,6 @@ class ContestFactoryTest(unittest.TestCase):
     def test_unsuccessfull_contest_creation(self):
         self.assertRaises(ValueError, create_contest, 3, 1,
                           "Contest can be created with wrong times.")
-
-
-class ParagliderTest(unittest.TestCase):
-    def test_success_creation(self):
-        p_id = str(uuid.uuid4())
-        p = contest.Paraglider(p_id, Name('Vasya', 'Pupkin'),
-            Country('RU'), 'Mantra 9', 15, 16)
-        self.assertEqual(p.person_id, p_id)
-        self.assertEqual(p.glider, 'mantra')
-        self.assertEqual(p.contest_number, 15)
-        # TODO: uncomment then TrackerID will be implemented.
-        # self.assertEqual(p.tracker_id, TrackerID())
 
 
 class ContestTest(unittest.TestCase):

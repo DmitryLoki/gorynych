@@ -115,7 +115,7 @@ class PersonFactory(object):
         if not person_id:
             person_id = PersonID()
         elif not isinstance(person_id, PersonID):
-            person_id = PersonID.fromstring(id)
+            person_id = PersonID.fromstring(person_id)
         person = Person(person_id,
                         Name(name, surname),
                         Country(country),

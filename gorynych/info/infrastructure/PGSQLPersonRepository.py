@@ -1,45 +1,12 @@
-#! /usr/bin/python
-#coding=utf-8
+'''
+PostgreSQL implementation of IPersonRepository
+'''
 from twisted.internet import defer
+from zope.interface import implements
 
-from zope.interface.declarations import implements
 from gorynych.info.domain.person import PersonFactory, IPersonRepository
 from gorynych.common.exceptions import NoAggregate
-
-SQL_SELECT_PERSON = """
-SELECT
-LASTNAME
-, FIRSTNAME
-, COUNTRY
-, EMAIL
-, REGDATE
-, PERSON_ID
-, ID
- FROM PERSON
- WHERE ID = %s
-"""
-
-SQL_INSERT_PERSON = """
-INSERT INTO PERSON(
- LASTNAME
-, FIRSTNAME
-, REGDATE
-, COUNTRY
-, EMAIL
-, PERSON_ID
-)VALUES(%s, %s, %s, %s, %s, %s)
- RETURNING ID
-"""
-
-SQL_UPDATE_PERSON = """
-UPDATE PERSON SET
- LASTNAME = %s
-, FIRSTNAME = %s
-, REGDATE = %s
-, COUNTRY = %s
-, EMAIL = %s
- WHERE PERSON_ID = %s
-"""
+from gorynych.common.infrastructure import persistence as pe
 
 
 class PGSQLPersonRepository(object):
@@ -47,13 +14,12 @@ class PGSQLPersonRepository(object):
 
     def __init__(self, pool):
         self.pool = pool
-        # Пока пусть там будет никакое значение -
-        # всё равно от event_publisher'а отказываемся
-        self.factory = PersonFactory(1)
+        self.factory = PersonFactory()
 
     @defer.inlineCallbacks
     def get_by_id(self, person_id):
-        data = yield self.pool.runQuery(SQL_SELECT_PERSON, (person_id,))
+        data = yield self.pool.runQuery(pe.select('person'),
+                                        (str(person_id),))
         if not data:
             raise NoAggregate("Person")
         result = self._create_person(data[0])
@@ -98,11 +64,11 @@ class PGSQLPersonRepository(object):
     def save(self, pers):
         d = None
         if pers._id:
-            d = self.pool.runOperation(SQL_UPDATE_PERSON,
+            d = self.pool.runOperation(pe.update('person'),
                                        self._extract_sql_fields(pers))
             d.addCallback(lambda _: pers)
         else:
-            d = self.pool.runQuery(SQL_INSERT_PERSON,
+            d = self.pool.runQuery(pe.insert('person'),
                                    self._extract_sql_fields(pers))
             d.addCallback(self._process_insert_result, pers)
         return d
@@ -110,8 +76,8 @@ class PGSQLPersonRepository(object):
     def _extract_sql_fields(self, pers=None):
         if pers is None:
             return ()
-        return (pers.name.surname(), pers.name.name(), pers.regdate,
-                    pers.country.code(), pers.email, str(pers.id))
+        return (pers.name.name, pers.name.surname, pers.regdate,
+                    pers.country, pers.email, str(pers.id))
 
     def _process_insert_result(self, data, pers):
         if data is not None and pers is not None:

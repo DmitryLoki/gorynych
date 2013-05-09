@@ -1,6 +1,5 @@
 -- Aggregate Person ---------------------------------------
 
-
 CREATE TABLE PERSON(
   ID BIGSERIAL PRIMARY KEY,
   NAME TEXT NOT NULL,
@@ -25,9 +24,23 @@ CREATE TABLE PERSON_TRACKS(
   PRIMARY KEY (ID, TRACK_ID)
 );
 
-
 -- Insert Person
 INSERT INTO PERSON(NAME, SURNAME, REGDATE, COUNTRY, EMAIL, PERSON_ID)
     VALUES (%s, %s, %s, %s, %s, %s)
     RETURNING ID;
 
+-- Select Person
+SELECT
+  NAME, SURNAME, COUNTRY, EMAIL, REGDATE, PERSON_ID, ID
+FROM
+  PERSON
+WHERE PERSON_ID=%s;
+
+-- Update Person
+UPDATE PERSON SET
+  NAME=%s,
+  SURNAME=%s,
+  REGDATE=%s,
+  COUNTRY=%s,
+  EMAIL=%s
+WHERE PERSON_ID = %s;

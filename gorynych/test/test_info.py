@@ -94,7 +94,7 @@ class ContestRESTAPITest(unittest.TestCase):
         self.assertEqual(r.status_code, 404)
 
     def test_2_create_contest(self):
-        params = dict(title='Best contest', start_time=1, end_time=10,
+        params = dict(title='Best contest', start_time='1', end_time='10',
             place = 'La France', country='ru',
             hq_coords='43.3,23.1', timezone='Europe/Moscow')
         r = requests.post('/'.join((URL, 'contest')), data=params)

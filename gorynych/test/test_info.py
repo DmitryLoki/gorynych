@@ -5,7 +5,7 @@ import json
 import requests
 
 import unittest
-from gorynych.info.domain.test.test_race import create_checkpoints
+from gorynych.info.domain.test.helpers import create_checkpoints
 
 URL = 'http://localhost:8085'
 

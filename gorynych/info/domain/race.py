@@ -9,11 +9,10 @@ import re
 import pytz
 from zope.interface.interfaces import Interface
 
-from gorynych.info.domain.person import IPersonRepository
 
 from gorynych.common.domain.model import AggregateRoot, ValueObject,\
                                         DomainEvent
-from gorynych.common.domain.types import Checkpoint, Name, Country
+from gorynych.common.domain.types import Checkpoint
 from gorynych.common.exceptions import BadCheckpoint
 from gorynych.info.domain.events import RaceCheckpointsChanged,\
                                         ArchiveURLReceived
@@ -53,7 +52,7 @@ RACETASKS = {'speedrun': SpeedRunTask,
 class RaceFactory(object):
 
     def create_race(self, title, race_type, timelimits, timezone,
-                    checkpoints, participants, race_id=None):
+                    race_id=None):
         if not race_id:
             race_id = RaceID()
         race = Race(race_id)
@@ -65,34 +64,8 @@ class RaceFactory(object):
         race.title = title
         race.timelimits = timelimits
         race.timezone = timezone
-        # Here Race is created and we start to fill it with useful
-        # information.
-        # TODO: the same for transport and organizers.
-        race = self._fill_race_with_paragliders(race, participants)
-        race.checkpoints = checkpoints
 
         return race
-
-    def _fill_race_with_paragliders(self, race, participants):
-        '''
-        @param participants: C{{person_id: {role='', contest_number=1,
-        glider='glider'},}}
-        '''
-        for key in participants.keys():
-            if participants[key]['role'] == 'paraglider':
-                person = persistence.get_repository(IPersonRepository
-                ).get_by_id(key)
-                if person:  # TODO: do this later: and person.tracker:
-                    race.paragliders[
-                        participants[key]['contest_number']] = Paraglider(
-                        key,
-                        person.name,
-                        person.country,
-                        participants[key]['glider'],
-                        participants[key]['contest_number'],
-                        person.tracker)
-        return race
-
 
 
 class CheckpointsAreAddedToRace(DomainEvent):
@@ -260,6 +233,7 @@ class Race(AggregateRoot):
                 result.append(p)
         return result
 
+
 class TrackArchive(object):
     def __init__(self, events):
         self.state = 'new'
@@ -305,35 +279,3 @@ class IRaceRepository(Interface):
         '''
 
 
-class Paraglider(ValueObject):
-
-    def __init__(self, person_id, name, country, glider, contest_number,
-                 tracker_id=None):
-        # TODO: remove tracker_id=None when tracker assignment will work.
-        from gorynych.info.domain.person import PersonID
-
-        if not isinstance(person_id, PersonID):
-            person_id = PersonID().fromstring(person_id)
-        if not isinstance(name, Name):
-            raise TypeError("Name must be an instance of Name class.")
-        if not isinstance(country, Country):
-            country = Country(country)
-            # TODO: uncomment this when tracker assignment will work.
-        # if not isinstance(tracker_id, TrackerID):
-        #     tracker_id = TrackerID(tracker_id)
-
-        self.person_id = person_id
-        self.name = name.short()
-        self.country = country.code()
-        self.glider = glider.strip().split(' ')[0].lower()
-        self.contest_number = int(contest_number)
-        self.tracker_id = tracker_id
-        self._contest_track_id = None
-
-    @property
-    def contest_track_id(self):
-        return self._contest_track_id
-
-    @contest_track_id.setter
-    def contest_track_id(self, value):
-        self._contest_track_id = str(value)

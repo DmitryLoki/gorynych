@@ -9,11 +9,11 @@ from pytz.exceptions import UnknownTimeZoneError
 
 from twisted.trial import unittest
 from twisted.internet import defer
+from gorynych.info.domain.test.helpers import create_checkpoints
 
 from gorynych.info.application import ApplicationService
 from gorynych.common.domain.types import Checkpoint
 from gorynych.info import domain
-from gorynych.info.domain.test.test_race import create_checkpoints
 
 
 class GoodRepository():
@@ -369,6 +369,3 @@ class ContestParagliderRaceTest(unittest.TestCase):
 
 
 
-
-if __name__ == '__main__':
-    unittest.main()

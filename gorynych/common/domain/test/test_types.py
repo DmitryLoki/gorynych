@@ -2,6 +2,7 @@ import unittest
 import simplejson as json
 
 from shapely.geometry import Point
+from gorynych.info.domain.test.helpers import create_checkpoints
 
 from gorynych.common.domain import types
 
@@ -162,6 +163,11 @@ class CheckpointTest(unittest.TestCase):
         self.assertIsInstance(str(ch), bytes)
         self.assertEqual(str(ch), json.dumps(point))
 
+    def test_geojson_feature_collection(self):
+        # TODO: rewrite it without dependencies to info and with more accuracy
+        ch_list = create_checkpoints()
+        res = types.geojson_feature_collection(ch_list)
+        self.assertIsInstance(res, str)
 
 if __name__ == '__main__':
     unittest.main()

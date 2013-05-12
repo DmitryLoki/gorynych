@@ -274,8 +274,6 @@ class Contest(AggregateRoot):
                         person.tracker)
         return race
 
-
-
     def change_participant_data(self, person_id, **kwargs):
         if not kwargs:
             raise ValueError("No new data has been received.")
@@ -314,12 +312,16 @@ class Paraglider(ValueObject):
         #     tracker_id = TrackerID(tracker_id)
 
         self.person_id = person_id
-        self.name = name.short()
+        self._name = name
         self.country = country.code()
         self.glider = glider.strip().split(' ')[0].lower()
-        self.contest_number = int(contest_number)
+        self.contest_number = contest_number
         self.tracker_id = tracker_id
         self._contest_track_id = None
+
+    @property
+    def name(self):
+        return self._name.short()
 
     @property
     def contest_track_id(self):
@@ -328,3 +330,8 @@ class Paraglider(ValueObject):
     @contest_track_id.setter
     def contest_track_id(self, value):
         self._contest_track_id = str(value)
+
+    def __eq__(self, other):
+        return self.person_id == other.person_id and (self.glider == other
+        .glider) and (self.contest_number == other.contest_number) and (self
+                                                                                       .tracker_id == other.tracker_id)

@@ -10,14 +10,17 @@ import time
 from twisted.trial import unittest
 from twisted.internet import defer
 
+from gorynych.info.domain.test.helpers import create_contest, \
+    create_checkpoints, create_race
 from gorynych.info.infrastructure import PGSQLPersonRepository
 from gorynych.info.infrastructure.PGSQLContestRepository import PGSQLContestRepository
+from gorynych.info.infrastructure.PGSQLRaceRepository import PGSQLRaceRepository, create_participants
 # TODO: create separate module with test utils
 from gorynych.info.domain.test.test_person import create_person
-from gorynych.info.domain.test.test_contest import create_contest
+from gorynych.common.domain.types import geojson_feature_collection, checkpoint_collection_from_geojson
 from gorynych.info.domain.ids import PersonID, ContestID, RaceID
 from gorynych.info.infrastructure.test import db_helpers
-from gorynych.common.exceptions import NoAggregate
+from gorynych.common.exceptions import NoAggregate, DatabaseValueError
 from gorynych.common.infrastructure import persistence as pe
 
 
@@ -195,7 +198,7 @@ class ContestRepositoryTest(unittest.TestCase):
 
     def _prepare_contest(self):
         cid = ContestID()
-        cont = create_contest(1, 5, id=cid)[0]
+        cont = create_contest(1, 5, id=cid)
         cont._participants = dict()
         pid1 = PersonID()
         cont._participants[pid1] = dict(role='paraglider',
@@ -255,4 +258,83 @@ class ContestRepositoryTest(unittest.TestCase):
 
         yield self._compare_contest_with_db(s_cont1)
 
+
+class RaceRepositoryTest(unittest.TestCase):
+
+    def setUp(self):
+        self.repo = PGSQLRaceRepository(POOL)
+        d = POOL.start()
+        d.addCallback(lambda _:db_helpers.initDB('race', POOL))
+        d.addCallback(lambda _: POOL.runOperation(
+            pe.insert('racetype', 'race'), ('racetogoal',)))
+        return d
+
+    def tearDown(self):
+        d = db_helpers.tearDownDB('contest', POOL)
+        d.addCallback(lambda _:POOL.close())
+        return d
+
+    @defer.inlineCallbacks
+    def _prepare_race(self):
+        rid = RaceID()
+        t = 'Racetitle'
+        tz = 'Europe/Amsterdam'
+        chs = create_checkpoints()
+        st = 1347711300
+        et = 1347732000
+        _chs = geojson_feature_collection(chs)
+        r_id = yield POOL.runQuery(pe.insert('race'),
+                (t, st, et, st-1, et+1, tz,
+                 'racetogoal', (geojson_feature_collection(chs)), str(rid)))
+
+        defer.returnValue(
+            (r_id[0][0], rid, t, st, et, st-1, et+1, tz, 'racetogoal', chs))
+
+    def _compare_race(self, i, ri, t, st, et, mst, met, tz, rt, chs, rc):
+        self.assertEqual(rc._id, i)
+        self.assertEqual(rc.id, ri)
+        self.assertEqual(rc.title, t)
+        self.assertEqual(rc.start_time, st)
+        self.assertEqual(rc.end_time, et)
+        self.assertEqual(rc.timelimits, (mst, met))
+        self.assertEqual(rc.timezone, tz)
+        self.assertEqual(rc.type, rt)
+        self.assertEqual(rc.checkpoints, chs)
+
+    @defer.inlineCallbacks
+    def test_by_id(self):
+        i, ri, t, st, et, mst, met, tz, rt, chs = yield self._prepare_race()
+        yield self.assertFailure(self.repo.get_by_id(ri), DatabaseValueError)
+        pid = PersonID()
+        yield POOL.runOperation(pe.insert('paraglider', 'race'),
+            (i, str(pid), '1', 'ru', 'gl1', '', 'alex', 't'))
+
+        rc = yield self.repo.get_by_id(ri)
+
+        self._compare_race(i, ri, t, st, et, mst, met, tz, rt, chs, rc)
+
+    @defer.inlineCallbacks
+    def test_get_by_nonexistent_id(self):
+        yield self.assertFailure(self.repo.get_by_id("not exist"), NoAggregate)
+
+    @defer.inlineCallbacks
+    def test_save(self):
+        self.maxDiff = None
+        rc = create_race()
+        saved_rc = yield self.repo.save(rc)
+        self._compare_race(saved_rc._id, rc.id, rc.title, rc.start_time,
+                           rc.end_time, rc.timelimits[0], rc.timelimits[1],
+                           rc.timezone, rc.type,
+                rc.checkpoints, saved_rc)
+
+        race_row = yield POOL.runQuery(pe.select('race'), (str(rc.id),))
+        i, ri, t, st, et, mst, met, tz, rt, chs = race_row[0]
+        self._compare_race(i, ri, t, st, et, mst, met, tz, rt,
+                           checkpoint_collection_from_geojson(chs), rc)
+
+        pg_row = yield POOL.runQuery(pe.select('paragliders', 'race'),
+                                     (saved_rc._id,))
+        pgs = create_participants(pg_row)['paragliders']
+        for key in pgs:
+            self.assertEqual(pgs[key], rc.paragliders[key])
 

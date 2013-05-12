@@ -1,10 +1,9 @@
 '''
 Functions used in other tests.
 '''
-import sys
 from shapely.geometry import Point
-from gorynych.common.domain.types import Checkpoint
-from gorynych.info.domain import contest
+from gorynych.common.domain.types import Checkpoint, Name
+from gorynych.info.domain import contest, race
 from gorynych.info.domain.person import PersonID
 
 __author__ = 'Boris Tsema'
@@ -20,14 +19,25 @@ def create_contest(start_time, end_time, id=None,
     return cont
 
 def create_race(cont=None):
+    factory = race.RaceFactory()
     if not cont:
-        cont = create_contest(1, sys.maxint)
+        # Max_end_time - 1/1/2020
+        cont = create_contest(1, 1577822400)
     pid1 = PersonID()
     pid2 = PersonID()
-    cont.register_paraglider(pid1, 'mantrA 9', '757')
-    cont.register_paraglider(pid2, 'gIn 9', '747')
-    result = cont.new_race('racetogoal', create_checkpoints(), 'Test Race')
-    return result
+    r = factory.create_race('Test Race', 'racetogoal',
+                (cont.start_time, cont.end_time), cont.timezone)
+    r.paragliders['12'] = contest.Paraglider(pid1, Name('Vasya', 'Hyev'),
+         'RUSSIA velikaya nasha derzhava Rossia velikaya nasha strana',
+         'pizdatyi glider', '12')
+    r.paragliders['13'] = contest.Paraglider(pid2, Name('John', 'Doe'),
+        'Ya nenavizhy etot ebannyi test i mena zaeblo eto pisat',
+        'hyevyi glider', '13')
+    r._checkpoints = create_checkpoints()
+    r._start_time = 1347711300
+    r._end_time = 1347732000
+
+    return r
 
 
 def create_checkpoints():

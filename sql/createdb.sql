@@ -85,7 +85,6 @@ CREATE TABLE CONTEST_RACE(
 
 -- Aggregate Race --------------------------------------
 
-
 CREATE TABLE RACE_TYPE(
   ID BIGSERIAL PRIMARY KEY,
   -- opendistance, racetogoal, speedrun etc.

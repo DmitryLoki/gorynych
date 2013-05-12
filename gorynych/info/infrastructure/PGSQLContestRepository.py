@@ -167,6 +167,7 @@ class PGSQLContestRepository(object):
                     d.addCallback(lambda _:
                     cur.execute("INSERT into contest_race values " + rq))
 
+            d.addCallback(lambda _:obj)
             return d
 
         result = None
@@ -175,8 +176,7 @@ class PGSQLContestRepository(object):
                                                       'contest'), (obj._id,))
             rids = yield self.pool.runQuery(pe.select('race', 'contest'),
                                             (obj._id,))
-            yield self.pool.runInteraction(update, prts, rids)
-            result = obj
+            result = yield self.pool.runInteraction(update, prts, rids)
         else:
             c__id = yield self.pool.runInteraction(save_new)
             obj._id = c__id[0]
@@ -201,11 +201,3 @@ class PGSQLContestRepository(object):
 
         result['race_ids'] = obj.race_ids[::]
         return result
-
-    def _process_insert_result(self, data, value):
-        if data is not None and value is not None:
-            inserted_id = data[0][0]
-            value._id = inserted_id
-            return value
-        return None
-

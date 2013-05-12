@@ -7,6 +7,12 @@ class NoAggregate(Exception):
     '''
 
 
+class DatabaseValueError(Exception):
+    '''
+    Raise when values from database are not so good as expected.
+    '''
+
+
 class BadCheckpoint(Exception):
     '''
     Raise when checkpoints don't satisfy some conditions.

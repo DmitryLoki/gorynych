@@ -163,3 +163,20 @@ def checkpoint_from_geojson(geodict):
     geometry = geodict['geometry']
     return Checkpoint(name, geometry, ch_type,
                       (open_time, close_time), radius)
+
+def checkpoint_collection_from_geojson(data):
+    if not isinstance(data, dict):
+        data = json.loads(data)
+
+    result = []
+    for ch in data['features']:
+        result.append(checkpoint_from_geojson(ch))
+    return result
+
+def geojson_feature_collection(ch_list):
+    assert isinstance(ch_list, list), "I'm waiting for list of Checkpoint."
+    result = []
+    for i, item in enumerate(ch_list):
+        result.append(item.__geo_interface__)
+    return json.dumps(dict(type='FeatureCollection',
+                           features=result))

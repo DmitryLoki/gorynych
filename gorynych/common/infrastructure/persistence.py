@@ -57,7 +57,7 @@ def create_tables(fname):
     @return: list of commands or None.
     '''
     with open(sqldir + fname + '.sql', 'r') as f:
-        tables = re.findall(r'''(CREATE\s+TABLE\s+[-(),\s\w\\]*);''',
+        tables = re.findall(r'''(CREATE\s+TABLE\s+[-(),.\s\w\\]*);''',
                             f.read(), re.IGNORECASE)
     return tables
 
@@ -119,7 +119,7 @@ def _operation(name, tagname, filename=None):
         filename = tagname
     with open(sqldir + filename + '.sql', 'r') as f:
         pattern = r'--\s+' + name + r'\s?' + tagname + \
-                  r'\s*([\w()\s.,%=\*]*);'
+                  r'\n\s*([\w()\s.,%=\*]*);'
         command = re.search(pattern, f.read(), re.IGNORECASE)
     return command.group(1)
 

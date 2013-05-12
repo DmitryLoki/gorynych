@@ -1,54 +1,22 @@
-#! /usr/bin/python
-#coding=utf-8
 from twisted.internet import defer
-import simplejson as json
+from zope.interface import implements
 
-from zope.interface.declarations import implements
 from gorynych.info.domain.race import IRaceRepository, RaceFactory
-from gorynych.common.exceptions import NoAggregate
-from gorynych.common.domain.types import Checkpoint
+from gorynych.info.domain.contest import Paraglider
+from gorynych.common.exceptions import NoAggregate, DatabaseValueError
+from gorynych.common.domain.types import geojson_feature_collection, checkpoint_collection_from_geojson, Name
+from gorynych.common.infrastructure import persistence as pe
 
-SQL_SELECT_RACE = """
-SELECT
- RACE_ID,
- TITLE,
- START_TIME,
- END_TIME,
- MIN_START_TIME,
- MAX_END_TIME,
- RACE_TYPE,
- CHECKPOINTS,
- ID
- FROM RACE
- WHERE ID = %s
-"""
 
-SQL_INSERT_RACE = """
-INSERT INTO RACE (
- TITLE,
- START_TIME,
- END_TIME,
- MIN_START_TIME,
- MAX_END_TIME,
- RACE_TYPE,
- CHECKPOINTS,
- RACE_ID
-)
- VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
- RETURNING ID
-"""
-
-SQL_UPDATE_RACE = """
-UPDATE RACE SET
- TITLE = %s,
- START_TIME = %s,
- END_TIME = %s,
- MIN_START_TIME = %s,
- MAX_END_TIME = %s,
- RACE_TYPE = %s,
- CHECKPOINTS = %s
- WHERE RACE_ID = %s
-"""
+def create_participants(paragliders_row):
+    result = dict()
+    if paragliders_row:
+        result['paragliders'] = dict()
+        for tup in paragliders_row:
+            _id, pid, cn , co, gl, ti, n, sn = tup
+            result['paragliders'][cn] = Paraglider(pid, Name(n, sn), co,
+                                                   gl, cn, ti)
+    return result
 
 
 class PGSQLRaceRepository(object):
@@ -59,66 +27,115 @@ class PGSQLRaceRepository(object):
         self.factory = RaceFactory()
 
     @defer.inlineCallbacks
-    def get_by_id(self, race_id):
-        data = yield self.pool.runQuery(SQL_SELECT_RACE, (race_id,))
-        if not data:
-            raise NoAggregate("Race")
-        result = self._create_race(data[0])
+    def get_list(self, limit=20, offset=None):
+        result = []
+        command = "select id from race"
+        if limit:
+            command += ' limit ' + str(limit)
+        if offset:
+            command += ' offset ' + str(offset)
+        ids = yield self.pool.runQuery(command)
+        for idx, rid in enumerate(ids):
+            rc = yield self.get_by_id(rid[0])
+            result.append(rc)
         defer.returnValue(result)
 
-    def _create_race(self, data_row):
-        result = self.factory.create_race(
-            data_row[1],  # TITLE
-            data_row[6],  # RACE_TYPE
-            (data_row[4], data_row[5]),  # MIN_START_TIME, MAX_END_TIME
-            data_row[0]   # RACE_ID
-        )
-        result._start_time = data_row[2]  # START_TIME
-        result._end_time = data_row[3]  # END_TIME
-        self._load_checkpoints_from_json(result, data_row[7])  # CHECKPOINTS
-        result._id = data_row[8]  # ID
+    @defer.inlineCallbacks
+    def get_by_id(self, race_id):
+        race_data = yield self.pool.runQuery(pe.select('race'), (str(race_id),))
+        if not race_data:
+            raise NoAggregate("Race")
+
+        pgs = yield self.pool.runQuery(pe.select('paragliders', 'race'),
+                                       (race_data[0][0],))
+        if not pgs:
+            raise DatabaseValueError("No paragliders has been found for race"
+                                     " %s." % race_data[0][1])
+        result = self._create_race(race_data[0], pgs)
+        defer.returnValue(result)
+
+    def _create_race(self, race_data, paragliders_row):
+        # TODO: repository knows too much about Race's internals. Think about it
+        i, rid, t, st, et, mst, met, tz, rt, chs = race_data
+        participants = create_participants(paragliders_row)
+
+        result = self.factory.create_race(t, rt, (mst, met), tz, rid)
+        result._start_time = st
+        result._end_time = et
+        result._checkpoints = checkpoint_collection_from_geojson(chs)
+        result._id = long(i)
+        result.paragliders = participants['paragliders']
         return result
 
-    def _load_checkpoints_from_json(self, race, text_value):
-        items = json.loads(text_value)
-        # TODO перебрать все записи JSON и из каждой сформировать Checkpoint
-        checkpoint_list = items["features"]
-        for item in checkpoint_list:
-            checkpoint = Checkpoint()
-            checkpoint.from_geojson(item)
-            race.checkpoints.append(checkpoint)
+    @defer.inlineCallbacks
+    def save(self, obj):
+        result = []
+        values = self._get_values_from_obj(obj)
+        def insert_id(_id, _list):
+            _list.insert(0, _id)
+            return _list
 
-    def _store_checkpoints_to_json(self, race):
-        checkpoints = []
-        for checkpoint in race.checkpoints:
-            checkpoints.append(checkpoint.__geo_interface__())
-        result = dict()
-        result["type"] = "FeatureCollection"
-        result["features"] = checkpoints
-        return json.dumps(result)
+        def save_new(cur):
+            d = cur.execute(pe.insert('race'), values['race'])
+            d.addCallback(lambda cur:cur.fetchone())
+            d.addCallback(lambda x:
+                ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s, %s)",
+                     (insert_id(x[0], p))) for p in values['paragliders']))
+            d.addCallback(lambda pq:
+                cur.execute("INSERT INTO paraglider VALUES " + pq +
+                            "RETURNING ID;"))
+            d.addCallback(lambda cur: cur.fetchone())
+            return d
 
-    def _params(self, race=None):
-        if race is None:
-            return ()
-        return (race.title, race._start_time, race._end_time,
-            race.timelimits[0], race.timelimits[1], race.type(),
-            self._store_checkpoints_to_json(race), race.id
-        )
+        def update(cur, pgs):
+            d = cur.execute(pe.update('race'), values['race'])
 
-    def save(self, value):
-        d = None
-        if value._id is not None:
-            d = self.pool.runOperation(SQL_UPDATE_RACE,
-                                       self._params(value))
-            d.addCallback(lambda _: value)
+            inobj = values['paragliders']
+            indb = pgs
+            for idx, p in enumerate(inobj):
+                p.insert(0, obj._id)
+                inobj[idx] = tuple(p)
+            to_insert = set(inobj).difference(set(indb))
+            to_delete = set(indb).difference(set(inobj))
+            if to_delete:
+                ids = tuple([x[1] for x in to_delete])
+                d.addCallback(lambda _:
+                cur.execute("DELETE FROM paraglider WHERE id=%s "
+                            "AND person_id in %s", (obj._id, ids)))
+            if to_insert:
+                q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s, %s)",
+                                         (pitem)) for pitem in to_insert)
+                d.addCallback(lambda _:
+                        cur.execute("INSERT into paraglider values " + q))
+                d.addCallback(lambda _: obj)
+                return d
+
+
+        if obj._id:
+            pgs = yield self.pool.runQuery(pe.select('paragliders', 'race'),
+                                           (obj._id,))
+            if not pgs:
+                raise DatabaseValueError(
+                    "No paragliders has been found for race %s." % obj.id)
+            result = yield self.pool.runInteraction(update, pgs)
         else:
-            d = self.pool.runQuery(SQL_INSERT_RACE, self._params(value))
-            d.addCallback(self._process_insert_result, value)
-        return d
+            r_id = yield self.pool.runInteraction(save_new)
+            obj._id = r_id[0]
+            result = obj
+        defer.returnValue(result)
 
-    def _process_insert_result(self, data, value):
-        if data is not None and value is not None:
-            inserted_id = data[0][0]
-            value._id = inserted_id
-            return value
-        return None
+    def _get_values_from_obj(self, obj):
+        result = dict()
+        result['race'] = (obj.title, obj.start_time, obj.end_time,
+                          obj.timelimits[0], obj.timelimits[1],
+                          obj.timezone, obj.type,
+                          geojson_feature_collection(obj.checkpoints),
+                          str(obj.id))
+        result['paragliders'] = []
+        for key in obj.paragliders:
+            p = obj.paragliders[key]
+            result['paragliders'].append([str(p.person_id), str(p.contest_number),
+                                     p.country, p.glider, p.tracker_id,
+                                     p._name.name, p._name.surname])
+        return result
+

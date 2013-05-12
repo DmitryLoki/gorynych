@@ -18,13 +18,14 @@ POOL = txpostgres.ConnectionPool(None, host=OPTS['db']['host'],
 
 @defer.inlineCallbacks
 def initDB(aggregate_name, pool):
-    for command in pe.drop_tables(aggregate_name):
-        yield pool.runOperation(command)
-    for create_table in pe.create_tables(aggregate_name):
-        yield pool.runOperation(create_table)
+    drop_tables = ';'.join(pe.drop_tables(aggregate_name))
+    yield pool.runOperation(drop_tables)
+
+    create_tables = ';'.join(pe.create_tables(aggregate_name))
+    yield pool.runOperation(create_tables)
 
 
 @defer.inlineCallbacks
 def tearDownDB(aggregate_name, pool=POOL):
-    for command in pe.drop_tables(aggregate_name):
-        yield pool.runOperation(command)
+    drop_tables = ';'.join(pe.drop_tables(aggregate_name))
+    yield pool.runOperation(drop_tables)

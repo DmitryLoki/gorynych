@@ -17,7 +17,7 @@ from gorynych.info.infrastructure.PGSQLContestRepository import PGSQLContestRepo
 from gorynych.info.infrastructure.PGSQLRaceRepository import PGSQLRaceRepository, create_participants
 # TODO: create separate module with test utils
 from gorynych.info.domain.test.test_person import create_person
-from gorynych.common.domain.types import geojson_feature_collection, checkpoint_collection_from_geojson
+from gorynych.common.domain.types import geojson_feature_collection, checkpoint_collection_from_geojson, Name
 from gorynych.info.domain.ids import PersonID, ContestID, RaceID
 from gorynych.info.infrastructure.test import db_helpers
 from gorynych.common.exceptions import NoAggregate, DatabaseValueError
@@ -338,3 +338,27 @@ class RaceRepositoryTest(unittest.TestCase):
         for key in pgs:
             self.assertEqual(pgs[key], rc.paragliders[key])
 
+    @defer.inlineCallbacks
+    def test_update(self):
+        rc = create_race()
+        saved_rc = yield self.repo.save(rc)
+        saved_rc.title = 'Updated title'
+        saved_rc._start_time = rc._start_time - 300
+        saved_rc._checkpoints.pop()
+        chs = saved_rc.checkpoints
+        chkey = saved_rc.paragliders.keys()[0]
+        saved_rc.paragliders[chkey]._name = Name("Mitrofan", "Ignatov")
+        updated_rc = yield self.repo.save(rc)
+        self._compare_race(saved_rc._id, saved_rc.id, saved_rc.title,
+                           saved_rc._start_time, saved_rc.end_time, saved_rc.timelimits[0], saved_rc.timelimits[1], saved_rc.timezone,
+                           saved_rc.type, chs, updated_rc)
+
+        race_row = yield POOL.runQuery(pe.select('race'), (str(rc.id),))
+        i, ri, t, st, et, mst, met, tz, rt, chs = race_row[0]
+        self._compare_race(i, ri, t, st, et, mst, met, tz, rt,
+                           checkpoint_collection_from_geojson(chs), rc)
+        pg_row = yield POOL.runQuery(pe.select('paragliders', 'race'),
+                                     (saved_rc._id,))
+        pgs = create_participants(pg_row)['paragliders']
+        for key in pgs:
+            self.assertEqual(pgs[key], rc.paragliders[key])

@@ -23,7 +23,7 @@ EVENT_DISPATCHED = """
     """
 
 ADD_TRACK_TO_RACE = """
-    INSERT INTO race_tracks (rid, contest_number, track_id) VALUES(%s, %s, %s)
+    INSERT INTO race_tracks (id, contest_number, track_id) VALUES(%s, %s, %s)
     """
 
 class TrackerService(Interface):

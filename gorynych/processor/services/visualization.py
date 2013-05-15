@@ -24,7 +24,7 @@ SELECT_DATA = """
           race r
         WHERE
           rt.track_id = tr.track_id AND   
-          rt.rid = r.id AND
+          rt.id = r.id AND
           r.race_id = %s)
     SELECT
           t.timestamp,
@@ -35,12 +35,35 @@ SELECT_DATA = """
           track_data t,
           ids i
         WHERE
-          t.trid = i.id AND
+          t.id = i.id AND
           t.timestamp BETWEEN %s AND %s
         GROUP BY
           t.timestamp
         ORDER BY
           t.timestamp;
+    """
+
+SELECT_DATA_SNAPSHOTS = """
+    WITH ids AS (
+        SELECT
+          tr.id AS id,
+          rt.contest_number as contest_number
+        FROM
+          track tr,
+          race_tracks rt,
+          race r
+        WHERE
+          rt.track_id = tr.track_id AND   
+          rt.id = r.id AND
+          r.race_id = %s)
+    SELECT
+      s.timestamp, s.snapshot, i.contest_number
+    FROM
+      track_snapshot s,
+      ids i
+    WHERE
+      s.id = i.id AND
+      s.timestamp BETWEEN %s AND %s
     """
 
 GET_HEADERS_DATA = """
@@ -54,29 +77,29 @@ GET_HEADERS_DATA = """
           race
         WHERE
           race_tracks.track_id = tr.track_id AND
-          race_tracks.rid = race.id AND
+          race_tracks.id = race.id AND
           race.race_id = %s),
 
           tdata AS (
             SELECT
               timestamp,
               concat_ws(',', lat::text, lon::text, alt::text, v_speed::text, g_speed::text, distance::text) as data,
-              trid as id,
-              row_number() OVER(PARTITION BY td.trid ORDER BY td.timestamp DESC) AS rk
+              td.id,
+              row_number() OVER(PARTITION BY td.id ORDER BY td.timestamp DESC) AS rk
             FROM track_data td,
                 ids
             WHERE
-              td.trid = ids.id
+              td.id = ids.id
               AND td."timestamp" BETWEEN %s AND %s)
 
     SELECT
-      i.contest_number, t.data
+      i.contest_number, t.data, t.timestamp
     FROM
       tdata t,
       ids i
     WHERE
       t.rk = 1 AND
-  i.id = t.id;
+      i.id = t.id;
   """
 
 GET_HEADERS_SNAPSHOTS = """
@@ -90,18 +113,18 @@ GET_HEADERS_SNAPSHOTS = """
           race
         WHERE
           race_tracks.track_id = tr.track_id AND
-          race_tracks.rid = race.id AND
+          race_tracks.id = race.id AND
           race.race_id = %s),
-          snaps AS (
+      snaps AS (
         SELECT
           snapshot,
           timestamp,
-          ts.trid AS id,
-          row_number() OVER(PARTITION BY ts.trid ORDER BY ts.timestamp DESC) AS rk
+          ts.id AS id,
+          row_number() OVER(PARTITION BY ts.id ORDER BY ts.timestamp DESC) AS rk
         FROM track_snapshot ts,
             ids
         WHERE
-          ts.trid = ids.id
+          ts.id = ids.id
           AND ts.timestamp <= %s)
     SELECT
       i.contest_number, s.snapshot, s.timestamp
@@ -139,8 +162,10 @@ class TrackVisualizationService(Service):
         start_positions = params.get('start_positions')
         tracks = yield self.pool.runQuery(SELECT_DATA, (race_id, from_time,
                                                   to_time))
+        snaps = yield self.pool.runQuery(SELECT_DATA_SNAPSHOTS, (race_id, from_time,
+                                                  to_time))
         t2 = time.time()
-        result['timeline'] = self.prepare_result(tracks)
+        result['timeline'] = self.prepare_result(tracks, snaps)
         t3 = time.time()
         log.msg("result requested in %s:" % (t2-t1))
         log.msg("result ready in: %s, preparation time is: %s" % (t3-t1, t3-t2))
@@ -159,19 +184,20 @@ class TrackVisualizationService(Service):
     def prepare_start_data(self, hdata, hsnaps):
         '''
         Prepare last state of tracks from their coordinates and snapshots.
-        @param hdata: (contest_number, data)
+        @param hdata: (contest_number, data, timestamp)
         @type hdata: list of tuples
         @param hsnaps: (contest_number, snapshot, timestamp)
         @type hsnaps: list of tuples
         @return: {'contest_number':{'data':[alt, lon, ...],
-        'state':'finished', 'statechanged_at': 2134}
+        'state':'finished', 'statechanged_at': 2134} - that's not true
         @rtype:
         '''
         t1 = time.time()
-        result = defaultdict(dict)
+        result = dict()
         # Add last coords and speeds to result.
         for row in hdata:
-            result[str(row[0])]['data'] = parse_result(row[1].split(','))
+            result[str(row[0])] = parse_result(row[1].split(','))
+            #result[str(row[0])]['ts'] = str(row[2])
 
 
         t2 = time.time()
@@ -185,13 +211,21 @@ class TrackVisualizationService(Service):
             if not result[pilot].has_key('state'):
                 result[pilot]['state'] = 'not started'
         log.msg("start data prepared in: %s" % (t3-t1))
+
+        #final_result = defaultdict(dict)
+        #for key in result:
+            #ts = result[key]['ts']
+            #del result[key]['ts']
+            #final_result[ts][key] = result[key]
+
         return result
 
-    def prepare_result(self, tracks):
+    def prepare_result(self, tracks, snaps):
         '''
 
         @param tracks: [(timestamp, contest_number,lat,lon,
         ...;contest_number,lat,lon..),...]
+        @param snaps: [(timestamp, snapshot, contest_number), ...]
         @type tracks: list of tuple
         @return:{timestamp:{'contnumber':[lat,lon...], },}
         @rtype:
@@ -201,6 +235,10 @@ class TrackVisualizationService(Service):
             for data in row[1].split(';'):
                 result[int(row[0])][str(data.split(',')[0])
                                     ] = parse_result(data.split(',')[1:])
+
+        for row in snaps:
+            result[int(row[0])][row[2]]['state'] = row[1]
+
         return result
 
 

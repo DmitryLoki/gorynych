@@ -1,3 +1,418 @@
 '''
 Realization of persistence logic.
 '''
+from twisted.internet import defer
+from zope.interface import implements
+
+from gorynych.info.domain.contest import Paraglider, IContestRepository, ContestFactory
+from gorynych.info.domain.ids import PersonID
+from gorynych.info.domain.race import IRaceRepository, RaceFactory
+from gorynych.common.domain.types import checkpoint_collection_from_geojson, geojson_feature_collection, Name
+from gorynych.info.domain.person import IPersonRepository, PersonFactory
+from gorynych.common.exceptions import NoAggregate, DatabaseValueError
+from gorynych.common.infrastructure import persistence as pe
+
+
+def create_participants(paragliders_row):
+    result = dict()
+    if paragliders_row:
+        result['paragliders'] = dict()
+        for tup in paragliders_row:
+            _id, pid, cn , co, gl, ti, n, sn = tup
+            result['paragliders'][cn] = Paraglider(pid, Name(n, sn), co,
+                                                   gl, cn, ti)
+    return result
+
+
+class PGSQLPersonRepository(object):
+    implements(IPersonRepository)
+
+    def __init__(self, pool):
+        self.pool = pool
+        self.factory = PersonFactory()
+
+    @defer.inlineCallbacks
+    def get_by_id(self, person_id):
+        data = yield self.pool.runQuery(pe.select('person'),
+                                        (str(person_id),))
+        if not data:
+            raise NoAggregate("Person")
+        result = self._create_person(data[0])
+
+#        tracks_data = yield self.pool.runQuery(SQL_GET_PERSON_TRACKS.format(
+#        tracks_table=TRACKS_TABLE), (person_id,))
+#        result = self._insert_tracks(result, tracks_data)
+        defer.returnValue(result)
+
+    def _create_person(self, data_row):
+        if data_row:
+            # regdate is datetime.datetime object
+            regdate = data_row[4]
+            result = self.factory.create_person(
+                data_row[0],
+                data_row[1],
+                data_row[2],
+                data_row[3],
+                regdate.year,
+                regdate.month,
+                regdate.day,
+                data_row[5])
+            result._id = data_row[6]
+            return result
+
+#    def _insert_tracks(self, person, tracks):
+#        # Not ready yet.
+#        return person
+
+#    @defer.inlineCallbacks
+#    def get_list(self, limit=None, offset=0):
+#        # TODO: limit and offset
+#        pers_list = yield self.pool.runQuery(SQL_GET_PERSON_LIST.format(
+#                        person_table=PERSON_TABLE))
+#        result = []
+#        for pers in pers_list:
+#            pers = self._create_person(pers)
+#            if pers:
+#                result.append(pers)
+#        defer.returnValue(result)
+
+    def save(self, pers):
+        d = None
+        if pers._id:
+            d = self.pool.runOperation(pe.update('person'),
+                                       self._extract_sql_fields(pers))
+            d.addCallback(lambda _: pers)
+        else:
+            d = self.pool.runQuery(pe.insert('person'),
+                                   self._extract_sql_fields(pers))
+            d.addCallback(self._process_insert_result, pers)
+        return d
+
+    def _extract_sql_fields(self, pers=None):
+        if pers is None:
+            return ()
+        return (pers.name.name, pers.name.surname, pers.regdate,
+                    pers.country, pers.email, str(pers.id))
+
+    def _process_insert_result(self, data, pers):
+        if data is not None and pers is not None:
+            inserted_id = data[0][0]
+            pers._id = inserted_id
+            return pers
+        return None
+
+
+class PGSQLRaceRepository(object):
+    implements(IRaceRepository)
+
+    def __init__(self, pool):
+        self.pool = pool
+        self.factory = RaceFactory()
+
+    @defer.inlineCallbacks
+    def get_list(self, limit=20, offset=None):
+        result = []
+        command = "select id from race"
+        if limit:
+            command += ' limit ' + str(limit)
+        if offset:
+            command += ' offset ' + str(offset)
+        ids = yield self.pool.runQuery(command)
+        for idx, rid in enumerate(ids):
+            rc = yield self.get_by_id(rid[0])
+            result.append(rc)
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def get_by_id(self, race_id):
+        race_data = yield self.pool.runQuery(pe.select('race'), (str(race_id),))
+        if not race_data:
+            raise NoAggregate("Race")
+
+        pgs = yield self.pool.runQuery(pe.select('paragliders', 'race'),
+                                       (race_data[0][0],))
+        if not pgs:
+            raise DatabaseValueError("No paragliders has been found for race"
+                                     " %s." % race_data[0][1])
+        result = self._create_race(race_data[0], pgs)
+        defer.returnValue(result)
+
+    def _create_race(self, race_data, paragliders_row):
+        # TODO: repository knows too much about Race's internals. Think about it
+        i, rid, t, st, et, mst, met, tz, rt, chs = race_data
+        participants = create_participants(paragliders_row)
+
+        result = self.factory.create_race(t, rt, (mst, met), tz, rid)
+        result._start_time = st
+        result._end_time = et
+        result._checkpoints = checkpoint_collection_from_geojson(chs)
+        result._id = long(i)
+        result.paragliders = participants['paragliders']
+        return result
+
+    @defer.inlineCallbacks
+    def save(self, obj):
+        result = []
+        values = self._get_values_from_obj(obj)
+        def insert_id(_id, _list):
+            _list.insert(0, _id)
+            return _list
+
+        def save_new(cur):
+            d = cur.execute(pe.insert('race'), values['race'])
+            d.addCallback(lambda cur:cur.fetchone())
+            d.addCallback(lambda x:
+                ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s, %s)",
+                     (insert_id(x[0], p))) for p in values['paragliders']))
+            d.addCallback(lambda pq:
+                cur.execute("INSERT INTO paraglider VALUES " + pq +
+                            "RETURNING ID;"))
+            d.addCallback(lambda cur: cur.fetchone())
+            return d
+
+        def update(cur, pgs):
+            d = cur.execute(pe.update('race'), values['race'])
+
+            inobj = values['paragliders']
+            indb = pgs
+            for idx, p in enumerate(inobj):
+                p.insert(0, obj._id)
+                inobj[idx] = tuple(p)
+            to_insert = set(inobj).difference(set(indb))
+            to_delete = set(indb).difference(set(inobj))
+            if to_delete:
+                ids = tuple([x[1] for x in to_delete])
+                d.addCallback(lambda _:
+                cur.execute("DELETE FROM paraglider WHERE id=%s "
+                            "AND person_id in %s", (obj._id, ids)))
+            if to_insert:
+                q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s, %s)",
+                                         (pitem)) for pitem in to_insert)
+                d.addCallback(lambda _:
+                        cur.execute("INSERT into paraglider values " + q))
+                d.addCallback(lambda _: obj)
+                return d
+
+
+        if obj._id:
+            pgs = yield self.pool.runQuery(pe.select('paragliders', 'race'),
+                                           (obj._id,))
+            if not pgs:
+                raise DatabaseValueError(
+                    "No paragliders has been found for race %s." % obj.id)
+            result = yield self.pool.runInteraction(update, pgs)
+        else:
+            r_id = yield self.pool.runInteraction(save_new)
+            obj._id = r_id[0]
+            result = obj
+        defer.returnValue(result)
+
+    def _get_values_from_obj(self, obj):
+        result = dict()
+        result['race'] = (obj.title, obj.start_time, obj.end_time,
+                          obj.timelimits[0], obj.timelimits[1],
+                          obj.timezone, obj.type,
+                          geojson_feature_collection(obj.checkpoints),
+                          str(obj.id))
+        result['paragliders'] = []
+        for key in obj.paragliders:
+            p = obj.paragliders[key]
+            result['paragliders'].append([str(p.person_id), str(p.contest_number),
+                                     p.country, p.glider, p.tracker_id,
+                                     p._name.name, p._name.surname])
+        return result
+
+
+class PGSQLContestRepository(object):
+    implements(IContestRepository)
+
+    def __init__(self, pool):
+        self.pool = pool
+
+    @defer.inlineCallbacks
+    def get_by_id(self, contest_id):
+        rows = yield self.pool.runQuery(pe.select('contest'),
+                                        (str(contest_id),))
+        if not rows:
+            raise NoAggregate("Contest")
+        cont = self._create_contest_from_data(rows[0])
+        cont = yield self._append_data_to_contest(cont)
+        defer.returnValue(cont)
+
+    @defer.inlineCallbacks
+    def _append_data_to_contest(self, cont):
+        participants = yield self.pool.runQuery(
+                    pe.select('participants', 'contest'), (cont._id,))
+        if participants:
+            cont = self._add_participants_to_contest(cont, participants)
+        races = yield self.pool.runQuery(pe.select('race', 'contest'),
+                                         (cont._id,))
+        if races:
+            for race_id in races:
+                cont.race_ids.append(race_id[0])
+        defer.returnValue(cont)
+
+    def _create_contest_from_data(self, row):
+        '''
+
+        @param row: (id, contest_id, title, stime, etime, tz, place,
+        country, hq_lat, hq_lon)
+        @type row: C{tuple}
+        @return: contest
+        @rtype: C{Contest}
+        '''
+        factory = ContestFactory()
+        sid, cid, ti, st, et, tz, pl, co, lat, lon = row
+        cont = factory.create_contest(ti, st, et, pl, co, (lat, lon), tz, cid)
+        cont._id = sid
+        return cont
+
+    def _add_participants_to_contest(self, cont, rows):
+        '''
+
+        @param cont:
+        @type cont: C{Contest}
+        @param rows: [(id, participant_id, role, glider,
+        contest_number, description, type)]
+        @type rows: C{list}
+        @return:
+        @rtype:
+        '''
+        participants = dict()
+        for row in rows:
+            id, pid, role, glider, cnum, desc, ptype = row
+            if role == 'paraglider':
+                participants[PersonID.fromstring(pid)] = dict(
+                    role=role,
+                    contest_number=cnum,
+                    glider=str(glider))
+            elif role == 'organizator':
+                participants[PersonID.fromstring(pid)] = dict(role=role)
+        cont._participants = participants
+        return cont
+
+    @defer.inlineCallbacks
+    def get_list(self, limit=20, offset=None):
+        result = []
+        command = "select id from contest"
+        if limit:
+            command += ' limit ' + str(limit)
+        if offset:
+            command += ' offset ' + str(offset)
+        ids = yield self.pool.runQuery(command)
+        for idx, cid in enumerate(ids):
+            cont = yield self.get_by_id(cid[0])
+            result.append(cont)
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def save(self, obj):
+        values = self._extract_values_from_contest(obj)
+        def insert_id(_id, _list):
+            _list.insert(0, _id)
+            return _list
+
+        def save_new(cur):
+            '''
+            Save just created contest.
+            '''
+
+            d = cur.execute(pe.insert('contest'), values['contest'])
+            d.addCallback(lambda cur: cur.fetchone())
+
+
+            if values['participants']:
+                # Callbacks wan't work in for loop, so i insert multiple values
+                # in one query.
+                # Oh yes, executemanu also wan't work in asynchronous mode.
+                d.addCallback(lambda x:
+                    ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s)",
+                       (insert_id(x[0], p))) for p in values['participants']))
+                d.addCallback(lambda q:
+                  cur.execute("INSERT into participant values " + q +
+                              "RETURNING id;"))
+                d.addCallback(lambda cur: cur.fetchone())
+
+            if values['race_ids']:
+                d.addCallback(lambda x:
+                    ','.join(cur.mogrify("(%s, %s)",
+                             (x[0], str(p))) for p in values['race_ids']))
+                d.addCallback(lambda q:
+                    cur.execute("INSERT into contest_race values " + q + ""
+                                                 "RETURNING ID;"))
+            d.addCallback(lambda cur: cur.fetchone())
+            return d
+
+        def update(cur, prts, rids):
+            d = cur.execute(pe.update('contest'), values['contest'])
+            # print values
+            if values['participants'] or prts:
+                inobj = values['participants']
+                indb = prts
+                for idx, p in enumerate(inobj):
+                    p.insert(0, obj._id)
+                    inobj[idx] = tuple(p)
+                to_insert = set(inobj).difference(set(indb))
+                to_delete = set(indb).difference(set(inobj))
+                if to_delete:
+                    ids = tuple([x[1] for x in to_delete])
+                    d.addCallback(lambda _:
+                        cur.execute("DELETE FROM participant WHERE id=%s "
+                            "AND participant_id in %s", (obj._id, ids)))
+                if to_insert:
+                    q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s)",
+                                    (pitem)) for pitem in to_insert)
+                    d.addCallback(lambda _:
+                        cur.execute("INSERT into participant values " + q))
+
+            if values['race_ids'] or rids:
+                inobj = values['race_ids']
+                indb = rids
+                for idx, r in enumerate(inobj):
+                    inobj[idx] = (obj._id, str(r))
+                to_insert = set(inobj).difference(set(indb))
+                to_delete = set(indb).difference(set(inobj))
+                if to_delete:
+                    rids = tuple([x[0] for x in to_delete])
+                    d.addCallback(lambda _:
+                     cur.execute("DELETE FROM contest_race WHERE id=%s AND "
+                                 "race_id in %s", (obj._id, rids)))
+                if to_insert:
+                    rq = ','.join(cur.mogrify("(%s, %s)",
+                                             (ritem)) for ritem in to_insert)
+                    d.addCallback(lambda _:
+                    cur.execute("INSERT into contest_race values " + rq))
+
+            d.addCallback(lambda _:obj)
+            return d
+
+        result = None
+        if obj._id:
+            prts = yield self.pool.runQuery(pe.select('participants',
+                                                      'contest'), (obj._id,))
+            rids = yield self.pool.runQuery(pe.select('race', 'contest'),
+                                            (obj._id,))
+            result = yield self.pool.runInteraction(update, prts, rids)
+        else:
+            c__id = yield self.pool.runInteraction(save_new)
+            obj._id = c__id[0]
+            result = obj
+        defer.returnValue(result)
+
+    def _extract_values_from_contest(self, obj):
+        result = dict()
+        result['contest'] = (obj.title, obj.start_time, obj.end_time,
+                          obj.timezone,
+                obj.address.place, obj.address.country,
+                obj.address.lat, obj.address.lon, str(obj.id))
+
+        result['participants'] = []
+        for key in obj._participants:
+            p = obj._participants[key]
+            row = [str(key), p['role'], p.get('glider', ''),
+                   p.get('contest_number', ''), p.get('description', ''),
+                   key.__class__.__name__.lower()[:-2]]
+            result['participants'].append(row)
+
+        result['race_ids'] = obj.race_ids[::]
+        return result

@@ -1,7 +1,6 @@
 '''
 Test PostgreSQL implementation of IPersonRepository.
 '''
-import mock
 
 __author__ = 'Boris Tsema'
 from datetime import datetime
@@ -9,12 +8,11 @@ import time
 
 from twisted.trial import unittest
 from twisted.internet import defer
+import mock
 
 from gorynych.info.domain.test.helpers import create_contest, \
     create_checkpoints, create_race
-from gorynych.info.infrastructure import PGSQLPersonRepository
-from gorynych.info.infrastructure.PGSQLContestRepository import PGSQLContestRepository
-from gorynych.info.infrastructure.PGSQLRaceRepository import PGSQLRaceRepository, create_participants
+from gorynych.info.infrastructure.persistence import PGSQLPersonRepository, PGSQLContestRepository, PGSQLRaceRepository, create_participants
 # TODO: create separate module with test utils
 from gorynych.info.domain.test.test_person import create_person
 from gorynych.common.domain.types import geojson_feature_collection, checkpoint_collection_from_geojson, Name
@@ -30,7 +28,7 @@ POOL = db_helpers.POOL
 class PersonRepositoryTest(unittest.TestCase):
 
     def setUp(self):
-        self.repo = PGSQLPersonRepository.PGSQLPersonRepository(POOL)
+        self.repo = PGSQLPersonRepository(POOL)
         d = POOL.start()
         d.addCallback(lambda _:db_helpers.initDB('person', POOL))
         return d

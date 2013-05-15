@@ -25,7 +25,7 @@ NEW_TRACK = """
     RETURNING ID;
     """
 INSERT_SNAPSHOT = """
-    INSERT INTO track_snapshot (timestamp, trid, snapshot) VALUES(%s, %s, %s)
+    INSERT INTO track_snapshot (timestamp, id, snapshot) VALUES(%s, %s, %s)
     """
 
 

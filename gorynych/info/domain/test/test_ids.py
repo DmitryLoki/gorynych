@@ -1,9 +1,11 @@
-from twisted.trial import unittest
 import uuid
 from datetime import date
 from sys import getsizeof
 
-from gorynych.info.domain.ids import ContestID
+from twisted.trial import unittest
+
+from gorynych.info.domain.ids import ContestID, \
+    namespace_date_random_validator, namespace_uuid_validator
 
 
 class ContestIDTest(unittest.TestCase):
@@ -41,3 +43,24 @@ class ContestIDTest(unittest.TestCase):
         string = 'cnts-120203-abr'
         self.assertRaises(ValueError, ContestID.fromstring, string)
 
+
+class ValidatorsTest(unittest.TestCase):
+    def test_namespace_date_random_validator(self):
+        r_field = str(uuid.uuid4().fields[0])
+        string = 'cnts-120203-' + r_field
+        self.assertTrue(namespace_date_random_validator(string, 'cnts'))
+        self.assertRaises(AssertionError, namespace_date_random_validator,
+                          string, 'hello')
+        badstring = 'cnts-12324-' + r_field
+        self.assertRaises(AssertionError, namespace_date_random_validator,
+                          badstring, 'cnts')
+        anotherbadstring = 'cnts-120203-hahaha'
+        self.assertRaises(ValueError, namespace_date_random_validator,
+                          anotherbadstring, 'cnts')
+
+    def test_namespace_uuid_validator(self):
+        _id = str(uuid.uuid4())
+        string = 'haha-'+_id
+        self.assertTrue(namespace_uuid_validator(string, 'haha'))
+        self.assertRaises(ValueError, namespace_uuid_validator,
+                          string[:15], 'haha')

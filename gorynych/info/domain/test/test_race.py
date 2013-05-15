@@ -1,28 +1,12 @@
 import unittest
 
 import mock
-from shapely.geometry import Point
 
+from gorynych.info.domain.test.helpers import create_checkpoints
 from gorynych.info.domain import race
-from gorynych.common.domain.types import Checkpoint
 from gorynych.common.exceptions import BadCheckpoint
 from gorynych.info.domain.events import RaceCheckpointsChanged, ArchiveURLReceived
 from gorynych.info.domain.ids import RaceID
-
-
-
-def create_checkpoints():
-    # also used in test_info
-    ch1 = Checkpoint('D01', Point(43.9785, 6.48), 'TO',
-                     (1347711300, 1347716700), 1)
-    ch2 = Checkpoint('D01', Point(43.9785, 6.48), 'ss',
-                     (1347714900, 1347732000), 3000)
-    ch2_ordinal = Checkpoint('B20', Point(43.9511, 6.3708),  radius=2000)
-    ch3 = Checkpoint('B37', Point(43.9658, 6.5578), 'es',
-                     (1347714900, 1347732000), radius=1500)
-    ch4 = Checkpoint('g10', Point(43.9658, 6.5578), 'goal',
-                     (1347714900, 1347732000), 1000)
-    return [ch1, ch2, ch2_ordinal, ch3, ch4]
 
 
 class RaceTest(unittest.TestCase):
@@ -166,5 +150,3 @@ class RaceTaskTest(unittest.TestCase):
         self.assertRaises(TypeError, task.checkpoints_are_good, [1, 2])
 
 
-if __name__ == '__main__':
-    unittest.main()

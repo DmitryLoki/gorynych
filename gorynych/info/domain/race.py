@@ -1,6 +1,7 @@
 '''
 Aggregate Race.
 '''
+__author__ = 'Boris Tsema'
 from copy import deepcopy
 import decimal
 import re
@@ -8,11 +9,15 @@ import re
 import pytz
 from zope.interface.interfaces import Interface
 
-from gorynych.common.domain.model import AggregateRoot, ValueObject
+
+from gorynych.common.domain.model import AggregateRoot, ValueObject,\
+                                        DomainEvent
 from gorynych.common.domain.types import Checkpoint
 from gorynych.common.exceptions import BadCheckpoint
-from gorynych.info.domain.events import RaceCheckpointsChanged, ArchiveURLReceived
+from gorynych.info.domain.events import RaceCheckpointsChanged,\
+                                        ArchiveURLReceived
 from gorynych.common.infrastructure import persistence
+from gorynych.info.domain.ids import RaceID
 
 
 class RaceTask(ValueObject):
@@ -30,15 +35,46 @@ class RaceTask(ValueObject):
 class SpeedRunTask(RaceTask):
     type = 'speedrun'
 
+
 class RaceToGoalTask(RaceTask):
     type = 'racetogoal'
+
 
 class OpenDistanceTask(RaceTask):
     type = 'opendistance'
 
+
 RACETASKS = {'speedrun': SpeedRunTask,
              'racetogoal': RaceToGoalTask,
              'opendistance': OpenDistanceTask}
+
+
+class RaceFactory(object):
+
+    def create_race(self, title, race_type, timelimits, timezone,
+                    race_id=None):
+        if not race_id:
+            race_id = RaceID()
+        race = Race(race_id)
+        race_type = ''.join(race_type.strip().lower().split())
+        if race_type in RACETASKS.keys():
+            race.task = RACETASKS[race_type]()
+        else:
+            raise ValueError("Unknown race type.")
+        race.title = title
+        race.timelimits = timelimits
+        race.timezone = timezone
+
+        return race
+
+
+class CheckpointsAreAddedToRace(DomainEvent):
+    '''
+    Raised when someone try to add track archive after it has been parsed.
+    '''
+    def __init__(self, event_id, checkpoints):
+        self.checkpoints = checkpoints
+        DomainEvent.__init__(self, event_id)
 
 
 class TrackArchiveAlreadyExist(Exception):
@@ -47,10 +83,9 @@ class TrackArchiveAlreadyExist(Exception):
     '''
 
 
-
 class Race(AggregateRoot):
-    def __init__(self, id):
-        self.id = id
+    def __init__(self, race_id):
+        self.id = race_id
 
         self.task = None
         self._checkpoints = []
@@ -224,7 +259,6 @@ class TrackArchive(object):
         self.state = 'work is started'
 
 
-
 class IRaceRepository(Interface):
     def get_by_id(id):
         '''
@@ -243,3 +277,5 @@ class IRaceRepository(Interface):
         @return:
         @rtype:
         '''
+
+

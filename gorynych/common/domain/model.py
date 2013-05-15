@@ -44,7 +44,7 @@ class DomainIdentifier(object):
         try:
             uuid.UUID(string)
         except ValueError as error:
-            raise ValueError("Bad id string: %r" % error)
+            raise ValueError("Bad id string %r: %r" % (string, error))
         return True
 
     def __eq__(self, other):

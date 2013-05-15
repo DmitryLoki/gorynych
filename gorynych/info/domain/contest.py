@@ -6,15 +6,13 @@ from copy import deepcopy
 import pytz
 from zope.interface.interfaces import Interface
 
-from gorynych.common.domain.model import AggregateRoot
-from gorynych.common.domain.model import ValueObject
-from gorynych.common.domain.types import Address, Name, Country
+from gorynych.common.domain.model import AggregateRoot, ValueObject
+from gorynych.common.domain.types import Address, Country, Name
 from gorynych.common.infrastructure import persistence
-from gorynych.info.domain.race import Race, RACETASKS
-from gorynych.info.domain.person import IPersonRepository
+from gorynych.info.domain.race import RaceFactory
 from gorynych.info.domain.events import ParagliderRegisteredOnContest
-from gorynych.info.domain.ids import ContestID, RaceID
-
+from gorynych.info.domain.ids import ContestID, PersonID
+from gorynych.info.domain.person import IPersonRepository
 
 
 class IContestRepository(Interface):
@@ -41,17 +39,17 @@ class ContestFactory(object):
 
     def create_contest(self, title, start_time, end_time,
                contest_place, contest_country, hq_coords, timezone,
-               id=None):
+               contest_id=None):
         address = Address(contest_place, contest_country, hq_coords)
-        if not int(start_time) <  int(end_time):
+        if end_time < start_time:
             raise ValueError("Start time must be less then end time.")
-        if not id:
-            id = ContestID()
-        elif not isinstance(id, ContestID):
-            id = ContestID.fromstring(id)
+        if not contest_id:
+            contest_id = ContestID()
+        elif not isinstance(contest_id, ContestID):
+            contest_id = ContestID.fromstring(contest_id)
         if not timezone in pytz.all_timezones_set:
             raise pytz.exceptions.UnknownTimeZoneError("Wrong timezone.")
-        contest = Contest(id, start_time, end_time, address)
+        contest = Contest(contest_id, start_time, end_time, address)
         contest.title = title
         contest.timezone = timezone
         return contest
@@ -59,13 +57,14 @@ class ContestFactory(object):
 
 class Contest(AggregateRoot):
 
-    def __init__(self, id, start_time, end_time, address):
-        self.id = id
+    def __init__(self, contest_id, start_time, end_time, address):
+        self.id = contest_id
         self._title = ''
         self._timezone = ''
         self._start_time = start_time
         self._end_time = end_time
         self.address = address
+        # {person_id:{role:'..', contest_number:1, glider:'glider'},}
         self._participants = dict()
         self.race_ids = list()
 
@@ -197,7 +196,6 @@ class Contest(AggregateRoot):
     def title(self, value):
         self._title = value.strip().title()
 
-
     def register_paraglider(self, person_id, glider, contest_number):
         paraglider_before = deepcopy(self._participants.get(person_id))
 
@@ -243,33 +241,31 @@ class Contest(AggregateRoot):
         @return: a new race for contest
         @rtype: Race
         '''
-        race_id = RaceID()
-        race = Race(race_id)
-        race_type = ''.join(race_type.strip().lower().split())
-        if race_type in RACETASKS.keys():
-            race.task = RACETASKS[race_type]()
-        else:
-            raise ValueError("Unknown race type.")
-
-        race.title = race_title
-        race.timelimits = (self.start_time, self.end_time)
-        race.timezone = self.timezone
+        factory = RaceFactory()
+        race = factory.create_race(race_title, race_type,
+            (self.start_time, self.end_time), self.timezone)
         # Here Race is created and we start to fill it with useful
         # information.
         # TODO: the same for transport and organizers.
         race = self._fill_race_with_paragliders(race)
         race.checkpoints = checkpoints
-        self.race_ids.append(race_id)
+
+        self.race_ids.append(race.id)
         return race
 
+
     def _fill_race_with_paragliders(self, race):
+        '''
+        @param participants: C{{person_id: {role='', contest_number=1,
+        glider='glider'},}}
+        '''
         for key in self._participants.keys():
             if self._participants[key]['role'] == 'paraglider':
                 person = persistence.get_repository(IPersonRepository
-                                                    ).get_by_id(key)
-                if person: # TODO: do this later: and person.tracker:
+                ).get_by_id(key)
+                if person:  # TODO: do this later: and person.tracker:
                     race.paragliders[
-                      self._participants[key]['contest_number']] = Paraglider(
+                        self._participants[key]['contest_number']] = Paraglider(
                         key,
                         person.name,
                         person.country,
@@ -298,12 +294,12 @@ class Contest(AggregateRoot):
             raise ValueError("Paraglider must have unique contest number.")
 
 
+
 class Paraglider(ValueObject):
 
     def __init__(self, person_id, name, country, glider, contest_number,
                  tracker_id=None):
         # TODO: remove tracker_id=None when tracker assignment will work.
-        from gorynych.info.domain.person import PersonID
 
         if not isinstance(person_id, PersonID):
             person_id = PersonID().fromstring(person_id)
@@ -311,17 +307,21 @@ class Paraglider(ValueObject):
             raise TypeError("Name must be an instance of Name class.")
         if not isinstance(country, Country):
             country = Country(country)
-        # TODO: uncomment this when tracker assignment will work.
+            # TODO: uncomment this when tracker assignment will work.
         # if not isinstance(tracker_id, TrackerID):
         #     tracker_id = TrackerID(tracker_id)
 
         self.person_id = person_id
-        self.name = name.short()
+        self._name = name
         self.country = country.code()
         self.glider = glider.strip().split(' ')[0].lower()
-        self.contest_number = int(contest_number)
+        self.contest_number = contest_number
         self.tracker_id = tracker_id
         self._contest_track_id = None
+
+    @property
+    def name(self):
+        return self._name.short()
 
     @property
     def contest_track_id(self):
@@ -330,3 +330,8 @@ class Paraglider(ValueObject):
     @contest_track_id.setter
     def contest_track_id(self, value):
         self._contest_track_id = str(value)
+
+    def __eq__(self, other):
+        return self.person_id == other.person_id and (self.glider == other
+        .glider) and (self.contest_number == other.contest_number) and (self
+                                                                                       .tracker_id == other.tracker_id)

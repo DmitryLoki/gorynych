@@ -1,4 +1,5 @@
 from twisted.trial import unittest
+from gorynych.info.domain.test.helpers import create_checkpoints
 
 from gorynych.common.infrastructure import serializers
 from gorynych.common import exceptions
@@ -26,7 +27,7 @@ class DomainIdentifierSerializerTest(unittest.TestCase):
 class GeoObjectsListSerializerTest(unittest.TestCase):
     def test_bytes(self):
         from gorynych.common.domain.types import Checkpoint, checkpoint_from_geojson
-        from gorynych.info.domain.test.test_race import create_checkpoints
+
         s = serializers.GeoObjectsListSerializer(checkpoint_from_geojson)
         geolist = create_checkpoints()
 
@@ -38,6 +39,3 @@ class GeoObjectsListSerializerTest(unittest.TestCase):
         self.assertIsInstance(from_bts[0], Checkpoint)
 
 
-
-if __name__ == '__main__':
-    unittest.main()

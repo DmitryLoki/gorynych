@@ -1,25 +1,13 @@
-import uuid
 import unittest
 
 import mock
 from shapely.geometry import Point
+from gorynych.info.domain.test.helpers import create_contest
 
 from gorynych.info.domain import contest, person
 from gorynych.common.domain.types import Address, Name, Country, Checkpoint
 from gorynych.info.domain.events import ParagliderRegisteredOnContest
-from gorynych.info.domain.ids import RaceID
-
-
-def create_contest(start_time, end_time, id=None,
-                   title='  Hello world  ',
-                   place='Yrupinsk', country='rU', coords=(45.23, -23.22),
-                   timezone='Europe/Moscow'):
-    factory = contest.ContestFactory()
-    cont = factory.create_contest(title, start_time, end_time, place,
-        country, coords, timezone, id)
-    if not id:
-        id = cont.id
-    return cont, id
+from gorynych.info.domain.ids import RaceID, PersonID
 
 
 class MockedPersonRepository(mock.Mock):
@@ -42,7 +30,7 @@ class MockedPersonRepository(mock.Mock):
 class ContestFactoryTest(unittest.TestCase):
 
     def test_contestid_successfull_contest_creation(self):
-        cont, cont_id = create_contest(1, 2)
+        cont = create_contest(1, 2)
         self.assertIsInstance(cont.address, Address)
         self.assertEqual(cont.title, 'Hello World')
         self.assertEqual(cont.country, 'RU')
@@ -52,12 +40,12 @@ class ContestFactoryTest(unittest.TestCase):
         self.assertIsInstance(cont.id, contest.ContestID)
         self.assertIsNone(cont._id)
 
-        cont2, cont_id2 = create_contest(3, 4)
-        self.assertNotEqual(cont_id, cont_id2, "Contest with the same id has"
-                                               " been created.")
+        cont2 = create_contest(3, 4)
+        self.assertNotEqual(cont.id, cont2.id,
+                            "Contest with the same id has been created.")
 
     def test_str_successfull_contest_creation(self):
-        cont, cont_id = create_contest(1, 3, id='cnts-130422-12345')
+        cont = create_contest(1, 3, id='cnts-130422-12345')
         self.assertEqual(cont.end_time, 3)
         self.assertEqual(cont.start_time, 1)
         self.assertEqual(cont.id, 'cnts-130422-12345')
@@ -67,24 +55,12 @@ class ContestFactoryTest(unittest.TestCase):
                           "Contest can be created with wrong times.")
 
 
-class ParagliderTest(unittest.TestCase):
-    def test_success_creation(self):
-        p_id = str(uuid.uuid4())
-        p = contest.Paraglider(p_id, Name('Vasya', 'Pupkin'),
-            Country('RU'), 'Mantra 9', 15, 16)
-        self.assertEqual(p.person_id, p_id)
-        self.assertEqual(p.glider, 'mantra')
-        self.assertEqual(p.contest_number, 15)
-        # TODO: uncomment then TrackerID will be implemented.
-        # self.assertEqual(p.tracker_id, TrackerID())
-
-
 class ContestTest(unittest.TestCase):
     @mock.patch('gorynych.common.infrastructure.persistence.event_store')
     def test_register_paraglider(self, patched):
         event_store = mock.Mock()
         patched.return_value = event_store
-        cont, cont_id = create_contest(1, 2)
+        cont = create_contest(1, 2)
         p1 = person.PersonID()
         c = cont.register_paraglider(p1, 'mantrA 9', '747')
 
@@ -110,13 +86,13 @@ class ContestTest(unittest.TestCase):
         mock_calls = event_store.mock_calls
         self.assertEqual(len(mock_calls), 2)
         self.assertEqual(mock_calls[-1], mock.call.persist(
-            ParagliderRegisteredOnContest(p2, cont_id)))
+            ParagliderRegisteredOnContest(p2, cont.id)))
         self.assertEqual(mock_calls[-2], mock.call.persist(
-            ParagliderRegisteredOnContest(p1, cont_id)))
+            ParagliderRegisteredOnContest(p1, cont.id)))
 
 
     def test_times_changing(self):
-        cont, cont_id = create_contest(1, '15')
+        cont = create_contest(1, '15')
         cont.start_time = '2'
         self.assertEqual(cont.start_time, 2)
         cont.end_time = '8'
@@ -130,12 +106,12 @@ class ContestTest(unittest.TestCase):
         self.assertRaises(ValueError, cont.change_times, '10', '8')
 
     def test_change_title(self):
-        cont, cont_id = create_contest(1, '15')
+        cont = create_contest(1, '15')
         cont.title = '  hello moOn  '
         self.assertEqual(cont.title, 'Hello Moon')
 
     def test_change_address(self):
-        cont, cont_id = create_contest(1, '15')
+        cont = create_contest(1, '15')
         cont.place = 'Severodvinsk'
         self.assertEqual(cont.place, 'Severodvinsk')
         cont.country = 'tw'
@@ -153,7 +129,7 @@ class ContestTestWithRegisteredParagliders(unittest.TestCase):
         @mock.patch('gorynych.common.infrastructure.persistence.event_store')
         def fixture(patched):
             patched.return_value = mock.Mock()
-            cont, cont_id = create_contest(1, 15)
+            cont  = create_contest(1, 15)
             cont.register_paraglider(self.p2_id, 'mantrA 9', '757')
             cont.register_paraglider(self.p1_id, 'gIn 9', '747')
             person1 = cont._participants[self.p1_id]
@@ -234,6 +210,14 @@ class ContestTestWithRegisteredParagliders(unittest.TestCase):
             (self.p2_id, 'N. Surname', 'mantra', 'RU'))
 
 
-if __name__ == '__main__':
-    unittest.main()
+class ParagliderTest(unittest.TestCase):
+    def test_success_creation(self):
+        p_id = PersonID()
+        p = contest.Paraglider(p_id, Name('Vasya', 'Pupkin'),
+                            Country('RU'), 'Mantra 9', 15, 16)
+        self.assertEqual(p.person_id, p_id)
+        self.assertEqual(p.glider, 'mantra')
+        self.assertEqual(p.contest_number, 15)
+        # TODO: uncomment then TrackerID will be implemented.
+        # self.assertEqual(p.tracker_id, TrackerID())
 

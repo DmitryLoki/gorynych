@@ -2,7 +2,7 @@ import unittest
 import datetime
 
 from gorynych.info.domain import person
-from gorynych.info.domain.ids import TrackerID, ContestID
+from gorynych.info.domain.ids import TrackerID, ContestID, PersonID
 
 def create_person(name='John', surname='Doe',
                   country='UA', email='johndoe@example.com', reg_year=None,
@@ -17,8 +17,8 @@ def create_person(name='John', surname='Doe',
 class PersonFactoryTest(unittest.TestCase):
     def test_create_person(self):
         self.assertEqual(person.MINYEAR, 2012)
-        pers = create_person('Harold', 'Herzen', 'DE', 'boss@gmail.com', '2012',
-            11, '30')
+        pers = create_person('Harold', 'Herzen', 'DE', 'boss@gmail.com',
+                             '2012', 11, '30')
 
         self.assertEqual(pers.name.full(), 'Harold Herzen')
         self.assertEqual(pers.country, 'DE')
@@ -31,6 +31,17 @@ class PersonFactoryTest(unittest.TestCase):
                                      'bss@gmail.com', '2012',
                                      11, '30')
         self.assertNotEqual(pers.id, another_pers.id)
+
+    def test_create_with_id(self):
+        pid = PersonID()
+        pers = create_person('Harold', 'Herzen', 'DE', 'boss@gmail.com',
+                             '2012', 11, '30', str(pid))
+        self.assertEqual(pers.name.full(), 'Harold Herzen')
+        self.assertEqual(pers.country, 'DE')
+        self.assertEqual(pers.id, pid)
+        self.assertEqual(pers.email, 'boss@gmail.com')
+        self.assertEqual(pers.regdate, datetime.date(2012, 11, 30))
+        self.assertIsNone(pers._id)
 
     def test_good_init_without_regdate(self):
         self.assertEqual(person.MINYEAR, 2012)
@@ -97,8 +108,9 @@ class PersonTest(unittest.TestCase):
         self.assertEqual(self.person.country, 'RU')
 
     def test_equality(self):
-        p1 = create_person()
-        p2 = create_person()
+        pid = PersonID()
+        p1 = create_person(id=pid)
+        p2 = create_person(id=pid)
         self.assertEqual(p1, p2)
 
 

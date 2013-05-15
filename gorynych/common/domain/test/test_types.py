@@ -2,8 +2,10 @@ import unittest
 import simplejson as json
 
 from shapely.geometry import Point
+from gorynych.info.domain.test.helpers import create_checkpoints
 
 from gorynych.common.domain import types
+
 
 class TypesTest(unittest.TestCase):
     def test_name(self):
@@ -13,7 +15,6 @@ class TypesTest(unittest.TestCase):
         self.assertRaises(ValueError, types.Name)
         self.assertEqual(name.name, 'Firstname')
         self.assertEqual(name.surname, 'Lastname')
-
 
     def test_country(self):
         country = types.Country('mc123')
@@ -47,11 +48,11 @@ class AddressTest(unittest.TestCase):
         types.Address('ss', 'de', (89.999999, -180))
 
     def test_country(self):
-        a = types.Address('ss', 'de', (0,0))
+        a = types.Address('ss', 'de', (0, 0))
         self.assertEqual(a.country, 'DE')
 
     def test_place(self):
-        a = types.Address('ss', 'de', (0,0))
+        a = types.Address('ss', 'de', (0, 0))
         self.assertEqual(a.place, 'Ss')
 
 
@@ -62,7 +63,7 @@ class CheckpointTest(unittest.TestCase):
                                 ch_type='TO', times=(2, None), radius=2)
         ch2 = types.Checkpoint(name='A01', geometry=Point(42.502, 0.798),
                                  times=(4, 6), radius=3)
-        ch3 = types.Checkpoint(name='B02', geometry=Point(1,2), ch_type='es',
+        ch3 = types.Checkpoint(name='B02', geometry=Point(1, 2), ch_type='es',
             radius=3)
         ch4 = types.Checkpoint(name='g10', geometry={'type': 'Point',
                                                      'coordinates': [1, 2]},
@@ -86,9 +87,9 @@ class CheckpointTest(unittest.TestCase):
     def test_geo_interface(self):
         ch1 = types.Checkpoint(name='A01', geometry=Point(53, 1),
                                ch_type='TO', times=(2, None), radius=2)
-        expected_interface =  {'type': 'Feature',
+        expected_interface = {'type': 'Feature',
                               'geometry': {'type': 'Point',
-                                           'coordinates':[53.0, 1.0]},
+                                           'coordinates': [53.0, 1.0]},
                               'properties': {'radius': 2, 'name': 'A01',
                                             'checkpoint_type': 'to',
                                             'open_time': 2,
@@ -147,8 +148,8 @@ class CheckpointTest(unittest.TestCase):
         self.assertIsInstance(ch.geometry, Point)
 
     def test_bad_creating(self):
-        self.assertRaises(ValueError, types.Checkpoint, 'A01', Point(1,1))
-        self.assertRaises(AssertionError, types.Checkpoint, '2', Point(2,2),
+        self.assertRaises(ValueError, types.Checkpoint, 'A01', Point(1, 1))
+        self.assertRaises(AssertionError, types.Checkpoint, '2', Point(2, 2),
                                                            times=(3, 1),
                                                            radius=1)
 
@@ -162,6 +163,11 @@ class CheckpointTest(unittest.TestCase):
         self.assertIsInstance(str(ch), bytes)
         self.assertEqual(str(ch), json.dumps(point))
 
+    def test_geojson_feature_collection(self):
+        # TODO: rewrite it without dependencies to info and with more accuracy
+        ch_list = create_checkpoints()
+        res = types.geojson_feature_collection(ch_list)
+        self.assertIsInstance(res, str)
 
 if __name__ == '__main__':
     unittest.main()

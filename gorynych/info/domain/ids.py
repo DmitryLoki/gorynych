@@ -59,7 +59,7 @@ class PersonID(DomainIdentifier):
 
 class RaceID(DomainIdentifier):
     '''
-    r-ace75299-c7c5-4b73-a7b0-17f57320231c
+    r-b4e75299-c7c5-4b73-a7b0-17f57320231c
     r-uuid4
     '''
     def __init__(self):
@@ -72,7 +72,7 @@ class RaceID(DomainIdentifier):
 
 class TrackerID(DomainIdentifier):
     '''
-    trck-749e0d12574a4d4594e72488461574d0'
+    trckr-749e0d12574a4d4594e72488461574d0'
     namespace-uuid4.hex
     '''
     def __init__(self):

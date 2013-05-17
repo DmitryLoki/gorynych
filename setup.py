@@ -29,7 +29,6 @@ def find_packages(path, base="" ):
 
 packages = find_packages('.').keys()
 packages.append('twisted.plugins')
-print packages
 
 setup(
     name='gorynych',
@@ -51,7 +50,9 @@ setup(
     ],
     include_package_data=True,
     package_data={
-        'twisted': ['plugins/info_plugin.py']
+        'twisted': ['plugins/info_plugin.py',
+                    'plugins/trackservice_plugin.py',
+                    'plugins/visualization_plugin.py']
     }
 )
 

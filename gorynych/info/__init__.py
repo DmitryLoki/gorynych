@@ -16,8 +16,8 @@ from gorynych.info.domain.person import IPersonRepository
 from gorynych.common.infrastructure import persistence
 from gorynych.eventstore.eventstore import EventStore
 from gorynych.eventstore.store import PGSQLAppendOnlyStore
-# imports for test only
-from gorynych.info.test.helpers import PickleContestRepository, PicklePersonRepository, PickleRaceRepository
+from gorynych.info.infrastructure.persistence import PGSQLContestRepository,\
+    PGSQLPersonRepository, PGSQLRaceRepository
 
 class Options(BaseOptions):
     optParameters = [
@@ -52,12 +52,12 @@ def makeService(config, services=None):
     app_service.setServiceParent(services)
 
     # Test repositories init
-    persistence.register_repository(IContestRepository, PickleContestRepository
-        ('contest_repo'))
-    persistence.register_repository(IRaceRepository, PickleRaceRepository
-        ('race_repo'))
-    persistence.register_repository(IPersonRepository, PicklePersonRepository
-        ('person_repo'))
+    persistence.register_repository(IContestRepository,
+                                    PGSQLContestRepository(pool) )
+    persistence.register_repository(IRaceRepository,
+                                    PGSQLRaceRepository(pool))
+    persistence.register_repository(IPersonRepository,
+                                    PGSQLPersonRepository(pool))
 
     # REST API init
     api_tree = base_resource.resource_tree()

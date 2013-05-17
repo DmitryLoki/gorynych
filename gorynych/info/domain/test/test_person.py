@@ -49,7 +49,7 @@ class PersonFactoryTest(unittest.TestCase):
 
         self.assertEqual(pers.name.full(), 'Harold Herzen')
         self.assertEqual(pers.country, 'DE')
-        self.assertEqual(len(pers.id), 36)
+        self.assertEqual(str(pers.id).split('-')[0], 'pers')
         self.assertEqual(pers.regdate, datetime.date.today())
 
     def test_bad_init(self):

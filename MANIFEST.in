@@ -1,0 +1,6 @@
+global-include *.json
+global-include  *.yaml
+exclude   gorynych/config.yaml
+include gorynych/config.yaml.dist
+include sql/*.sql
+graft twisted

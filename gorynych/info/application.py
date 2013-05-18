@@ -108,7 +108,7 @@ class ApplicationService(Service):
         # log.msg("polling")
         d = self.pool.runQuery(GET_EVENTS, ('TrackAddedToRace',
                                             'ContestRaceCreated'))
-        d.addCallback(self.process_events)
+        d.addCallback(self.process_event_list)
         return d
 
     def process_event_list(self, event_list):

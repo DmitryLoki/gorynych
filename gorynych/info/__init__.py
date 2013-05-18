@@ -2,9 +2,9 @@
 Package for context which collect information and supply other context with
 it.
 '''
-from txpostgres import txpostgres
 from twisted.application import internet, service
 from twisted.web import server
+from twisted.enterprise import adbapi
 
 from gorynych import BaseOptions
 from gorynych.info.application import ApplicationService
@@ -21,7 +21,7 @@ from gorynych.info.infrastructure.persistence import PGSQLContestRepository,\
 
 class Options(BaseOptions):
     optParameters = [
-        ['webport', 'wp', 8086, None, int]
+        ['webport', 'wp', 8085, None, int]
     ]
 
 def makeService(config, services=None):
@@ -36,19 +36,18 @@ def makeService(config, services=None):
     '''
     if not services:
         services = service.MultiService()
-    pool = txpostgres.ConnectionPool(None,
-                                     host=config['dbhost'],
-                                     database=config['dbname'],
-                                     user=config['dbuser'],
-                                     password=config['dbpassword'],
-                                     min=config['poolthreads'])
+
+    pool = adbapi.ConnectionPool('psycopg2', database=config['dbname'],
+                                 user=config['dbuser'],
+                                 password=config['dbpassword'],
+                                 host=config['dbhost'])
 
     # EventStore init
     event_store = EventStore(PGSQLAppendOnlyStore(pool))
     persistence.add_event_store(event_store)
 
     # Application Service init
-    app_service = ApplicationService(event_store)
+    app_service = ApplicationService(pool, event_store)
     app_service.setServiceParent(services)
 
     # Test repositories init

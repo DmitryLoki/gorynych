@@ -97,11 +97,11 @@ class TrackerService(Interface):
 
 
 class ApplicationService(Service):
-    def __init__(self, event_store=None):
+    def __init__(self, pool, event_store=None):
         if not event_store:
             event_store = persistence.event_store()
         self.event_store = event_store
-        self.pool = self.event_store.store.pool
+        self.pool = pool
         self.event_poller = task.LoopingCall(self.poll_for_events)
 
     def poll_for_events(self):
@@ -111,10 +111,10 @@ class ApplicationService(Service):
         d.addCallback(self.process_events)
         return d
 
-    def process_events(self, events):
-        while events:
+    def process_event_list(self, event_list):
+        while event_list:
             # TODO: rewrite
-            name, aggrid, payload, event_id = events.pop()
+            name, aggrid, payload, event_id = event_list.pop()
             reactor.callLater(0, getattr(self, 'process_'+str(name)),
                               aggrid, payload, event_id)
 
@@ -160,17 +160,15 @@ class ApplicationService(Service):
 
     def startService(self):
         log.msg("Starting DB pool.")
-        d = self.pool.start()
-        d.addCallback(lambda _: log.msg("Pool started successfully."))
-        d.addCallbacks(lambda _:log.msg("Connection established."))
-        d.addCallback(lambda _:self.event_store.store.initialize())
+        # d = defer.Deferred()
+        d = self.event_store.store.initialize()
+        d.addCallback(lambda _: self.event_poller.start(0.5))
         d.addCallback(lambda _:Service.startService(self))
-        d.addCallback(lambda _: self.event_poller.start(2))
         return d.addCallback(lambda _: log.msg("Service started."))
 
-    def stopService(self):
-        Service.stopService(self)
-        return self.pool.close()
+    # def stopService(self):
+    #     Service.stopService(self)
+    #     return self.pool.close()
 
     ############## Contest Service part #############
     def create_new_contest(self, params):

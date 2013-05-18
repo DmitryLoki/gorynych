@@ -16,11 +16,11 @@ from gorynych.common.infrastructure import persistence as pe
 def create_participants(paragliders_row):
     result = dict()
     if paragliders_row:
-        result['paragliders'] = dict()
+        result = list()
         for tup in paragliders_row:
             _id, pid, cn , co, gl, ti, n, sn = tup
-            result['paragliders'][cn] = Paraglider(pid, Name(n, sn), co,
-                                                   gl, cn, ti)
+            result.append(Paraglider(pid, Name(n, sn), co,
+                                                   gl, cn, ti))
     return result
 
 
@@ -139,15 +139,14 @@ class PGSQLRaceRepository(object):
 
     def _create_race(self, race_data, paragliders_row):
         # TODO: repository knows too much about Race's internals. Think about it
-        i, rid, t, st, et, mst, met, tz, rt, chs = race_data
-        participants = create_participants(paragliders_row)
+        i, rid, t, st, et, tz, rt, _chs = race_data
+        ps = create_participants(paragliders_row)
+        chs = checkpoint_collection_from_geojson(_chs)
 
-        result = self.factory.create_race(t, rt, (mst, met), tz, rid)
+        result = self.factory.create_race(t, rt, tz, ps, chs, rid)
         result._start_time = st
         result._end_time = et
-        result._checkpoints = checkpoint_collection_from_geojson(chs)
         result._id = long(i)
-        result.paragliders = participants['paragliders']
         return result
 
     @defer.inlineCallbacks
@@ -210,7 +209,6 @@ class PGSQLRaceRepository(object):
     def _get_values_from_obj(self, obj):
         result = dict()
         result['race'] = (obj.title, obj.start_time, obj.end_time,
-                          obj.timelimits[0], obj.timelimits[1],
                           obj.timezone, obj.type,
                           geojson_feature_collection(obj.checkpoints),
                           str(obj.id))

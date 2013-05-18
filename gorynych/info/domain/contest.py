@@ -153,7 +153,7 @@ class Contest(AggregateRoot):
     def paragliders(self):
         '''
         Registered paragliders.
-        @return: list with zero or more L{Person}.
+        @return: {person_id: {role:..., contest_number:..., glider:},}
         @rtype: C{dict}
         '''
         result = dict()
@@ -229,50 +229,8 @@ class Contest(AggregateRoot):
     def _rollback_register_paraglider(self, paraglider_before, person_id):
         self._participants[person_id] = paraglider_before
 
-    def new_race(self, race_type, checkpoints, race_title):
-        '''
-        This is a fabric method which create aggregate Race.
-        @param race_type: name of the task type.
-        @type race_type: str
-        @param checkpoints: list of race checkpoints.
-        @type checkpoints: list of Checkpoint
-        @param race_title: this is a title for the race
-        @type race_title: title
-        @return: a new race for contest
-        @rtype: Race
-        '''
-        factory = RaceFactory()
-        race = factory.create_race(race_title, race_type,
-            (self.start_time, self.end_time), self.timezone)
-        # Here Race is created and we start to fill it with useful
-        # information.
-        # TODO: the same for transport and organizers.
-        race = self._fill_race_with_paragliders(race)
-        race.checkpoints = checkpoints
-
-        self.race_ids.append(race.id)
-        return race
-
-
-    def _fill_race_with_paragliders(self, race):
-        '''
-        @param participants: C{{person_id: {role='', contest_number=1,
-        glider='glider'},}}
-        '''
-        for key in self._participants.keys():
-            if self._participants[key]['role'] == 'paraglider':
-                person = persistence.get_repository(IPersonRepository
-                ).get_by_id(key)
-                if person:  # TODO: do this later: and person.tracker:
-                    race.paragliders[
-                        self._participants[key]['contest_number']] = Paraglider(
-                        key,
-                        person.name,
-                        person.country,
-                        self._participants[key]['glider'],
-                        self._participants[key]['contest_number'],
-                        person.tracker)
-        return race
+    def add_race_id(self, race_id):
+        self.race_ids.append(race_id)
 
     def change_participant_data(self, person_id, **kwargs):
         if not kwargs:

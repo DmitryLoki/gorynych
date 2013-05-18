@@ -169,46 +169,6 @@ class ContestTestWithRegisteredParagliders(unittest.TestCase):
         self.assertRaises(ValueError, self.cont.change_participant_data,
             'person1', contest_number='757')
 
-    @mock.patch('gorynych.common.infrastructure.persistence.get_repository')
-    def test_new_race(self, patched):
-        patched.return_value = MockedPersonRepository()
-        # cont, cont_id = create_contest(1, 15)
-        # cont.register_paraglider(self.p2_id, 'mantrA 9', '757')
-        # cont.register_paraglider(self.p1_id, 'gIn 9', '747')
-        # person without tracker
-        # cont.register_paraglider(self.p3_id, 'gIn 9', '777')
-
-        ch1 = Checkpoint('A01', Point(42.502, 0.798), 'TO', (2, None), 2)
-        ch2 = Checkpoint('A01', Point(42.502, 0.798), 'ss', (4, 6), 3)
-        ch3 = Checkpoint('B02', Point(1, 2), 'es', radius=3)
-        ch4 = Checkpoint('g10', Point(2, 2), 'goal', (None, 8), 3)
-        race = self.cont.new_race('Speed Run', [ch1, ch2, ch3, ch4], 'task 4')
-
-        ### test Race aggregate ###
-        self.assertEqual(race.type, 'speedrun')
-        self.assertEqual(race.checkpoints, [ch1, ch2, ch3, ch4])
-        self.assertEqual(race.title, 'Task 4')
-        self.assertTupleEqual((1, 15), race.timelimits)
-        self.assertTupleEqual((race.start_time, race.end_time), (2, 8))
-        self.assertEqual(race.timezone, self.cont.timezone)
-        self.assertIsNone(race.bearing)
-
-        ### test Contest aggregate ###
-        self.assertEqual(len(self.cont.race_ids), 1)
-        self.assertIsInstance(self.cont.race_ids[0], RaceID)
-
-        self.assertEqual(len(race.paragliders), 2)
-        p1 = race.paragliders[747]
-        p2 = race.paragliders[757]
-        self.assertEqual((str(p1.person_id), p1.name,
-                          p1.glider,
-                          p1.country),
-            (self.p1_id, 'N. Surname', 'gin', 'RU'))
-        self.assertEqual((str(p2.person_id), p2.name,
-                          p2.glider,
-                          p2.country),
-            (self.p2_id, 'N. Surname', 'mantra', 'RU'))
-
 
 class ParagliderTest(unittest.TestCase):
     def test_success_creation(self):

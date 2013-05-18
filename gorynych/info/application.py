@@ -11,11 +11,12 @@ from twisted.python import log
 from gorynych.info.domain import contest, person, race
 from gorynych.common.infrastructure import persistence
 from gorynych.common.domain.types import checkpoint_from_geojson
+from gorynych.info.domain import events
 
 GET_EVENTS = """
     SELECT e.event_name, e.aggregate_id, e.event_payload, e.event_id
     FROM events e, dispatch d
-    WHERE event_name = %s AND e.event_id = d.event_id;
+    WHERE event_name = %s OR event_name = %s AND e.event_id = d.event_id;
     """
 
 EVENT_DISPATCHED = """
@@ -104,13 +105,15 @@ class ApplicationService(Service):
         self.event_poller = task.LoopingCall(self.poll_for_events)
 
     def poll_for_events(self):
-        log.msg("polling")
-        d = self.pool.runQuery(GET_EVENTS, ('TrackAddedToRace',))
+        # log.msg("polling")
+        d = self.pool.runQuery(GET_EVENTS, ('TrackAddedToRace',
+                                            'ContestRaceCreated'))
         d.addCallback(self.process_events)
-        return d.addCallback(lambda _:self.event_poller.stop())
+        return d
 
     def process_events(self, events):
         while events:
+            # TODO: rewrite
             name, aggrid, payload, event_id = events.pop()
             reactor.callLater(0, getattr(self, 'process_'+str(name)),
                               aggrid, payload, event_id)
@@ -138,8 +141,22 @@ class ApplicationService(Service):
         log.msg("Inserting track %s for race" % track_id)
         yield self.pool.runOperation(ADD_TRACK_TO_RACE, (1, contest_number,
                                                        track_id))
-        yield self.pool.runOperation(
-            "DELETE FROM dispatch WHERE event_id=%s", (event_id,))
+        yield self.pool.runOperation(EVENT_DISPATCHED, (event_id,))
+
+    def process_ContestRaceCreated(self, aggrid, payload, event_id):
+        # TODO: rewrite
+        log.msg("ContestRaceCreated event %s %s %s" %
+                (aggrid, payload, event_id))
+        d = self._get_aggregate(contest.ContestID.fromstring(aggrid),
+                                contest.IContestRepository)
+        d.addCallback(lambda cont: (cont.race_ids.append(
+            race.RaceID.fromstring(payload)), cont)[1])
+        d.addCallback(persistence.get_repository(contest.IContestRepository)
+            .save)
+        d.addCallback(lambda _:self.pool.runOperation(EVENT_DISPATCHED,
+                                                      (event_id,)))
+        return d
+
 
     def startService(self):
         log.msg("Starting DB pool.")
@@ -332,11 +349,24 @@ class ApplicationService(Service):
     def create_new_race_for_contest(self, params):
         cont = yield self._get_aggregate(params['contest_id'],
                                 contest.IContestRepository)
-        r = yield cont.new_race(params['race_type'], params['checkpoints'],
-                      params['title'])
+        paragliders = cont.paragliders
+        plist = []
+        for key in paragliders:
+            pers = yield self._get_aggregate(key, person.IPersonRepository)
+            plist.append(contest.Paraglider(key, pers.name, pers.country,
+                         paragliders[key]['glider'],
+                         paragliders[key]['contest_number'], pers.tracker))
+
+        factory = race.RaceFactory()
+        r = factory.create_race(params['title'], params['race_type'],
+                                   cont.timezone, plist,
+                                   params['checkpoints'])
+        # TODO: do it transactionally.
+        yield persistence.event_store().persist(events.ContestRaceCreated(
+            cont.id, r.id))
         yield persistence.get_repository(race.IRaceRepository).save(r)
-        yield persistence.get_repository(contest.IContestRepository).save(
-            cont)
+        # yield persistence.get_repository(contest.IContestRepository).save(
+        #     cont)
         defer.returnValue(r)
 
     def get_contest_races(self, params):

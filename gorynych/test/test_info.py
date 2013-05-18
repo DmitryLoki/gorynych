@@ -2,9 +2,11 @@
 Tests for info context.
 '''
 import json
-import requests
+import time
 
+import requests
 import unittest
+
 from gorynych.info.domain.test.helpers import create_checkpoints
 
 URL = 'http://localhost:8085'
@@ -58,7 +60,6 @@ def register_paraglider(pers_id, cont_id):
     r = requests.post('/'.join((URL, 'contest', cont_id,
                                 'paraglider')), data=params)
     if not r.status_code == 201:
-        print r.text
         raise Exception
     return r
 
@@ -137,9 +138,12 @@ class PersonAPITest(unittest.TestCase):
         params = dict(name='Vasylyi', surname='Doe', country='SS',
             email='vasya@example.com', reg_date='2012,12,12')
         r = requests.post(self.url, data=params)
+        time.sleep(1)
         result = r.json()
         self.assertEqual(r.status_code, 201)
-        r2 = requests.get(self.url+result['id'])
+        link = self.url + result['id']
+        r2 = requests.get(link)
+        self.assertEqual(r2.status_code, 200)
         self.assertEqual(r2.json()['id'], result['id'])
 
     def test_3_get_person(self):
@@ -227,6 +231,7 @@ class ContestRaceTest(unittest.TestCase):
                                        'end_time': '1347732000'}, r.json())
 
         # Test GET /contest/{id}/race
+        time.sleep(1)
         r = requests.get('/'.join((URL, 'contest', c_id, 'race')))
         self.assertEqual(r.status_code, 200)
         self.assertIsInstance(r.json(), list)

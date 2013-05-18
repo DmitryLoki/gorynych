@@ -44,6 +44,20 @@ class PGSQLPersonRepository(object):
 #        result = self._insert_tracks(result, tracks_data)
         defer.returnValue(result)
 
+    @defer.inlineCallbacks
+    def get_list(self, limit=20, offset=None):
+        result = []
+        command = "select person_id from person"
+        if limit:
+            command += ' limit ' + str(limit)
+        if offset:
+            command += ' offset ' + str(offset)
+        ids = yield self.pool.runQuery(command)
+        for idx, pid in enumerate(ids):
+            pers = yield self.get_by_id(pid[0])
+            result.append(pers)
+        defer.returnValue(result)
+
     def _create_person(self, data_row):
         if data_row:
             # regdate is datetime.datetime object
@@ -96,7 +110,7 @@ class PGSQLRaceRepository(object):
     @defer.inlineCallbacks
     def get_list(self, limit=20, offset=None):
         result = []
-        command = "select id from race"
+        command = "select contest_id from race"
         if limit:
             command += ' limit ' + str(limit)
         if offset:
@@ -269,7 +283,7 @@ class PGSQLContestRepository(object):
     @defer.inlineCallbacks
     def get_list(self, limit=20, offset=None):
         result = []
-        command = "select id from contest"
+        command = "select contest_id from contest"
         if limit:
             command += ' limit ' + str(limit)
         if offset:

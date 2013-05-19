@@ -42,6 +42,7 @@ class RaceToGoalTask(RaceTask):
 
 class OpenDistanceTask(RaceTask):
     type = 'opendistance'
+    bearing = None
 
 
 RACETASKS = {'speedrun': SpeedRunTask,
@@ -52,7 +53,7 @@ RACETASKS = {'speedrun': SpeedRunTask,
 class RaceFactory(object):
 
     def create_race(self, title, race_type, timezone,
-                    paragliders, checkpoints, race_id=None):
+                    paragliders, checkpoints, **kw):
         '''
 
         @param title:
@@ -72,10 +73,10 @@ class RaceFactory(object):
         @return:
         @rtype:
         '''
-        if not race_id:
+        if not kw.has_key('race_id'):
             race_id = RaceID()
-        elif isinstance(race_id, str):
-            race_id = RaceID.fromstring(race_id)
+        elif isinstance(kw['race_id'], str):
+            race_id = RaceID.fromstring(kw['race_id'])
         race = Race(race_id)
         race_type = ''.join(race_type.strip().lower().split())
         if race_type in RACETASKS.keys():
@@ -86,6 +87,8 @@ class RaceFactory(object):
         race.timezone = timezone
         race = self._fill_with_paragliders(race, paragliders)
         race.checkpoints = checkpoints
+        if race_type == 'opendistance':
+            race.task.bearing = kw['bearing']
 
         return race
 
@@ -148,6 +151,13 @@ class Race(AggregateRoot):
         except AttributeError:
             pass
         return result
+
+    @bearing.setter
+    def bearing(self, value):
+        if not self.type == 'opendistance':
+            raise TypeError("Bearing can't be set for race type %s" % race
+            .type)
+        self.task.bearing = int(value)
 
     @property
     def start_time(self):

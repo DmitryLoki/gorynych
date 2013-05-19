@@ -358,7 +358,8 @@ class ApplicationService(Service):
         factory = race.RaceFactory()
         r = factory.create_race(params['title'], params['race_type'],
                                    cont.timezone, plist,
-                                   params['checkpoints'])
+                                   params['checkpoints'],
+                                   bearing=params.get('bearing'))
         # TODO: do it transactionally.
         yield persistence.event_store().persist(events.ContestRaceCreated(
             cont.id, r.id))
@@ -407,6 +408,7 @@ class ApplicationService(Service):
         '''
         def change(r):
             if params.has_key('checkpoints'):
+                # TODO: make in thinner
                 ch_list = json.loads(params['checkpoints'])['features']
                 checkpoints = []
                 for ch in ch_list:
@@ -414,6 +416,8 @@ class ApplicationService(Service):
                 r.checkpoints = checkpoints
             if params.has_key('race_title'):
                 r.title = params['race_title']
+            if params.has_key('bearing'):
+                r.bearing = params['bearing']
             return r
 
         d = self._get_aggregate(params['race_id'], race.IRaceRepository)

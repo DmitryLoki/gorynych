@@ -1,6 +1,8 @@
 '''
 Realization of persistence logic.
 '''
+import simplejson as json
+
 from twisted.internet import defer
 from zope.interface import implements
 
@@ -110,7 +112,7 @@ class PGSQLRaceRepository(object):
     @defer.inlineCallbacks
     def get_list(self, limit=20, offset=None):
         result = []
-        command = "select contest_id from race"
+        command = "select race_id from race"
         if limit:
             command += ' limit ' + str(limit)
         if offset:
@@ -137,11 +139,14 @@ class PGSQLRaceRepository(object):
 
     def _create_race(self, race_data, paragliders_row):
         # TODO: repository knows too much about Race's internals. Think about it
-        i, rid, t, st, et, tz, rt, _chs = race_data
+        i, rid, t, st, et, tz, rt, _chs, _aux = race_data
         ps = create_participants(paragliders_row)
         chs = checkpoint_collection_from_geojson(_chs)
 
-        result = self.factory.create_race(t, rt, tz, ps, chs, rid)
+        aux = json.loads(_aux)
+        b = aux.get('bearing')
+        result = self.factory.create_race(t, rt, tz, ps, chs, race_id=rid,
+                                          bearing=b)
         result._start_time = st
         result._end_time = et
         result._id = long(i)
@@ -199,10 +204,13 @@ class PGSQLRaceRepository(object):
 
     def _get_values_from_obj(self, obj):
         result = dict()
+        bearing = None
+        if obj.type == 'opendistance':
+            bearing = json.dumps(dict(bearing = int(obj.task.bearing)))
         result['race'] = (obj.title, obj.start_time, obj.end_time,
                           obj.timezone, obj.type,
                           geojson_feature_collection(obj.checkpoints),
-                          str(obj.id))
+                          bearing, str(obj.id))
         result['paragliders'] = []
         for key in obj.paragliders:
             p = obj.paragliders[key]

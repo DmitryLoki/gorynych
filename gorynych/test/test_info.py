@@ -64,7 +64,6 @@ def register_paraglider(pers_id, cont_id):
     return r
 
 
-
 class RESTAPITest(unittest.TestCase):
     '''
     REST API must be started and running before tests.
@@ -223,12 +222,13 @@ class ContestRaceTest(unittest.TestCase):
 
         chs = create_geojson_checkpoints()
         r = create_race(c_id, chs)
-        race_id = r.json()['id']
         self.assertEqual(r.status_code, 201)
+        race_id = r.json()['id']
         self.assertDictContainsSubset({'type':'opendistance',
                                        'title':'Task 8',
                                        'start_time': '1347711300',
-                                       'end_time': '1347732000'}, r.json())
+                                       'end_time': '1347732000'
+                                       }, r.json())
 
         # Test GET /contest/{id}/race
         time.sleep(1)
@@ -244,8 +244,8 @@ class ContestRaceTest(unittest.TestCase):
         r = requests.get('/'.join((URL, 'contest', c_id, 'race', race_id)))
         result = r.json()
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(result['checkpoints'],
-                         json.loads(chs))
+        self.assertEqual(result['bearing'], '12')
+        self.assertEqual(result['checkpoints'], json.loads(chs))
         self.assertEqual(result['race_title'], 'Task 8')
         self.assertEqual(result['timezone'], 'Europe/Paris')
 
@@ -254,12 +254,13 @@ class ContestRaceTest(unittest.TestCase):
         new_ch_list[0].name = 'HAHA'
         for i, item in enumerate(new_ch_list):
             new_ch_list[i] = item.__geo_interface__
-        params = dict(race_title='Changed race', checkpoints=json.dumps(
-            {'type': 'FeatureCollection', 'features': new_ch_list}))
+        params = dict(race_title='Changed race', bearing=8, checkpoints=json
+            .dumps({'type': 'FeatureCollection', 'features': new_ch_list}))
         r = requests.put('/'.join((URL, 'contest', c_id, 'race', race_id)),
                          data=json.dumps(params))
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['race_title'], 'Changed Race')
+        self.assertEqual(r.json()['bearing'], '8')
         self.assertEqual(r.json()['checkpoints']['features'],
                          json.loads(json.dumps(new_ch_list)))
 

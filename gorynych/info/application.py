@@ -16,7 +16,7 @@ from gorynych.info.domain import events
 GET_EVENTS = """
     SELECT e.event_name, e.aggregate_id, e.event_payload, e.event_id
     FROM events e, dispatch d
-    WHERE event_name = %s OR event_name = %s AND e.event_id = d.event_id;
+    WHERE event_name = %s AND e.event_id = d.event_id;
     """
 
 EVENT_DISPATCHED = """
@@ -106,8 +106,7 @@ class ApplicationService(Service):
 
     def poll_for_events(self):
         # log.msg("polling")
-        d = self.pool.runQuery(GET_EVENTS, ('TrackAddedToRace',
-                                            'ContestRaceCreated'))
+        d = self.pool.runQuery(GET_EVENTS, ('TrackAddedToRace',))
         d.addCallback(self.process_event_list)
         return d
 
@@ -142,21 +141,6 @@ class ApplicationService(Service):
         yield self.pool.runOperation(ADD_TRACK_TO_RACE, (1, contest_number,
                                                        track_id))
         yield self.pool.runOperation(EVENT_DISPATCHED, (event_id,))
-
-    def process_ContestRaceCreated(self, aggrid, payload, event_id):
-        # TODO: rewrite
-        log.msg("ContestRaceCreated event %s %s %s" %
-                (aggrid, payload, event_id))
-        d = self._get_aggregate(contest.ContestID.fromstring(aggrid),
-                                contest.IContestRepository)
-        d.addCallback(lambda cont: (cont.race_ids.append(
-            race.RaceID.fromstring(payload)), cont)[1])
-        d.addCallback(persistence.get_repository(contest.IContestRepository)
-            .save)
-        d.addCallback(lambda _:self.pool.runOperation(EVENT_DISPATCHED,
-                                                      (event_id,)))
-        return d
-
 
     def startService(self):
         log.msg("Starting DB pool.")

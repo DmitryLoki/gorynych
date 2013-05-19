@@ -19,12 +19,12 @@ class EventStore(object):
     def load_events(self, id):
         '''
 
-        @param id:
-        @type id:
-        @return:
-        @rtype: C{EventStream} subclass.
+        @param id: identificator of aggregate for which to load events.
+        @type id: C{DomainIdentifier} subclass.
+        @return: list of events.
+        @rtype: C{list}.
         '''
-        d = self.store.load_events(id)
+        d = self.store.load_events(str(id))
         return d.addCallback(self._construct_event_list)
 
     def _construct_event_list(self, stored_events):

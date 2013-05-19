@@ -149,5 +149,9 @@ class AggregateRootTest(unittest.TestCase):
         ar.apply([de])
         ar.apply_DomainEvent.assert_called_once_with(de)
 
+    def test_apply_none(self):
+        ar = model.AggregateRoot()
+        ar.apply(None)
+
 if __name__ == '__main__':
     unittest.main()

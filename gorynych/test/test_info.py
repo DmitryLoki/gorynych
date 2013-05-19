@@ -17,6 +17,8 @@ def create_contest(title='Contest with paragliders'):
         place = 'La France', country='ru',
         hq_coords='43.3,23.1', timezone='Europe/Paris')
     r = requests.post(URL + '/contest', data=params)
+    if not r.status_code == 201:
+        print r.text
     return r.json()['id']
 
 

@@ -39,7 +39,7 @@ INSERT_INTO_EVENTS = """
 READ_EVENTS = """
     SELECT * FROM {events_table}
       WHERE AGGREGATE_ID = %s
-      ORDER BY EVENT_ID;
+      ORDER BY OCCURED_ON ASC;
     """
 
 CREATE_TRIGGER = """
@@ -121,7 +121,7 @@ class PGSQLAppendOnlyStore(object):
         @param aggregate_id:
         @type aggregate_id:
         @return:
-        @rtype:
+        @rtype: C{list}
         '''
         return self.pool.runQuery(READ_EVENTS.format(
                             events_table=EVENTS_TABLE), (aggregate_id,))

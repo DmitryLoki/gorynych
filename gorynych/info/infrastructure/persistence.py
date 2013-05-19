@@ -40,10 +40,6 @@ class PGSQLPersonRepository(object):
         if not data:
             raise NoAggregate("Person")
         result = self._create_person(data[0])
-
-#        tracks_data = yield self.pool.runQuery(SQL_GET_PERSON_TRACKS.format(
-#        tracks_table=TRACKS_TABLE), (person_id,))
-#        result = self._insert_tracks(result, tracks_data)
         defer.returnValue(result)
 
     @defer.inlineCallbacks
@@ -234,6 +230,8 @@ class PGSQLContestRepository(object):
             raise NoAggregate("Contest")
         cont = self._create_contest_from_data(rows[0])
         cont = yield self._append_data_to_contest(cont)
+        event_list = yield pe.event_store().load_events(cont.id)
+        cont.apply(event_list)
         defer.returnValue(cont)
 
     @defer.inlineCallbacks
@@ -242,11 +240,6 @@ class PGSQLContestRepository(object):
                     pe.select('participants', 'contest'), (cont._id,))
         if participants:
             cont = self._add_participants_to_contest(cont, participants)
-        races = yield self.pool.runQuery(pe.select('race', 'contest'),
-                                         (cont._id,))
-        if races:
-            for race_id in races:
-                cont.race_ids.append(race_id[0])
         defer.returnValue(cont)
 
     def _create_contest_from_data(self, row):
@@ -397,5 +390,5 @@ class PGSQLContestRepository(object):
                    key.__class__.__name__.lower()[:-2]]
             result['participants'].append(row)
 
-        result['race_ids'] = obj.race_ids[::]
+        result['race_ids'] = list(obj.race_ids)
         return result

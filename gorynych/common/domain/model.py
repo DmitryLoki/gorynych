@@ -7,6 +7,7 @@ import simplejson as json
 
 
 from zope.interface import implementer
+from zope.interface.verify import verifyObject
 
 from gorynych.eventstore.interfaces import IEvent
 
@@ -92,6 +93,19 @@ class AggregateRoot(object):
     Base class for aggregate roots.
     '''
     _id = None
+
+    def apply(self, elist):
+        '''
+        Read events list and apply them to self.
+        @param elist: list of events.
+        @type elist: C{list}
+        '''
+        assert isinstance(elist, list), "I expect list not a %s" % type(elist)
+        for ev in elist:
+            if verifyObject(IEvent, ev):
+                evname = ev.__class__.__name__
+                if hasattr(self, 'apply_' + evname):
+                    getattr(self, 'apply_' + evname)(ev)
 
 
 @implementer(IEvent)

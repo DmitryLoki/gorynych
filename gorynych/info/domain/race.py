@@ -42,6 +42,7 @@ class RaceToGoalTask(RaceTask):
 
 class OpenDistanceTask(RaceTask):
     type = 'opendistance'
+    bearing = None
 
 
 RACETASKS = {'speedrun': SpeedRunTask,
@@ -51,10 +52,31 @@ RACETASKS = {'speedrun': SpeedRunTask,
 
 class RaceFactory(object):
 
-    def create_race(self, title, race_type, timelimits, timezone,
-                    race_id=None):
-        if not race_id:
+    def create_race(self, title, race_type, timezone,
+                    paragliders, checkpoints, **kw):
+        '''
+
+        @param title:
+        @type title:
+        @param race_type:
+        @type race_type:
+        @param timelimits:
+        @type timelimits:
+        @param timezone:
+        @type timezone:
+        @param paragliders: list of L{Paragliders}
+        @type paragliders: C{list}
+        @param checkpoints:
+        @type checkpoints:
+        @param race_id:
+        @type race_id:
+        @return:
+        @rtype:
+        '''
+        if not kw.has_key('race_id'):
             race_id = RaceID()
+        elif isinstance(kw['race_id'], str):
+            race_id = RaceID.fromstring(kw['race_id'])
         race = Race(race_id)
         race_type = ''.join(race_type.strip().lower().split())
         if race_type in RACETASKS.keys():
@@ -62,9 +84,21 @@ class RaceFactory(object):
         else:
             raise ValueError("Unknown race type.")
         race.title = title
-        race.timelimits = timelimits
         race.timezone = timezone
+        race = self._fill_with_paragliders(race, paragliders)
+        race.checkpoints = checkpoints
+        if race_type == 'opendistance':
+            race.task.bearing = kw['bearing']
 
+        return race
+
+    def _fill_with_paragliders(self, race, paragliders):
+        '''
+        @param paragliders: list of Paraglider.
+        @type paragliders: C{list}
+        '''
+        for p in paragliders:
+            race.paragliders[p.contest_number] = p
         return race
 
 
@@ -117,6 +151,13 @@ class Race(AggregateRoot):
         except AttributeError:
             pass
         return result
+
+    @bearing.setter
+    def bearing(self, value):
+        if not self.type == 'opendistance':
+            raise TypeError("Bearing can't be set for race type %s" % race
+            .type)
+        self.task.bearing = int(value)
 
     @property
     def start_time(self):
@@ -178,8 +219,14 @@ class Race(AggregateRoot):
             self._rollback_set_checkpoints(old_checkpoints)
             raise e
         self._get_times_from_checkpoints(self._checkpoints)
-        # Notify other systems about checkpoints changing.
-        persistence.event_store().persist(RaceCheckpointsChanged(self.id,
+        # Notify other systems about checkpoints changing if previous
+        # checkpoints existed.
+        if old_checkpoints:
+            print "*"*40
+            print "publish event"
+            print old_checkpoints
+            print self.id, type(self.id)
+            persistence.event_store().persist(RaceCheckpointsChanged(self.id,
                                                                 checkpoints))
 
     def _invariants_are_correct(self):

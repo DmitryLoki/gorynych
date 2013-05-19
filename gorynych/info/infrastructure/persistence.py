@@ -1,6 +1,8 @@
 '''
 Realization of persistence logic.
 '''
+import simplejson as json
+
 from twisted.internet import defer
 from zope.interface import implements
 
@@ -16,11 +18,11 @@ from gorynych.common.infrastructure import persistence as pe
 def create_participants(paragliders_row):
     result = dict()
     if paragliders_row:
-        result['paragliders'] = dict()
+        result = list()
         for tup in paragliders_row:
             _id, pid, cn , co, gl, ti, n, sn = tup
-            result['paragliders'][cn] = Paraglider(pid, Name(n, sn), co,
-                                                   gl, cn, ti)
+            result.append(Paraglider(pid, Name(n, sn), co,
+                                                   gl, cn, ti))
     return result
 
 
@@ -44,6 +46,20 @@ class PGSQLPersonRepository(object):
 #        result = self._insert_tracks(result, tracks_data)
         defer.returnValue(result)
 
+    @defer.inlineCallbacks
+    def get_list(self, limit=20, offset=None):
+        result = []
+        command = "select person_id from person"
+        if limit:
+            command += ' limit ' + str(limit)
+        if offset:
+            command += ' offset ' + str(offset)
+        ids = yield self.pool.runQuery(command)
+        for idx, pid in enumerate(ids):
+            pers = yield self.get_by_id(pid[0])
+            result.append(pers)
+        defer.returnValue(result)
+
     def _create_person(self, data_row):
         if data_row:
             # regdate is datetime.datetime object
@@ -59,22 +75,6 @@ class PGSQLPersonRepository(object):
                 data_row[5])
             result._id = data_row[6]
             return result
-
-#    def _insert_tracks(self, person, tracks):
-#        # Not ready yet.
-#        return person
-
-#    @defer.inlineCallbacks
-#    def get_list(self, limit=None, offset=0):
-#        # TODO: limit and offset
-#        pers_list = yield self.pool.runQuery(SQL_GET_PERSON_LIST.format(
-#                        person_table=PERSON_TABLE))
-#        result = []
-#        for pers in pers_list:
-#            pers = self._create_person(pers)
-#            if pers:
-#                result.append(pers)
-#        defer.returnValue(result)
 
     def save(self, pers):
         d = None
@@ -112,7 +112,7 @@ class PGSQLRaceRepository(object):
     @defer.inlineCallbacks
     def get_list(self, limit=20, offset=None):
         result = []
-        command = "select id from race"
+        command = "select race_id from race"
         if limit:
             command += ' limit ' + str(limit)
         if offset:
@@ -139,15 +139,17 @@ class PGSQLRaceRepository(object):
 
     def _create_race(self, race_data, paragliders_row):
         # TODO: repository knows too much about Race's internals. Think about it
-        i, rid, t, st, et, mst, met, tz, rt, chs = race_data
-        participants = create_participants(paragliders_row)
+        i, rid, t, st, et, tz, rt, _chs, _aux = race_data
+        ps = create_participants(paragliders_row)
+        chs = checkpoint_collection_from_geojson(_chs)
 
-        result = self.factory.create_race(t, rt, (mst, met), tz, rid)
+        aux = json.loads(_aux)
+        b = aux.get('bearing')
+        result = self.factory.create_race(t, rt, tz, ps, chs, race_id=rid,
+                                          bearing=b)
         result._start_time = st
         result._end_time = et
-        result._checkpoints = checkpoint_collection_from_geojson(chs)
         result._id = long(i)
-        result.paragliders = participants['paragliders']
         return result
 
     @defer.inlineCallbacks
@@ -159,19 +161,15 @@ class PGSQLRaceRepository(object):
             return _list
 
         def save_new(cur):
-            d = cur.execute(pe.insert('race'), values['race'])
-            d.addCallback(lambda cur:cur.fetchone())
-            d.addCallback(lambda x:
-                ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s, %s)",
-                     (insert_id(x[0], p))) for p in values['paragliders']))
-            d.addCallback(lambda pq:
-                cur.execute("INSERT INTO paraglider VALUES " + pq +
-                            "RETURNING ID;"))
-            d.addCallback(lambda cur: cur.fetchone())
-            return d
+            cur.execute(pe.insert('race'), values['race'])
+            x = cur.fetchone()
+            pq = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s, %s)",
+                     (insert_id(x[0], p))) for p in values['paragliders'])
+            cur.execute("INSERT INTO paraglider VALUES " + pq)
+            return x
 
         def update(cur, pgs):
-            d = cur.execute(pe.update('race'), values['race'])
+            cur.execute(pe.update('race'), values['race'])
 
             inobj = values['paragliders']
             indb = pgs
@@ -182,16 +180,13 @@ class PGSQLRaceRepository(object):
             to_delete = set(indb).difference(set(inobj))
             if to_delete:
                 ids = tuple([x[1] for x in to_delete])
-                d.addCallback(lambda _:
                 cur.execute("DELETE FROM paraglider WHERE id=%s "
-                            "AND person_id in %s", (obj._id, ids)))
+                            "AND person_id in %s", (obj._id, ids))
             if to_insert:
                 q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s, %s)",
                                          (pitem)) for pitem in to_insert)
-                d.addCallback(lambda _:
-                        cur.execute("INSERT into paraglider values " + q))
-                d.addCallback(lambda _: obj)
-                return d
+                cur.execute("INSERT into paraglider values " + q)
+            return obj
 
 
         if obj._id:
@@ -209,11 +204,13 @@ class PGSQLRaceRepository(object):
 
     def _get_values_from_obj(self, obj):
         result = dict()
+        bearing = None
+        if obj.type == 'opendistance':
+            bearing = json.dumps(dict(bearing = int(obj.task.bearing)))
         result['race'] = (obj.title, obj.start_time, obj.end_time,
-                          obj.timelimits[0], obj.timelimits[1],
                           obj.timezone, obj.type,
                           geojson_feature_collection(obj.checkpoints),
-                          str(obj.id))
+                          bearing, str(obj.id))
         result['paragliders'] = []
         for key in obj.paragliders:
             p = obj.paragliders[key]
@@ -294,7 +291,7 @@ class PGSQLContestRepository(object):
     @defer.inlineCallbacks
     def get_list(self, limit=20, offset=None):
         result = []
-        command = "select id from contest"
+        command = "select contest_id from contest"
         if limit:
             command += ' limit ' + str(limit)
         if offset:
@@ -317,35 +314,26 @@ class PGSQLContestRepository(object):
             Save just created contest.
             '''
 
-            d = cur.execute(pe.insert('contest'), values['contest'])
-            d.addCallback(lambda cur: cur.fetchone())
+            i = cur.execute(pe.insert('contest'), values['contest'])
+            x = cur.fetchone()
 
 
             if values['participants']:
                 # Callbacks wan't work in for loop, so i insert multiple values
                 # in one query.
-                # Oh yes, executemanu also wan't work in asynchronous mode.
-                d.addCallback(lambda x:
-                    ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s)",
-                       (insert_id(x[0], p))) for p in values['participants']))
-                d.addCallback(lambda q:
-                  cur.execute("INSERT into participant values " + q +
-                              "RETURNING id;"))
-                d.addCallback(lambda cur: cur.fetchone())
+                # Oh yes, executemany also wan't work in asynchronous mode.
+                q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s)",
+                       (insert_id(x[0], p))) for p in values['participants'])
+                cur.execute("INSERT into participant values " + q)
 
             if values['race_ids']:
-                d.addCallback(lambda x:
-                    ','.join(cur.mogrify("(%s, %s)",
-                             (x[0], str(p))) for p in values['race_ids']))
-                d.addCallback(lambda q:
-                    cur.execute("INSERT into contest_race values " + q + ""
-                                                 "RETURNING ID;"))
-            d.addCallback(lambda cur: cur.fetchone())
-            return d
+                q = ','.join(cur.mogrify("(%s, %s)",
+                             (x[0], str(p))) for p in values['race_ids'])
+                cur.execute("INSERT into contest_race values " + q)
+            return x
 
         def update(cur, prts, rids):
-            d = cur.execute(pe.update('contest'), values['contest'])
-            # print values
+            cur.execute(pe.update('contest'), values['contest'])
             if values['participants'] or prts:
                 inobj = values['participants']
                 indb = prts
@@ -356,14 +344,12 @@ class PGSQLContestRepository(object):
                 to_delete = set(indb).difference(set(inobj))
                 if to_delete:
                     ids = tuple([x[1] for x in to_delete])
-                    d.addCallback(lambda _:
-                        cur.execute("DELETE FROM participant WHERE id=%s "
-                            "AND participant_id in %s", (obj._id, ids)))
+                    cur.execute("DELETE FROM participant WHERE id=%s "
+                            "AND participant_id in %s", (obj._id, ids))
                 if to_insert:
                     q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s)",
                                     (pitem)) for pitem in to_insert)
-                    d.addCallback(lambda _:
-                        cur.execute("INSERT into participant values " + q))
+                    cur.execute("INSERT into participant values " + q)
 
             if values['race_ids'] or rids:
                 inobj = values['race_ids']
@@ -374,17 +360,14 @@ class PGSQLContestRepository(object):
                 to_delete = set(indb).difference(set(inobj))
                 if to_delete:
                     rids = tuple([x[0] for x in to_delete])
-                    d.addCallback(lambda _:
-                     cur.execute("DELETE FROM contest_race WHERE id=%s AND "
-                                 "race_id in %s", (obj._id, rids)))
+                    cur.execute("DELETE FROM contest_race WHERE id=%s AND "
+                                 "race_id in %s", (obj._id, rids))
                 if to_insert:
                     rq = ','.join(cur.mogrify("(%s, %s)",
                                              (ritem)) for ritem in to_insert)
-                    d.addCallback(lambda _:
-                    cur.execute("INSERT into contest_race values " + rq))
+                    cur.execute("INSERT into contest_race values " + rq)
 
-            d.addCallback(lambda _:obj)
-            return d
+            return obj
 
         result = None
         if obj._id:

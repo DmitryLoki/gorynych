@@ -57,3 +57,9 @@ class TrackerUnAssigned(DomainEvent):
     unassigned.
     @param payload: id of Tracker aggregate.
     '''
+
+class ContestRaceCreated(DomainEvent):
+    '''
+    Fired with RaceID as payload for Contest aggregate
+    '''
+    serializer = serializers.DomainIdentifierSerializer('RaceID')

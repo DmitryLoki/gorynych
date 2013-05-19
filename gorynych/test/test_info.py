@@ -2,9 +2,11 @@
 Tests for info context.
 '''
 import json
-import requests
+import time
 
+import requests
 import unittest
+
 from gorynych.info.domain.test.helpers import create_checkpoints
 
 URL = 'http://localhost:8085'
@@ -58,10 +60,8 @@ def register_paraglider(pers_id, cont_id):
     r = requests.post('/'.join((URL, 'contest', cont_id,
                                 'paraglider')), data=params)
     if not r.status_code == 201:
-        print r.text
         raise Exception
     return r
-
 
 
 class RESTAPITest(unittest.TestCase):
@@ -137,9 +137,12 @@ class PersonAPITest(unittest.TestCase):
         params = dict(name='Vasylyi', surname='Doe', country='SS',
             email='vasya@example.com', reg_date='2012,12,12')
         r = requests.post(self.url, data=params)
+        time.sleep(1)
         result = r.json()
         self.assertEqual(r.status_code, 201)
-        r2 = requests.get(self.url+result['id'])
+        link = self.url + result['id']
+        r2 = requests.get(link)
+        self.assertEqual(r2.status_code, 200)
         self.assertEqual(r2.json()['id'], result['id'])
 
     def test_3_get_person(self):
@@ -219,14 +222,16 @@ class ContestRaceTest(unittest.TestCase):
 
         chs = create_geojson_checkpoints()
         r = create_race(c_id, chs)
-        race_id = r.json()['id']
         self.assertEqual(r.status_code, 201)
+        race_id = r.json()['id']
         self.assertDictContainsSubset({'type':'opendistance',
                                        'title':'Task 8',
                                        'start_time': '1347711300',
-                                       'end_time': '1347732000'}, r.json())
+                                       'end_time': '1347732000'
+                                       }, r.json())
 
         # Test GET /contest/{id}/race
+        time.sleep(1)
         r = requests.get('/'.join((URL, 'contest', c_id, 'race')))
         self.assertEqual(r.status_code, 200)
         self.assertIsInstance(r.json(), list)
@@ -239,8 +244,8 @@ class ContestRaceTest(unittest.TestCase):
         r = requests.get('/'.join((URL, 'contest', c_id, 'race', race_id)))
         result = r.json()
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(result['checkpoints'],
-                         json.loads(chs))
+        self.assertEqual(result['bearing'], '12')
+        self.assertEqual(result['checkpoints'], json.loads(chs))
         self.assertEqual(result['race_title'], 'Task 8')
         self.assertEqual(result['timezone'], 'Europe/Paris')
 
@@ -249,12 +254,13 @@ class ContestRaceTest(unittest.TestCase):
         new_ch_list[0].name = 'HAHA'
         for i, item in enumerate(new_ch_list):
             new_ch_list[i] = item.__geo_interface__
-        params = dict(race_title='Changed race', checkpoints=json.dumps(
-            {'type': 'FeatureCollection', 'features': new_ch_list}))
+        params = dict(race_title='Changed race', bearing=8, checkpoints=json
+            .dumps({'type': 'FeatureCollection', 'features': new_ch_list}))
         r = requests.put('/'.join((URL, 'contest', c_id, 'race', race_id)),
                          data=json.dumps(params))
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['race_title'], 'Changed Race')
+        self.assertEqual(r.json()['bearing'], '8')
         self.assertEqual(r.json()['checkpoints']['features'],
                          json.loads(json.dumps(new_ch_list)))
 

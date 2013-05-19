@@ -162,7 +162,7 @@ class ContestRepositoryTest(unittest.TestCase):
         except:
             pass
         self.repo.pool.runQuery.assert_called_once_with(
-            'select id from contest limit 20 offset 1')
+            'select contest_id from contest limit 20 offset 1')
 
     def _prepare_participants(self, p_rows):
         participants = dict()

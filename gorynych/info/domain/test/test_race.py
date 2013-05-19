@@ -2,12 +2,47 @@ import unittest
 
 import mock
 
+from gorynych.common.domain.types import Name
 from gorynych.info.domain.test.helpers import create_checkpoints
-from gorynych.info.domain import race
+from gorynych.info.domain import race, contest
 from gorynych.common.exceptions import BadCheckpoint
 from gorynych.info.domain.events import RaceCheckpointsChanged, ArchiveURLReceived
-from gorynych.info.domain.ids import RaceID
+from gorynych.info.domain.ids import RaceID, PersonID
 
+
+class RaceFactoryTest(unittest.TestCase):
+    def test_create_new_race(self):
+        factory = race.RaceFactory()
+        chs = create_checkpoints()
+        pid1 = PersonID()
+        pid2 = PersonID()
+        rid = str(RaceID())
+        pg1 = contest.Paraglider(pid1, Name("vasya", 'pupkin'), 'RU', 'gl1', '0')
+        pg2 = contest.Paraglider(pid2, Name("fedya", 'pupkin'), 'RU', 'gl2',
+                                 '2')
+        r = factory.create_race('task 4', 'Speed Run', 'Europe/Amsterdam',
+                                [pg1, pg2], chs, race_id=rid)
+
+        self.assertEqual(r.type, 'speedrun')
+        self.assertEqual(r.checkpoints, chs)
+        self.assertEqual(r.title, 'Task 4')
+        self.assertEqual(r.timezone, 'Europe/Amsterdam')
+        self.assertTupleEqual((r.start_time, r.end_time),
+                              (1347711300, 1347732000))
+        self.assertIsNone(r.bearing)
+        self.assertIsNone(r._id)
+        self.assertIsInstance(r.id, RaceID)
+        self.assertEqual(r.id,  RaceID.fromstring(rid))
+
+        self.assertEqual(len(r.paragliders), 2)
+        p1 = r.paragliders['0']
+        p2 = r.paragliders['2']
+        self.assertTupleEqual(
+            (p1.person_id, p1.country, p1.glider, p1.contest_number, p1.name),
+            (pid1, 'RU', 'gl1', '0', 'V. Pupkin'))
+        self.assertTupleEqual(
+            (p2.person_id, p2.country, p2.glider, p2.contest_number, p2.name),
+            (pid2, 'RU', 'gl2', '2', 'F. Pupkin'))
 
 class RaceTest(unittest.TestCase):
 
@@ -47,8 +82,8 @@ class RaceTest(unittest.TestCase):
         self.race.task = race.OpenDistanceTask()
         good_checkpoints = create_checkpoints()
         self.race.checkpoints = good_checkpoints
-        event_store.persist.assert_called_once_with(
-            RaceCheckpointsChanged(self.race.id, good_checkpoints))
+        assert not event_store.persist.called, "Event was fired but " \
+                                               "shouldn't be."
 
     @mock.patch('gorynych.common.infrastructure.persistence.event_store')
     def test_rollback_checkpoints(self, patched):
@@ -66,8 +101,8 @@ class RaceTest(unittest.TestCase):
         except:
             pass
         self.assertEqual(self.race._checkpoints, good_checkpoints)
-        event_store.persist.assert_called_once_with(
-            RaceCheckpointsChanged(self.race.id, good_checkpoints))
+        assert not event_store.persist.called, "Event was fired but " \
+                                               "shouldn't be."
 
     def test_get_times_from_checkpoints(self):
         chs = create_checkpoints()

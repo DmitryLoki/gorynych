@@ -208,6 +208,8 @@ class Race(AggregateRoot):
         @param checkpoints: list of L{Checlpoint} instances.
         @type checkpoints: C{list}
         '''
+        if checkpoints == self._checkpoints:
+            return
         old_checkpoints = deepcopy(self._checkpoints)
         self._checkpoints = checkpoints
         if not self._invariants_are_correct():
@@ -222,10 +224,6 @@ class Race(AggregateRoot):
         # Notify other systems about checkpoints changing if previous
         # checkpoints existed.
         if old_checkpoints:
-            print "*"*40
-            print "publish event"
-            print old_checkpoints
-            print self.id, type(self.id)
             persistence.event_store().persist(RaceCheckpointsChanged(self.id,
                                                                 checkpoints))
 

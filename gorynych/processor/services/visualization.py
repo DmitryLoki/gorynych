@@ -193,7 +193,7 @@ class TrackVisualizationService(Service):
         @rtype:
         '''
         t1 = time.time()
-        result = dict()
+        result = defaultdict(dict)
         # Add last coords and speeds to result.
         for row in hdata:
             result[str(row[0])] = parse_result(row[1].split(','))

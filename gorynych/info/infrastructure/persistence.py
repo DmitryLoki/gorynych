@@ -143,7 +143,10 @@ class PGSQLRaceRepository(object):
         ps = create_participants(paragliders_row)
         chs = checkpoint_collection_from_geojson(_chs)
 
-        aux = json.loads(_aux)
+        try:
+            aux = json.loads(_aux)
+        except:
+            aux = {}
         b = aux.get('bearing')
         result = self.factory.create_race(t, rt, tz, ps, chs, race_id=rid,
                                           bearing=b)

@@ -1,3 +1,6 @@
 *.pyc
 .trial_temp/
 .idea/
+.DS_Store
+devdocs/DDDgorynych.asta.bak
+_trial_temp/

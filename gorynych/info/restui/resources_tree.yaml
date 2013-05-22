@@ -1,0 +1,62 @@
+package: &gorynych
+  !!python/module:gorynych.info.restui.resources
+aliases:
+  uuid: &uuid
+    '[a-z0-9]+-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+'
+  contest_index: &contest_index
+    'cnts-[0-9]{6}-[0-9]+'
+  person_index: &person_index
+    'pers-[0-9]{6}-[0-9]+'
+  race_index: &race_index
+    'r-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+'
+  track_index: &track_index
+    'trck-[a-z0-9]+'
+
+contest:
+  leaf: ContestResourceCollection
+  package: *gorynych
+  tree:
+    *contest_index:
+      leaf: ContestResource
+      package: *gorynych
+      tree:
+        paraglider:
+          leaf: ContestParagliderResourceCollection
+          package: *gorynych
+          tree:
+            *person_index:
+              leaf: ContestParagliderResource
+              package: *gorynych
+        race:
+          leaf: ContestRaceResourceCollection
+          package: *gorynych
+          tree:
+            *race_index:
+              leaf: ContestRaceResource
+              package: *gorynych
+              tree:
+                paraglider:
+                  leaf: RaceParagliderResourceCollection
+                  package: *gorynych
+                track_archive:
+                  leaf: TrackArchiveResource
+                  package: *gorynych
+person:
+  leaf: PersonResourceCollection
+  package: *gorynych
+  tree:
+    *person_index:
+      leaf: PersonResource
+      package: *gorynych
+
+race:
+  leaf: Placeholder
+  package: *gorynych
+  tree:
+    *race_index:
+      leaf: RaceResource
+      package: *gorynych
+      tree:
+        paragliders:
+          leaf: RaceParagliderResourceCollection
+          package: *gorynych

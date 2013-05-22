@@ -66,7 +66,7 @@ class Contest(AggregateRoot):
         self.address = address
         # {person_id:{role:'..', contest_number:1, glider:'glider'},}
         self._participants = dict()
-        self.race_ids = list()
+        self.race_ids = set()
 
     @property
     def timezone(self):
@@ -229,8 +229,8 @@ class Contest(AggregateRoot):
     def _rollback_register_paraglider(self, paraglider_before, person_id):
         self._participants[person_id] = paraglider_before
 
-    def add_race_id(self, race_id):
-        self.race_ids.append(race_id)
+    def apply_ContestRaceCreated(self, ev):
+        self.race_ids.add(ev.payload)
 
     def change_participant_data(self, person_id, **kwargs):
         if not kwargs:

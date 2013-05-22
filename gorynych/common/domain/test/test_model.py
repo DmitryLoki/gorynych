@@ -1,9 +1,11 @@
 import unittest
 import time
 import uuid
-import simplejson as json
 
+import simplejson as json
+import mock
 from zope.interface.verify import verifyObject
+from zope.interface.exceptions import DoesNotImplement
 
 from gorynych.common.domain import model
 from gorynych.eventstore.interfaces import IEvent
@@ -129,6 +131,27 @@ class AggregateRootTest(unittest.TestCase):
         self.assertIsNone(ar._id)
         ar._id = 1
         self.assertIsNotNone(ar._id)
+
+    def test_apply(self):
+        ar = model.AggregateRoot()
+        ar.apply_DomainEvent = mock.Mock()
+        _id = model.DomainIdentifier()
+        de = model.DomainEvent(_id)
+        self.assertRaises(AssertionError, ar.apply, 1)
+        self.assertRaises(DoesNotImplement, ar.apply, [1])
+
+        class Event(model.DomainEvent):
+            pass
+
+        ar.apply([Event(_id)])
+        self.assertFalse(ar.apply_DomainEvent.called)
+
+        ar.apply([de])
+        ar.apply_DomainEvent.assert_called_once_with(de)
+
+    def test_apply_none(self):
+        ar = model.AggregateRoot()
+        ar.apply(None)
 
 if __name__ == '__main__':
     unittest.main()

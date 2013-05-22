@@ -40,10 +40,6 @@ class PGSQLPersonRepository(object):
         if not data:
             raise NoAggregate("Person")
         result = self._create_person(data[0])
-
-#        tracks_data = yield self.pool.runQuery(SQL_GET_PERSON_TRACKS.format(
-#        tracks_table=TRACKS_TABLE), (person_id,))
-#        result = self._insert_tracks(result, tracks_data)
         defer.returnValue(result)
 
     @defer.inlineCallbacks
@@ -237,6 +233,8 @@ class PGSQLContestRepository(object):
             raise NoAggregate("Contest")
         cont = self._create_contest_from_data(rows[0])
         cont = yield self._append_data_to_contest(cont)
+        event_list = yield pe.event_store().load_events(cont.id)
+        cont.apply(event_list)
         defer.returnValue(cont)
 
     @defer.inlineCallbacks
@@ -245,11 +243,6 @@ class PGSQLContestRepository(object):
                     pe.select('participants', 'contest'), (cont._id,))
         if participants:
             cont = self._add_participants_to_contest(cont, participants)
-        races = yield self.pool.runQuery(pe.select('race', 'contest'),
-                                         (cont._id,))
-        if races:
-            for race_id in races:
-                cont.race_ids.append(race_id[0])
         defer.returnValue(cont)
 
     def _create_contest_from_data(self, row):
@@ -329,13 +322,9 @@ class PGSQLContestRepository(object):
                        (insert_id(x[0], p))) for p in values['participants'])
                 cur.execute("INSERT into participant values " + q)
 
-            if values['race_ids']:
-                q = ','.join(cur.mogrify("(%s, %s)",
-                             (x[0], str(p))) for p in values['race_ids'])
-                cur.execute("INSERT into contest_race values " + q)
             return x
 
-        def update(cur, prts, rids):
+        def update(cur, prts):
             cur.execute(pe.update('contest'), values['contest'])
             if values['participants'] or prts:
                 inobj = values['participants']
@@ -354,31 +343,13 @@ class PGSQLContestRepository(object):
                                     (pitem)) for pitem in to_insert)
                     cur.execute("INSERT into participant values " + q)
 
-            if values['race_ids'] or rids:
-                inobj = values['race_ids']
-                indb = rids
-                for idx, r in enumerate(inobj):
-                    inobj[idx] = (obj._id, str(r))
-                to_insert = set(inobj).difference(set(indb))
-                to_delete = set(indb).difference(set(inobj))
-                if to_delete:
-                    rids = tuple([x[0] for x in to_delete])
-                    cur.execute("DELETE FROM contest_race WHERE id=%s AND "
-                                 "race_id in %s", (obj._id, rids))
-                if to_insert:
-                    rq = ','.join(cur.mogrify("(%s, %s)",
-                                             (ritem)) for ritem in to_insert)
-                    cur.execute("INSERT into contest_race values " + rq)
-
             return obj
 
         result = None
         if obj._id:
             prts = yield self.pool.runQuery(pe.select('participants',
                                                       'contest'), (obj._id,))
-            rids = yield self.pool.runQuery(pe.select('race', 'contest'),
-                                            (obj._id,))
-            result = yield self.pool.runInteraction(update, prts, rids)
+            result = yield self.pool.runInteraction(update, prts)
         else:
             c__id = yield self.pool.runInteraction(save_new)
             obj._id = c__id[0]
@@ -400,5 +371,4 @@ class PGSQLContestRepository(object):
                    key.__class__.__name__.lower()[:-2]]
             result['participants'].append(row)
 
-        result['race_ids'] = obj.race_ids[::]
         return result

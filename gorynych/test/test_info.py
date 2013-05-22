@@ -38,11 +38,14 @@ def create_geojson_checkpoints(ch_list=None):
                                   features=ch_list))
 
 
-def create_race(contest_id, checkpoints=None):
+def create_race(contest_id, checkpoints=None, race_type='racetogoal',
+                bearing=None):
     if not checkpoints:
         checkpoints = create_geojson_checkpoints()
-    params = dict(title="Task 8", race_type='opendistance', bearing=12,
+    params = dict(title="Task 8", race_type=race_type,
                    checkpoints=checkpoints)
+    if bearing:
+        params['bearing'] = bearing
     return requests.post('/'.join((URL, 'contest', contest_id, 'race')),
                      data=params)
 
@@ -70,15 +73,14 @@ class RESTAPITest(unittest.TestCase):
     '''
     REST API must be started and running before tests.
     '''
-    url = 'http://localhost:8085'
 
     def test_main_page(self):
-        r = requests.get(self.url)
+        r = requests.get(URL)
         self.assertEqual(r.status_code, 404)
 
 
 class ContestRESTAPITest(unittest.TestCase):
-    url = 'http://localhost:8085/contest'
+    url = URL + '/contest'
     def test_1_get_no_contests(self):
         '''
         Here I suppose that contest repository is empty.
@@ -124,7 +126,7 @@ class ContestRESTAPITest(unittest.TestCase):
 
 
 class PersonAPITest(unittest.TestCase):
-    url = 'http://localhost:8085/person/'
+    url = URL + '/person/'
     def test_1_get_no_persons(self):
         self.skipTest("I'm lazy and don't want to clean repository.")
         r = requests.get(self.url)
@@ -167,7 +169,6 @@ class PersonAPITest(unittest.TestCase):
 
 
 class ParaglidersTest(unittest.TestCase):
-    url = 'http://localhost:8085'
 
     def test_1_register_paragliders(self):
         try:
@@ -187,7 +188,7 @@ class ParaglidersTest(unittest.TestCase):
 
         # test get paragliders. it's supposed to be in separate testcase,
         # but I'm lazy to know how to store this cont_id.
-        r2 = requests.get('/'.join((self.url, 'contest', cont_id,
+        r2 = requests.get('/'.join((URL, 'contest', cont_id,
                                     'paraglider')))
         self.assertEqual(r2.status_code, 200)
         result2 = r2.json()[0]
@@ -202,7 +203,7 @@ class ParaglidersTest(unittest.TestCase):
                                     "paraglider.")
         cont_id, p_id = results
         params = json.dumps(dict(glider='marlboro', contest_number='13'))
-        r = requests.put('/'.join((self.url, 'contest', cont_id,
+        r = requests.put('/'.join((URL, 'contest', cont_id,
                                    'paraglider', p_id)), data=params)
         self.assertEqual(r.status_code, 200)
         result = r.json()
@@ -223,7 +224,7 @@ class ContestRaceTest(unittest.TestCase):
             raise unittest.SkipTest("I need contest and paraglider for test")
 
         chs = create_geojson_checkpoints()
-        r = create_race(c_id, chs)
+        r = create_race(c_id, chs, race_type='opendistance', bearing=12)
         self.assertEqual(r.status_code, 201)
         race_id = r.json()['id']
         self.assertDictContainsSubset({'type':'opendistance',
@@ -285,6 +286,8 @@ class ContestRaceTest(unittest.TestCase):
         if not (p_id and c_id and race_id):
             raise unittest.SkipTest("I need race for test")
 
+        r = requests.get('/'.join((URL, 'contest', c_id, 'race', race_id)))
+        self.assertEqual(r.status_code, 200)
         r = requests.get('/'.join((URL, 'contest', c_id, 'race', race_id,
                                     'paraglider')))
         self.assertEqual(r.status_code, 200)

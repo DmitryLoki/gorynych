@@ -152,7 +152,11 @@ class APIResource(resource.Resource):
         except KeyError:
             if not request.method == 'HEAD':
                 allowed_methods = self.service_command.keys()
-                raise UnsupportedMethod(allowed_methods)
+                body = 'Next methods allowed: %s ' % allowed_methods
+                # TODO: according to RFC I must write Allow header.
+                self._handle_error(request, 405, 'Method now allowed', body)
+                # TODO: am I need this?
+                # raise UnsupportedMethod(allowed_methods)
             else:
                 # HEAD method must be supported accordingly to RFC2616 5.1.1
                 self.render_HEAD(request)

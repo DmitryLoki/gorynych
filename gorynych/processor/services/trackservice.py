@@ -1,23 +1,20 @@
 # coding=utf-8
-import psycopg2
-from twisted.application.service import Service
-from twisted.python import log
-from twisted.internet import task, reactor, threads, defer
-import numpy as np
 from io import BytesIO
 from struct import pack
 
-from gorynych.common.infrastructure import persistence
-from gorynych.processor import trfltfs
+import psycopg2
+from twisted.python import log
+from twisted.internet import threads, defer
+import numpy as np
+
+from gorynych.common.infrastructure import persistence as pe
+from gorynych.processor import trfltfs, events
+from gorynych.processor.domain import TrackArchive
 from gorynych.common.domain.model import DomainIdentifier
-from gorynych.processor import events
+from gorynych.common.application import EventPollingService
+from gorynych.common.domain.services import APIAccessor
 from gorynych import OPTS
 
-GET_EVENTS = """
-    SELECT e.event_name, e.aggregate_id, e.event_payload, e.event_id
-    FROM events e, dispatch d
-    WHERE (event_name = %s OR event_name = %s) AND e.event_id = d.event_id;
-    """
 
 NEW_TRACK = """
     INSERT INTO track (start_time, end_time, track_type, track_id)
@@ -28,6 +25,7 @@ INSERT_SNAPSHOT = """
     INSERT INTO track_snapshot (timestamp, id, snapshot) VALUES(%s, %s, %s)
     """
 
+API = APIAccessor()
 
 def find_snapshots(item, dbid):
     result = []
@@ -44,37 +42,67 @@ def find_snapshots(item, dbid):
     return result
 
 
-class TrackService(Service):
+class ProcessorService(EventPollingService):
+    '''
+    Orchestrate track creation and parsing.
+    '''
+    @defer.inlineCallbacks
+    def process_ArchiveURLReceived(self, ev):
+        '''
+        Download and process track archive.
+        '''
+        race_id = str(ev.aggregate_id)
+        # TODO: add resource race/{id}/track_archive
+        res = yield API.get_track_archive(race_id)
+        if res['status'] == 'no archive':
+            ta = TrackArchive(race_id, ev.payload)
+            archinfo = yield threads.deferToThread(ta.process_archive)
+            yield self._inform_about_paragliders(archinfo, race_id)
+        elif res['status'] == 'unpacked':
+            yield self.event_dispatched(ev.id)
+
+    @defer.inlineCallbacks
+    def _inform_about_paragliders(self, archinfo, race_id):
+        '''
+        Emit ParagliderFoundInArchive events for every received paraglider,
+        also delete ArchiveURLReceived event.
+        @param archinfo: ([{person_id, trackfile, contest_number}],
+        [trackfile,], [person_id,])
+        '''
+        # TODO: add events for extra tracks and left paragliders.
+        tracks, extra_tracks, left_paragliders = archinfo
+        res = yield API.get_track_archive(race_id)
+        if res['status'] == 'unpacked':
+            # I think here will be list of contest numbers.
+            persisted = res['progress']['paragliders_found']
+            to_persist = []
+            for di in tracks:
+                if not di['contest_number'] in persisted:
+                    to_persist.append(di)
+                    tracks = to_persist
+        else:
+        # TODO: JSON serializer
+            yield pe.event_store().persist(events
+                .TrackArchiveUnpacked(race_id, aggregate_type='race',
+                                      payload=archinfo))
+        yield self._paragliders_found(tracks, race_id)
+
+    def _paragliders_found(self, to_persist, race_id):
+        dlist = []
+        for di in to_persist:
+            dlist.append(pe.event_store().persist(events
+                .ParagliderFoundInArchive(race_id,
+                                          aggregate_type='race',
+                                          payload=di))
+            )
+        d = defer.gatherResults(dlist, consumeErrors=True)
+        return d
+
+
+class TrackService(EventPollingService):
     '''
     TrackService parse track archive.
     '''
-    def __init__(self, pool):
-        self.pool = pool
-        self.event_poller = task.LoopingCall(self.poll_for_events)
-
-    def startService(self):
-        d = self.pool.start()
-        d.addCallback(lambda _: log.msg("DB pool started."))
-        d.addCallback(lambda _: self.event_poller.start(2))
-        return d.addCallback(lambda _: Service.startService(self))
-
-    def stopService(self):
-        self.event_poller.stop()
-        Service.stopService(self)
-        return self.pool.close()
-
-    def poll_for_events(self):
-        d = self.pool.runQuery(GET_EVENTS, ('ArchiveURLReceived',
-                                                        'TrackArchiveParsed'))
-        d.addCallback(self.process_events)
-        return d
-
-    def process_events(self, events):
-        while events:
-            name, aggrid, payload, event_id = events.pop()
-            reactor.callLater(0, getattr(self, 'process_'+str(name)),
-                aggrid, payload, event_id)
-
     def process_ArchiveURLReceived(self, aggregate_id, payload, event_id):
         # d = self.create_track_archive(aggregate_id, payload)
         # d.addCallback(lambda ta: (ta, ta.download()))

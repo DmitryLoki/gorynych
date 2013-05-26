@@ -5,7 +5,7 @@ import yaml
 import os
 from twisted.python import usage
 
-__version__ = 0.1
+__version__ = 0.2
 # Set GOR_ENV to develop if version is odd and not environment variable is set.
 if 10 * __version__ % 2:
     if not os.getenv('GOR_ENV', None):

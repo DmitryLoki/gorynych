@@ -6,6 +6,7 @@ import time
 import scipy as sc
 from scipy import signal, interpolate
 import numpy as np
+import numpy.ma as ma
 
 from gorynych.common.domain.services import point_dist_calculator
 
@@ -272,4 +273,117 @@ def gspeed_calculator(lat, lon, times):
     np.around(result, decimals=1, out=result)
     return  result
 
+
+class OfflineCorrectorService:
+    '''
+    Cut track and correct it.
+    '''
+    # Maximum gap in track after which it accounted as finished (in seconds).
+    maxtimediff = 300
+
+    def _clean_timestamps(self, track, stime, etime):
+        '''
+        Cut track in time and make array with timestamps monotonic.
+        @param track:
+        @type track:
+        @return:
+        @rtype:
+        '''
+        data = ma.masked_inside(track, stime, etime)
+        track = track.compress(data.mask)
+        # Eliminate repetitive points.
+        times, indices = np.unique(track['timestamp'], return_index=True)
+        track = track[indices]
+        # Here we still can has points reversed in time. Fix it.
+        tdifs = np.ediff1d(data['timestamp'], to_begin=1)
+        # At first let's find end of track by timeout, if any.
+        track_end_idxs = np.where(tdifs > self.maxtimediff)[0]
+        if track_end_idxs:
+            track_end_idxs = track_end_idxs[0]
+            track = track[:track_end_idxs]
+            tdifs = tdifs[:track_end_idxs]
+
+        # Eliminate reverse points.
+        data = ma.masked_greater(tdifs, 0)
+        track = track.compress(data.mask)
+        return track
+
+    def correct_track(self, track, stime, etime):
+        '''
+        Receive raw parsed data, cut it and looks for bad times.
+        @param track: array with dtype defined in L{CompetitionTrack}
+        @type track: C{numpy.array}
+        @return track without dublicated or reversed points in timescale.
+        @rtype: C{numpy.array}
+        '''
+        # Eliminate points outside task time.
+        track = self._clean_timestamps(track, stime, etime)
+        return ParaglidingTrackCorrector().correct_data(track)
+
+
+def runs_of_ones_array(bits):
+    '''
+    Calculate start and end indexes of subarray of ones in array.
+    @param bits:
+    @type bits:
+    @return:
+    @rtype:
+    '''
+    # make sure all runs of ones are well-bounded
+    bounded = np.hstack(([0], bits, [0]))
+    # get 1 at run starts and -1 at run ends
+    difs = np.diff(bounded)
+    run_starts, = np.where(difs > 0)
+    run_ends, = np.where(difs < 0)
+    return run_starts, run_ends
+
+
+class ParagliderTrackMixin:
+    # I'm not sure that this is needed for offline tracks so I just left it.
+    threshold_speed = 10
+    # Threshold value for 'not started'-'flying' change in km/h.
+    sf_speed = 20
+    # Threshold value for 'flying'-'not started' change in km/h.
+    fs_speed = 10
+    # Time interval in which is allowed for pilot to be slow, seconds.
+    slow_interval = 60
+    alt_interval = 5
+
+    __state = 'not started'
+
+    def sky_earth_definer(self):
+        overspeed_idxs = np.where(self.data['g_speed'] > self.threshold_speed)
+        rs, re = runs_of_ones_array(overspeed_idxs)
+        for i in xrange(len(rs)):
+            if self.data['timestamp'][re[i]] - self.data['timestamp'][re[i]] \
+                    > self.slow_interval:
+                # TODO: wrap it in event.
+                self.__state = 'flying'
+                ts = self.data['timestamp'][re[i]]
+                break
+
+        lowspeed_idxs = np.where(self.data['g_speed'] < self.threshold_speed)
+        rls, rle = runs_of_ones_array(lowspeed_idxs)
+        # TODO: do the same as above.
+
+    def _state_work(self, kw):
+        ''' Calculate pilot's state.'''
+        if kw['hs'] > self.sf_speed and self.__state == 'not started':
+            self.__state = 'flying'
+        if self.__state == 'flying':
+            if self._slow and (kw['ts'] -
+                self._became_slow >= self.slow_interval):
+                self.state = 'landed'
+            elif self._slow and (kw['hs'] > self.fs_speed or
+                    abs(kw['alt'] - self._slow_alt) > self.alt_interval):
+                self._slow = False
+            elif (not self._slow) and kw['hs'] < self.fs_speed:
+                self._slow = True
+                self._slow_alt = kw['alt']
+                self._became_slow = kw['ts']
+
+        if (self.last_wp > self._task['p_amount'] - 1 and
+            self.race.is_finished(self.state, (self.lat, self.lon))):
+            self.state = 'finished'
+            self.fin_time = self.ts
 

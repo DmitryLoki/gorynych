@@ -91,6 +91,31 @@ class KMLTrackParser(object):
     pass
 
 
+class FileParserAdapter(object):
+    def __init__(self, dtype):
+        self.dtype = dtype
+
+    def read(self, data):
+        try:
+            parsed_track = choose_offline_parser(data)(self.dtype).parse(data)
+        except Exception as e:
+            raise Exception("Error while parsing file: %r " % e)
+        return parsed_track
+
+    def process(self, data, trackstate, stime, etime):
+        corrector = OfflineCorrectorService()
+        try:
+            track = corrector.correct_track(data, stime, etime)
+        except Exception as e:
+            raise Exception("Error while correcting track: %r " % e)
+        track['v_speed'] = vspeed_calculator(track['alt'],
+            track['timestamp'])
+        track['g_speed'] = gspeed_calculator(track['lat'],
+            track['lon'],
+            track['timestamp'])
+        return track
+
+
 class ParaglidingTrackCorrector(object):
     '''
 
@@ -362,28 +387,4 @@ class ParagliderTrackMixin:
                 ts = self.data['timestamp'][re[i]]
                 break
 
-        lowspeed_idxs = np.where(self.data['g_speed'] < self.threshold_speed)
-        rls, rle = runs_of_ones_array(lowspeed_idxs)
-        # TODO: do the same as above.
-
-    def _state_work(self, kw):
-        ''' Calculate pilot's state.'''
-        if kw['hs'] > self.sf_speed and self.__state == 'not started':
-            self.__state = 'flying'
-        if self.__state == 'flying':
-            if self._slow and (kw['ts'] -
-                self._became_slow >= self.slow_interval):
-                self.state = 'landed'
-            elif self._slow and (kw['hs'] > self.fs_speed or
-                    abs(kw['alt'] - self._slow_alt) > self.alt_interval):
-                self._slow = False
-            elif (not self._slow) and kw['hs'] < self.fs_speed:
-                self._slow = True
-                self._slow_alt = kw['alt']
-                self._became_slow = kw['ts']
-
-        if (self.last_wp > self._task['p_amount'] - 1 and
-            self.race.is_finished(self.state, (self.lat, self.lon))):
-            self.state = 'finished'
-            self.fin_time = self.ts
 

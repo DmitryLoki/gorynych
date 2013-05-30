@@ -26,6 +26,12 @@ class APIAccessor(object):
         d.addCallback(json.loads)
         return d
 
+    def get_race_task(self, race_id):
+        url = '/'.join((self.url, 'race', race_id))
+        d = getPage(url)
+        d.addCallback(json.loads)
+        return d
+
 
 def point_dist_calculator(start_lat, start_lon, end_lat, end_lon):
     """Return distance between two points in float

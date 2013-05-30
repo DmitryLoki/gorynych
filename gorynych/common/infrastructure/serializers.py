@@ -71,3 +71,10 @@ class TupleOf(object):
         return tuple(result)
 
 
+class JSONSerializer(object):
+
+    def to_bytes(self, value):
+        return json.dumps(value)
+
+    def from_bytes(self, value):
+        return json.loads(value)

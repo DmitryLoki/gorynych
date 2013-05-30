@@ -11,6 +11,8 @@ from gorynych.common.domain.model import AggregateRoot, ValueObject, DomainIdent
 from gorynych.common.infrastructure import persistence as pe
 from gorynych.processor.domain import services
 from gorynych.processor import events
+from gorynych.common.domain.types import checkpoint_collection_from_geojson
+from gorynych.common.domain.services import times_from_checkpoints
 
 DTYPE = [('id', 'i8'), ('timestamp', 'i4'), ('lat', 'f4'),
     ('lon', 'f4'), ('alt', 'i2'), ('g_speed', 'f4'), ('v_speed', 'f4'),
@@ -18,8 +20,12 @@ DTYPE = [('id', 'i8'), ('timestamp', 'i4'), ('lat', 'f4'),
 
 
 def track_types(ttype):
-    types = {'competition aftertask': FileParserAdapter(DTYPE)}
+    types = dict(competition_aftertask=services.FileParserAdapter(DTYPE))
     return types.get(ttype)
+
+
+# def race_tasks(rtask):
+#     tasks = dict(racetogoal=RaceToGoal)
 
 
 class TrackID(DomainIdentifier): pass
@@ -130,36 +136,16 @@ class Track(AggregateRoot):
         return self._type
 
 
-class FileParserAdapter(object):
-    def __init__(self, dtype):
-        self.dtype = dtype
-
-    def read(self, data):
-        try:
-            parsed_track = services.choose_offline_parser(data)(self.dtype
-                                                                ).parse(data)
-        except Exception as e:
-            raise Exception("Error while parsing file: %r " % e)
-        return parsed_track
-
-    def process(self, data, trackstate, stime, etime):
-        corrector = services.OfflineCorrectorService()
-        try:
-            track = corrector.correct_track(data, stime, etime)
-        except Exception as e:
-            raise Exception("Error while correcting track: %r " % e)
-        track['v_speed'] = services.vspeed_calculator(track['alt'],
-            track['timestamp'])
-        track['g_speed'] = services.gspeed_calculator(track['lat'],
-            track['lon'],
-            track['timestamp'])
-        return track
-
-
 class RaceTask:
     '''
     Incapsulate race parameters calculation.
     '''
+
+    def __init__(self, chlist):
+        self.checkpoints = checkpoint_collection_from_geojson(chlist)
+        self.start_time, self.end_time = times_from_checkpoints(self.checkpoints)
+
+
     @classmethod
     def create(cls, value):
         '''
@@ -172,29 +158,4 @@ class RaceTask:
         @rtype:
         '''
         return cls(value)
-
-
-class CompetitionTrack:
-    # np.array dtype for data
-    dtype = [('id', 'i8'), ('timestamp', 'i4'), ('lat', 'f4'),
-        ('lon', 'f4'), ('alt', 'i2'), ('g_speed', 'f4'), ('v_speed', 'f4'),
-        ('distance', 'i4')]
-
-    def __init__(self, tracktask):
-        self.tracktask = tracktask
-        # TODO: implement good buffer for track points or use self.data?
-        self.trackbuffer = deque(50)
-        self.data = np.empty(1, self.dtype)
-
-    def process_task_data(self, data, trackstate):
-        returned_events = []
-        a = len(trackstate)
-        result, trackstate = self.tracktask.process(data, trackstate)
-        for item in trackstate[a - 1:]:
-            returned_events.append(self.analyze_competition_event(item))
-        return trackstate, returned_events
-
-    def analyze_competition_event(self, item):
-        pass
-
 

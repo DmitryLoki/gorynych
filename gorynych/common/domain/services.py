@@ -6,6 +6,7 @@ import simplejson as json
 from twisted.web.client import getPage
 
 from gorynych import __version__
+from gorynych.common.exceptions import BadCheckpoint
 
 # TODO: create module with constants (like in twisted?).
 EARTH_RADIUS = 6371000
@@ -41,4 +42,19 @@ def point_dist_calculator(start_lat, start_lon, end_lat, end_lon):
             math.sin(d_lat/2)**2 + math.cos(start_lat) * math.cos(end_lat) * math.sin(d_lon/2)**2))
     c = df * EARTH_RADIUS
     return c
+
+
+def times_from_checkpoints(checkpoints):
+    assert isinstance(checkpoints, list), "I'm waiting for a list."
+    start_time = None
+    end_time = None
+    for point in checkpoints:
+        if point.open_time < start_time:
+            start_time = point.open_time
+        if point.close_time > end_time:
+            end_time = point.close_time
+    if start_time < end_time:
+        return start_time, end_time
+    else:
+        raise BadCheckpoint("Wrong or absent times in checkpoints.")
 

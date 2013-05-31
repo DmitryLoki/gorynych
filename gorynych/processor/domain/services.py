@@ -9,6 +9,7 @@ import numpy as np
 import numpy.ma as ma
 
 from gorynych.common.domain.services import point_dist_calculator
+from gorynych.processor.events import TrackEnded
 
 def choose_offline_parser(trackname):
     if trackname.endswith('.igc'): return IGCTrackParser
@@ -102,7 +103,7 @@ class FileParserAdapter(object):
             raise Exception("Error while parsing file: %r " % e)
         return parsed_track
 
-    def process(self, data, trackstate, stime, etime):
+    def process(self, data, stime, etime):
         corrector = OfflineCorrectorService()
         try:
             track = corrector.correct_track(data, stime, etime)
@@ -114,6 +115,11 @@ class FileParserAdapter(object):
             track['lon'],
             track['timestamp'])
         return track
+
+    def correct(self, trackstate, _id):
+        if not trackstate.finish_time:
+            return TrackEnded(_id, dict(state='landed'),
+                occured_on=trackstate.pbuffer[ -1]['timestamp'])
 
 
 class ParaglidingTrackCorrector(object):

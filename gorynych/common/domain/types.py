@@ -104,6 +104,19 @@ class Checkpoint(ValueObject):
         if self.open_time and self.close_time:
             assert int(self.close_time) > int(self.open_time), \
                 "Checkpoint close_time must be after open_time."
+        # Distance to something.
+        self.path_distance = 0
+
+    def distance_to(self, point):
+        '''
+        Calculate distance from point to checkpoint.
+        @param lat:
+        @type lat:
+        @return:
+        @rtype: C{float}
+        '''
+        raise NotImplementedError()
+
 
     @property
     def __geo_interface__(self):

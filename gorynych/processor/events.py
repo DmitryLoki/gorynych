@@ -58,6 +58,48 @@ class TrackDataReceived(DomainEvent):
     serializer = serializers.StringSerializer()
 
 
+class PointsAddedToTrack(DomainEvent):
+    '''
+    Fired after points processing.
+    @param aggregate_id: TrackID.
+    @param payload: array with track points which are considered to be a part of track.
+    '''
+    serializer = 'some byte serializer for numpy arrays.'
+
+
+class TrackCheckpointTaken(DomainEvent):
+    '''
+    Fired then pilot took checkpoint.
+    @param aggregate_id: TrackID
+    @param payload: (checkpoint number, dist from pilot to checkpoint).
+    '''
+    serializer = serializers.TupleOf(serializers.IntSerializer())
+
+
+class TrackFinishTimeReceived(DomainEvent):
+    '''
+    Fired then system found time which will be used as finish time.
+    @param aggregate_id: TrackID
+    @param payload: finishtime.
+    '''
+    serializer = serializers.IntSerializer()
+
+
+class TrackStarted(DomainEvent):
+    '''
+    Fired then system decided that competition has been started.
+    '''
+    serializer = serializers.NoneSerializer()
+
+
+class TrackFinished(DomainEvent):
+    '''
+    Fired then system decided that competition track finished.
+    @param payload: None
+    '''
+    serializer = serializers.NoneSerializer()
+
+
 class TrackStarted(DomainEvent):
     '''
     New track started.
@@ -71,9 +113,9 @@ class TrackEnded(DomainEvent):
     '''
     Track ended. Pilot landed or finished or time is gone.
     @param aggregate_id: Track ID
-    @param payload: None
+    @param payload: track state
     '''
-    serializer = serializers.StringSerializer()
+    serializer = serializers.JSONSerializer()
 
 
 ########## Person events ##################################

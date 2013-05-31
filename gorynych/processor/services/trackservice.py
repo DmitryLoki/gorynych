@@ -1,4 +1,3 @@
-# coding=utf-8
 from io import BytesIO
 from struct import pack
 
@@ -9,7 +8,7 @@ import numpy as np
 
 from gorynych.common.infrastructure import persistence as pe
 from gorynych.processor import events
-from gorynych.processor.domain import TrackArchive, services, track
+from gorynych.processor.domain import TrackArchive, track
 from gorynych.common.domain.model import DomainIdentifier
 from gorynych.common.application import EventPollingService
 from gorynych.common.domain.services import APIAccessor
@@ -81,7 +80,6 @@ class ProcessorService(EventPollingService):
                     to_persist.append(di)
                     tracks = to_persist
         else:
-        # TODO: JSON serializer
             yield pe.event_store().persist(events
                 .TrackArchiveUnpacked(race_id, aggregate_type='race',
                                       payload=archinfo))
@@ -179,8 +177,9 @@ class TrackService(EventPollingService):
                 if ev.occured_on <= aggr.state.timestamp:
                     to_persist.append(ev)
             # TODO: do twisted.
-            self.event_store.persist(to_persist)
-            self.track_repository.save(aggr.state)
+            d = self.event_store.persist(to_persist)
+            d.addCallback(lambda _:self.track_repository.save(aggr.state))
+            return d
 
     def _get_aggregate(self, _id):
         if self.aggregates.get(_id):

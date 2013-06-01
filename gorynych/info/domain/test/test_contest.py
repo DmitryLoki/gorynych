@@ -1,13 +1,12 @@
 import unittest
 
 import mock
-from shapely.geometry import Point
-from gorynych.info.domain.test.helpers import create_contest
 
+from gorynych.common.domain.events import ParagliderRegisteredOnContest
+from gorynych.info.domain.test.helpers import create_contest
 from gorynych.info.domain import contest, person
-from gorynych.common.domain.types import Address, Name, Country, Checkpoint
-from gorynych.info.domain.events import ParagliderRegisteredOnContest
-from gorynych.info.domain.ids import RaceID, PersonID
+from gorynych.common.domain.types import Address, Name, Country
+from gorynych.info.domain.ids import PersonID
 
 
 class MockedPersonRepository(mock.Mock):

@@ -3,8 +3,8 @@ Tracker Aggregate.
 '''
 from zope.interface.interfaces import Interface
 
+from gorynych.common.domain.events import TrackerAssigned, TrackerUnAssigned
 from gorynych.common.domain.model import AggregateRoot
-from gorynych.info.domain.events import TrackerAssigned, TrackerUnAssigned
 from gorynych.info.domain.ids import TrackerID
 
 

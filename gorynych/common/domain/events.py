@@ -4,12 +4,28 @@ from gorynych.common.infrastructure import serializers
 
 #### Race events ##############################
 
+class ArchiveURLReceived(DomainEvent):
+    '''
+    Notify processing system that new archive with tracks has been loaded for
+    race.
+    Event fields:
+    @param id: Race id
+    @param url: url with track archive.
+    '''
+    serializer = serializers.StringSerializer()
+
+
 class TrackArchiveUnpacked(DomainEvent):
     '''
-    Track archive unpacked and analyzed, tracks for paragliders found.
+    Fired in L{gorynych.processor.services.trackservise.ProcessorService}
     @param id: Race ID
-    @payload: (list of dict with keys (person_id, trackfile),
-    list of extra_tracks, list of paragliders without tracks)
+    @payload:
+        ([{person_id, trackfile, contest_number}, ...], - list of dicts
+        [extra trackfile,], - list of str
+         [person_id without tracks,]) - list of str
+         finded tracks for persons,
+         extra tracks,
+        paragliders without tracks.
     '''
     serializer = 'hmmm, json?'
 
@@ -20,7 +36,16 @@ class ParagliderFoundInArchive(DomainEvent):
     @param id: RaceID
     @param payload: {person_id, trackfile, contest_number}
     '''
-    serializer = serializers.StringSerializer()
+    serializer = serializers.JSONSerializer()
+
+
+class RaceGotTrack(DomainEvent):
+    '''
+    Fired when first data for new track has been received.
+    @param aggregate_id: RaceID
+    @param payload: {contest_number, track_type, track_id}
+    '''
+    serializer = serializers.JSONSerializer()
 
 
 class TrackArchiveParsed(DomainEvent):
@@ -32,12 +57,16 @@ class TrackArchiveParsed(DomainEvent):
     serializer = serializers.StringSerializer()
 
 
-class RaceTrackCreated(DomainEvent):
+class RaceCheckpointsChanged(DomainEvent):
     '''
-    Fired when first data for new track has been received.
-    @param payload: {contest_number, track_type, trackid}
+    Notify other systems (such as processor) about checkpoints change.
+    @todo: think about more explicit name for this event.
+    Event fields:
+    @param id: Race id
+    @param payload: list with new checkpoints. List of L{Checkpoints}.
     '''
-    serializer = serializers.JSONSerializer()
+    from gorynych.common.domain.types import checkpoint_from_geojson
+    serializer = serializers.GeoObjectsListSerializer(checkpoint_from_geojson)
 
 
 ###### Track events #############################
@@ -53,6 +82,7 @@ class TrackCreated(DomainEvent):
 class TrackDataReceived(DomainEvent):
     '''
     In offline track fired when track filename is received.
+    @param aggregat_id: TrackID
     @param payload: track filename.
     '''
     serializer = serializers.StringSerializer()
@@ -88,6 +118,7 @@ class TrackFinishTimeReceived(DomainEvent):
 class TrackStarted(DomainEvent):
     '''
     Fired then system decided that competition has been started.
+    @param aggregate_id: TrackID
     '''
     serializer = serializers.NoneSerializer()
 
@@ -95,6 +126,7 @@ class TrackStarted(DomainEvent):
 class TrackFinished(DomainEvent):
     '''
     Fired then system decided that competition track finished.
+    @param aggregate_id: TrackID
     @param payload: None
     '''
     serializer = serializers.NoneSerializer()
@@ -128,7 +160,30 @@ class PersonGotTrack(DomainEvent):
     serializer = serializers.StringSerializer()
 
 
-############################
+class ParagliderRegisteredOnContest(DomainEvent):
+    '''
+    Person with id id registered on contest with id contest_id as paraglider.
+    Event is fired to notificate users.
+    Event fields:
+    @param aggregate_id: PersonID
+    @param payload: ContestID
+    '''
+    serializer = serializers.DomainIdentifierSerializer('ContestID')
+
+
+######### Contest events #################################
+
+
+class ContestRaceCreated(DomainEvent):
+    '''
+    Fired then race created for contest.
+    @param aggregate_id: ContestID
+    @param payload: RaceID
+    '''
+    serializer = serializers.DomainIdentifierSerializer('RaceID')
+
+
+############## undecided events
 
 class TrackAddedToRace(DomainEvent):
     '''
@@ -136,3 +191,23 @@ class TrackAddedToRace(DomainEvent):
     @type: payload: C{tuple}
     '''
     serializer = serializers.TupleOf(serializers.StringSerializer())
+
+
+class TrackerAssigned(DomainEvent):
+    '''
+    This event is fired then tracker is assigned to someone.
+
+    Event fields are:
+    @param id: id of aggregate to which tracker has been assigned (Person,
+    Transport).
+    @param tracker_id: tracker id.
+    '''
+
+
+class TrackerUnAssigned(DomainEvent):
+    '''
+    This event is fired then tracker is unassigned from person or transport.
+    @param aggregate_id: id of aggregate from which tracker has been
+    unassigned (Person, Transport).
+    @param payload: id of Tracker aggregate.
+    '''

@@ -8,11 +8,9 @@ from zope.interface.interfaces import Interface
 
 from gorynych.common.domain.model import AggregateRoot, ValueObject
 from gorynych.common.domain.types import Address, Country, Name
+from gorynych.common.domain.events import ParagliderRegisteredOnContest
 from gorynych.common.infrastructure import persistence
-from gorynych.info.domain.race import RaceFactory
-from gorynych.info.domain.events import ParagliderRegisteredOnContest
 from gorynych.info.domain.ids import ContestID, PersonID
-from gorynych.info.domain.person import IPersonRepository
 
 
 class IContestRepository(Interface):

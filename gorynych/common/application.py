@@ -1,8 +1,8 @@
+from gorynych.common.domain.events import ArchiveURLReceived
+
 __author__ = 'Boris Tsema'
 import re
 import time
-
-from gorynych.info.domain.events import ArchiveURLReceived
 
 from twisted.application.service import Service
 from twisted.internet import task, reactor

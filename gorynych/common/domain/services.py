@@ -1,6 +1,7 @@
 __author__ = 'Boris Tsema'
 
 import math
+import decimal
 
 import simplejson as json
 from twisted.web.client import getPage
@@ -51,14 +52,23 @@ def point_dist_calculator(start_lat, start_lon, end_lat, end_lon):
 
 
 def times_from_checkpoints(checkpoints):
+    '''
+    Look for checkpoints and get race times from them.
+    @param checkpoints:
+    @type checkpoints:
+    @return: tuple of ints
+    @rtype: C{tuple}
+    '''
     assert isinstance(checkpoints, list), "I'm waiting for a list."
-    start_time = None
+    start_time = decimal.Decimal('infinity')
     end_time = None
     for point in checkpoints:
-        if point.open_time < start_time:
-            start_time = point.open_time
-        if point.close_time > end_time:
-            end_time = point.close_time
+        if point.open_time:
+            if int(point.open_time) < start_time:
+                start_time = point.open_time
+        if point.close_time:
+            if int(point.close_time) > end_time:
+                end_time = int(point.close_time)
     if start_time < end_time:
         return start_time, end_time
     else:

@@ -11,7 +11,7 @@ from twisted.python import log
 from gorynych.info.domain import contest, person, race
 from gorynych.common.infrastructure import persistence
 from gorynych.common.domain.types import checkpoint_from_geojson
-from gorynych.info.domain import events
+from gorynych.common.domain.events import ContestRaceCreated
 
 GET_EVENTS = """
     SELECT e.event_name, e.aggregate_id, e.event_payload, e.event_id
@@ -327,12 +327,16 @@ class ApplicationService(Service):
                                       change)
 
     ############## Race Service part ################
+    def get_race(self, params):
+        return self._get_aggregate(params['race_id'], race.IRaceRepository)
+
     @defer.inlineCallbacks
     def create_new_race_for_contest(self, params):
         cont = yield self._get_aggregate(params['contest_id'],
                                 contest.IContestRepository)
         paragliders = cont.paragliders
         plist = []
+        # TODO: make it thinner.
         for key in paragliders:
             pers = yield self._get_aggregate(key, person.IPersonRepository)
             plist.append(contest.Paraglider(key, pers.name, pers.country,
@@ -345,7 +349,7 @@ class ApplicationService(Service):
                                    params['checkpoints'],
                                    bearing=params.get('bearing'))
         # TODO: do it transactionally.
-        yield persistence.event_store().persist(events.ContestRaceCreated(
+        yield persistence.event_store().persist(ContestRaceCreated(
             cont.id, r.id))
         yield persistence.get_repository(race.IRaceRepository).save(r)
         # yield persistence.get_repository(contest.IContestRepository).save(
@@ -376,8 +380,7 @@ class ApplicationService(Service):
         @return:
         @rtype:
         '''
-        r = yield self._get_aggregate(params['race_id'],
-                                      race.IRaceRepository)
+        r = yield self.get_race(params)
         c = yield self._get_aggregate(params['contest_id'],
                                       contest.IContestRepository)
         defer.returnValue((c, r))
@@ -404,20 +407,15 @@ class ApplicationService(Service):
                 r.bearing = params['bearing']
             return r
 
-        d = self._get_aggregate(params['race_id'], race.IRaceRepository)
+        d = self.get_race(params)
         d.addCallback(change)
         d.addCallback(persistence.get_repository(race.IRaceRepository).save)
         return d
 
-    def get_race_paragliders(self, params):
-        return self._get_aggregate(params['race_id'], race.IRaceRepository)
-
-    def get_race(self, params):
-        return self._get_aggregate(params['race_id'], race.IRaceRepository)
-
     def add_track_archive(self, params):
-        d = self._get_aggregate(params['race_id'], race.IRaceRepository)
-        return d.addCallback(lambda r: r.add_track_archive(params['url']))
+        d = self.get_race(params)
+        d.addCallback(lambda r: r.add_track_archive(params['url']))
+        return d
 
     ############## common methods ###################
     def _get_aggregate(self, id, repository):

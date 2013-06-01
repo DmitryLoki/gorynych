@@ -93,6 +93,7 @@ class AggregateRoot(object):
     Base class for aggregate roots.
     '''
     _id = None
+    events = []
 
     def apply(self, elist=None):
         '''
@@ -107,6 +108,10 @@ class AggregateRoot(object):
                     evname = ev.__class__.__name__
                     if hasattr(self, 'apply_' + evname):
                         getattr(self, 'apply_' + evname)(ev)
+                    else:
+                        # For cases when event handled in aggregate's
+                        # boundary.
+                        self.events.append(ev)
 
 
 @implementer(IEvent)

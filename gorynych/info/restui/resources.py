@@ -218,7 +218,7 @@ class RaceParagliderResourceCollection(APIResource):
     /race/{id}/paragliders
     '''
     name = 'race_paraglider_collection'
-    service_command = dict(GET='get_race_paragliders')
+    service_command = dict(GET='get_race')
 
     def read_GET(self, r, request_params=None):
         if r:
@@ -266,11 +266,21 @@ class TrackArchiveResource(APIResource):
     contest/{id}/race/{id}/trackarchive
     '''
     name = 'track_archive'
-    service_command = dict(POST='add_track_archive')
+    templates = dict(GET='track_archive_GET', POST='track_archive_POST')
+    service_command = dict(POST='add_track_archive', GET='get_race')
 
-    def read_POST(self, smth, p=None):
-        if smth:
-            return dict(status=str(smth))
+    def read_POST(self, result, p=None):
+        if result:
+            return dict(status=str(result))
+
+    def read_GET(self, r, p=None):
+        if r:
+            status = r.track_archive.state
+            found_cn = list(r.track_archive.progress.get('paragliders_found'))
+            parsed_cn = list(r.track_archive.progress.get('parsed_tracks'))
+            return dict(status=status,
+                        found_contest_numbers=found_cn,
+                        parsed_contest_numbers=parsed_cn)
 
 
 # TODO: this resource should be in processor package.

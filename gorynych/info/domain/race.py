@@ -2,6 +2,7 @@
 Aggregate Race.
 '''
 __author__ = 'Boris Tsema'
+from collections import defaultdict
 from copy import deepcopy
 import re
 
@@ -13,9 +14,10 @@ from gorynych.common.domain.model import AggregateRoot, ValueObject,\
                                         DomainEvent
 from gorynych.common.domain.types import Checkpoint
 from gorynych.common.domain.services import times_from_checkpoints
-from gorynych.info.domain.events import RaceCheckpointsChanged,\
-                                        ArchiveURLReceived
+from gorynych.common.domain.events import ArchiveURLReceived, \
+    RaceCheckpointsChanged
 from gorynych.common.infrastructure import persistence
+from gorynych.common.exceptions import TrackArchiveAlreadyExist
 from gorynych.info.domain.ids import RaceID
 
 
@@ -99,12 +101,6 @@ class RaceFactory(object):
         for p in paragliders:
             race.paragliders[p.contest_number] = p
         return race
-
-
-class TrackArchiveAlreadyExist(Exception):
-    '''
-    Raised when someone try to add track archive after it has been parsed.
-    '''
 
 
 class Race(AggregateRoot):
@@ -195,8 +191,8 @@ class Race(AggregateRoot):
         # Notify other systems about checkpoints changing if previous
         # checkpoints existed.
         if old_checkpoints:
-            persistence.event_store().persist(RaceCheckpointsChanged(self.id,
-                                                                checkpoints))
+            persistence.event_store().persist(
+                                RaceCheckpointsChanged(self.id, checkpoints))
 
     def _invariants_are_correct(self):
         has_paragliders = len(self.paragliders) > 0
@@ -209,16 +205,13 @@ class Race(AggregateRoot):
 
     @property
     def track_archive(self):
-        events = persistence.event_store().load_events(str(self.id))
-        # and now events is Deferred instance :(
-        # TODO: pass list to TrackArchive, not deferred.
-        track_archive = TrackArchive(events)
+        track_archive = TrackArchive(self.events)
         return track_archive
 
     def add_track_archive(self, url):
-        if not self.track_archive.state == 'new':
+        if not self.track_archive.state == 'no archive':
             raise TrackArchiveAlreadyExist("Track archive with url %s "
-                                           "already parsed.")
+                                           "has been added already." % url)
         url_pattern = r'https?://airtribune.com/\w+'
         if re.match(url_pattern, url):
             persistence.event_store().persist(ArchiveURLReceived(self.id,
@@ -237,28 +230,45 @@ class Race(AggregateRoot):
 
 
 class TrackArchive(object):
+    states = ['no archive', 'unpacked', 'parsed']
     def __init__(self, events):
-        self.state = 'new'
-        self.progress = 'nothing has been done'
-        # for event in events:
-        #     self.apply(event)
+        self._state = 'no archive'
+        self.progress = defaultdict(set)
+        for event in events:
+            self.apply(event)
 
-    def apply(self, event):
+    def apply(self, ev):
         '''
         Apply event from list one by one.
-        @param event: event from list
-        @type event: subclasses of L{DomainEvent}
+        @param ev: event from list
+        @type ev: subclasses of L{DomainEvent}
         @return:
         @rtype:
         '''
-        try:
-            getattr(self, '_'.join(('when', event.__class__.__name__.lower(
-                ))))(event)
-        except AttributeError:
-            pass
+        evname = ev.__class__.__name__
+        if hasattr(self, 'apply_' + evname):
+            getattr(self, 'apply_' + evname)(ev)
 
-    def when_archiveurlreceived(self, event):
-        self.state = 'work is started'
+    def apply_TrackArchiveUnpacked(self, ev):
+        self.state = 'unpacked'
+        tracks, extra_tracks, pers_without_tracks = ev.payload
+        for item in tracks:
+            self.progress['paragliders_found'].add(item['contest_number'])
+
+    def apply_RaceGotTrack(self, ev):
+        self.progress['parsed_tracks'].add(ev.payload['contest_number'])
+
+    def apply_TrackArchiveParsed(self, ev):
+        self.state = 'parsed'
+
+    @property
+    def state(self):
+        return self._state
+
+    @state.setter
+    def state(self, state):
+        if self.states.index(self.state) < self.states.index(state):
+            self._state = state
 
 
 class IRaceRepository(Interface):

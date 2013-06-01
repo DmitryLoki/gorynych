@@ -78,3 +78,11 @@ class JSONSerializer(object):
 
     def from_bytes(self, value):
         return json.loads(value)
+
+
+class IntSerializer():
+    pass
+
+
+def NoneSerializer():
+    return None

@@ -1,13 +1,14 @@
 from io import BytesIO
 from struct import pack
+import time
 
 import psycopg2
 from twisted.python import log
 from twisted.internet import threads, defer
 import numpy as np
 
+from gorynych.common.domain import events
 from gorynych.common.infrastructure import persistence as pe
-from gorynych.processor import events
 from gorynych.processor.domain import TrackArchive, track
 from gorynych.common.domain.model import DomainIdentifier
 from gorynych.common.application import EventPollingService
@@ -45,74 +46,55 @@ class ProcessorService(EventPollingService):
     '''
     Orchestrate track creation and parsing.
     '''
+    in_progress = dict()
+    ttl = 120
     @defer.inlineCallbacks
     def process_ArchiveURLReceived(self, ev):
         '''
         Download and process track archive.
         '''
-        race_id = str(ev.aggregate_id)
-        # TODO: add resource race/{id}/track_archive
-        res = yield API.get_track_archive(race_id)
+        race_id = ev.aggregate_id
+        res = yield API.get_track_archive(str(race_id))
+        url = ev.payload
+        if url in self.in_progress and time.time() - self.in_progress[url] <\
+                self.ttl:
+            # Don't process one url simultaneously.
+            defer.returnValue('')
         if res['status'] == 'no archive':
-            ta = TrackArchive(race_id, ev.payload)
+            ta = TrackArchive(str(race_id), url)
             archinfo = yield threads.deferToThread(ta.process_archive)
             yield self._inform_about_paragliders(archinfo, race_id)
         elif res['status'] == 'unpacked':
             yield self.event_dispatched(ev.id)
 
-    @defer.inlineCallbacks
     def _inform_about_paragliders(self, archinfo, race_id):
         '''
-        Emit ParagliderFoundInArchive events for every received paraglider,
-        also delete ArchiveURLReceived event.
+        Inform system about finded paragliders, then inform system about
+        succesfull archive unpacking.
         @param archinfo: ([{person_id, trackfile, contest_number}],
         [trackfile,], [person_id,])
+        @type race_id: C{RaceID}
         '''
         # TODO: add events for extra tracks and left paragliders.
         tracks, extra_tracks, left_paragliders = archinfo
-        res = yield API.get_track_archive(race_id)
-        if res['status'] == 'unpacked':
-            # I think here will be list of contest numbers.
-            persisted = res['progress']['paragliders_found']
-            to_persist = []
-            for di in tracks:
-                if not di['contest_number'] in persisted:
-                    to_persist.append(di)
-                    tracks = to_persist
-        else:
-            yield pe.event_store().persist(events
-                .TrackArchiveUnpacked(race_id, aggregate_type='race',
-                                      payload=archinfo))
-        yield self._paragliders_found(tracks, race_id)
-
-    def _paragliders_found(self, to_persist, race_id):
-        '''
-        Persist events in EventStore.
-        @param to_persist: {person_id, trackfile, contest_number}
-        @type to_persist: C{dict}
-        '''
         dlist = []
-        for di in to_persist:
-            dlist.append(pe.event_store().persist(events
-                .ParagliderFoundInArchive(race_id,
-                                          aggregate_type='race',
-                                          payload=di))
-            )
-        d = defer.gatherResults(dlist, consumeErrors=True)
+        es = pe.event_store()
+        for di in tracks:
+            ev = events.ParagliderFoundInArchive(race_id, payload=di)
+            dlist.append(es.persist(ev))
+        d = defer.DeferredList(dlist, fireOnOneErrback=True)
+        d.addCallback(lambda _:es.persist(events
+                .TrackArchiveUnpacked(race_id, payload=archinfo)))
         return d
 
     @defer.inlineCallbacks
-    def process_RaceGotNewTrack(self, ev):
-        race_id = str(ev.aggregate_id)
-        cn = ev.payload['contest_number']
-        res = yield API.get_track_archive(race_id)
-        # Maybe this will be list of contest numbers too.
+    def process_RaceGotTrack(self, ev):
+        race_id = ev.aggregate_id
+        res = yield API.get_track_archive(str(race_id))
         if len(res['progress']['parsed_tracks']) == len(res['progress'][
-            'paragliders_found']):
-            yield pe.event_store().persist(events.
-                TrackArchiveParsed(race_id, aggregate_type='race',
-                                   payload=''))
-        self.event_dispatched(ev.id)
+            'paragliders_found']) and not res['status'] == 'parsed':
+            yield pe.event_store().persist(events.TrackArchiveParsed(race_id))
+        yield self.event_dispatched(ev.id)
 
 
 class TrackService(EventPollingService):

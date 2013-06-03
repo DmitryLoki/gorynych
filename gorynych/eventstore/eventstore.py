@@ -8,7 +8,7 @@ import simplejson as json
 from zope.interface import implementer
 
 from gorynych.eventstore.interfaces import IEventStore
-from gorynych.info.domain import events
+from gorynych.common.domain import events
 
 
 @implementer(IEventStore)
@@ -25,6 +25,10 @@ class EventStore(object):
         @rtype: C{list}.
         '''
         d = self.store.load_events(str(id))
+        return d.addCallback(self._construct_event_list)
+
+    def load_undispatched_events(self):
+        d = self.store.load_undispatched_events()
         return d.addCallback(self._construct_event_list)
 
     def _construct_event_list(self, stored_events):
@@ -59,8 +63,13 @@ class EventStore(object):
             return event
 
     def persist(self, event):
-        serialized_event = self._serialize(event)
-        return self.store.append(serialized_event)
+        if isinstance(event, list):
+            to_store = list()
+            for ev in event:
+                to_store.append(self._serialize(ev))
+        else:
+            to_store = [self._serialize(event)]
+        return self.store.append(to_store)
 
     def _serialize(self, event):
         '''

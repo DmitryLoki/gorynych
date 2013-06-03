@@ -1,4 +1,5 @@
 # coding=utf-8
+from twisted.internet import defer
 from zope.interface import implementer
 from twisted.python import log
 
@@ -57,6 +58,13 @@ ADD_TRIGGER = """
     FOR EACH ROW EXECUTE PROCEDURE {func_name}();
     """
 
+GET_UNDISPATCHED_EVENTS = """
+    SELECT e.event_name, e.aggregate_id, e.aggregate_type, e.event_payload,
+    e.event_id, e.occured_on
+    FROM events e, dispatch d
+    WHERE e.event_id = d.event_id;
+    """
+
 EVENTS_TABLE = 'events'
 FUNC_NAME = 'add_to_dispatch'
 DISPATCH_TABLE = 'dispatch'
@@ -98,22 +106,31 @@ class PGSQLAppendOnlyStore(object):
         '''
         Append events from stream to store.
         @param serialized_event:
-        @type serialized_event:
+        @type serialized_event: C{list}
         @return:
         @rtype:
         '''
+        d = defer.Deferred()
+        assert isinstance(serialized_event, list), "AOStore wait for a list."
+        for ev in serialized_event:
+            self._check_event(ev)
+            d.addCallback(lambda _:
+                self.pool.runOperation(INSERT_INTO_EVENTS.format(
+                                            events_table=EVENTS_TABLE), (
+                                           ev['event_name'],
+                                           ev['aggregate_id'],
+                                           ev['aggregate_type'],
+                                           ev['event_payload'],
+                                           ev['occured_on'])))
+        d.callback(1)
+        return d
+
+    def _check_event(self, ev):
         columns = ['event_name', 'aggregate_id',
-           'aggregate_type', 'event_payload', 'occured_on']
+            'aggregate_type', 'event_payload', 'occured_on']
         for col in columns:
-            if not serialized_event.has_key(col):
+            if not ev.has_key(col):
                 raise KeyError("Argument %s is missed" % col)
-        return self.pool.runOperation(INSERT_INTO_EVENTS.format(
-            events_table=EVENTS_TABLE), (
-                       serialized_event['event_name'],
-                       serialized_event['aggregate_id'],
-                       serialized_event['aggregate_type'],
-                       serialized_event['event_payload'],
-                       serialized_event['occured_on']))
 
     def load_events(self, aggregate_id):
         '''
@@ -125,3 +142,7 @@ class PGSQLAppendOnlyStore(object):
         '''
         return self.pool.runQuery(READ_EVENTS.format(
                             events_table=EVENTS_TABLE), (aggregate_id,))
+
+    def load_undispatched_events(self):
+        return self.pool.runQuery(GET_UNDISPATCHED_EVENTS)
+

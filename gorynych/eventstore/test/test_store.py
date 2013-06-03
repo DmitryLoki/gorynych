@@ -4,7 +4,7 @@ from datetime import datetime
 
 from twisted.trial import unittest
 from twisted.internet import defer
-from txpostgres import txpostgres
+from twisted.enterprise import adbapi
 
 from gorynych.eventstore import store
 from gorynych import OPTS
@@ -31,15 +31,16 @@ def create_serialized_event(ts=None, id=None):
     result['occured_on'] = datetime.fromtimestamp(ts)
     return result
 
+POOL = adbapi.ConnectionPool('psycopg2', host=OPTS['db']['host'],
+    database=OPTS['db']['database'], user=OPTS['db']['user'],
+    password=OPTS['db']['password'])
 
 class PGSQLAOSInitTest(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        self.pool = txpostgres.ConnectionPool(None, host=OPTS['db']['host'],
-           database=OPTS['db']['database'], user=OPTS['db']['user'],
-           password=OPTS['db']['password'], min=5)
-        yield self.pool.start()
+        self.pool = POOL
+        self.pool.start()
         yield self.pool.runOperation('drop table if exists "%s" CASCADE',
                                      (EVENTS_TABLE,))
         yield self.pool.runOperation('drop table if exists "%s"',
@@ -55,7 +56,6 @@ class PGSQLAOSInitTest(unittest.TestCase):
                                      (DISPATCH_TABLE,))
         yield self.pool.runOperation('drop function if exists {f}() CASCADE'
         .format(f=FUNC_NAME))
-        yield self.pool.close()
 
     @defer.inlineCallbacks
     def test_init(self):
@@ -78,12 +78,8 @@ class PGSQLAOSInitTest(unittest.TestCase):
 class PGSQLAOSTest(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        self.pool = txpostgres.ConnectionPool(None, host=OPTS['db']['host'],
-                                              database=OPTS['db']['database'],
-                                              user=OPTS['db']['user'],
-                                              password=OPTS['db']['password'],
-                                              min=5)
-        yield self.pool.start()
+        self.pool = POOL
+        self.pool.start()
         self.store = store.PGSQLAppendOnlyStore(self.pool)
         yield self.pool.runOperation('drop table if exists "%s" CASCADE;',
                                      (EVENTS_TABLE,))
@@ -101,14 +97,13 @@ class PGSQLAOSTest(unittest.TestCase):
                                      DISPATCH_TABLE)
         yield self.pool.runOperation('drop function if exists {f}() CASCADE;'
         .format(f=FUNC_NAME))
-        yield self.pool.close()
 
     @defer.inlineCallbacks
     def test_append(self):
         ts = int(time.time())
         id = str(uuid.uuid4())
         ser_event = create_serialized_event(ts=ts, id=id)
-        yield self.store.append(ser_event)
+        yield self.store.append([ser_event])
 
         stored_event = yield self.pool.runQuery(
             "select * from {tbl} where aggregate_id like %s".format(
@@ -129,7 +124,7 @@ class PGSQLAOSTest(unittest.TestCase):
         # id = str(uuid.uuid4())
         id = '4'
         ser_event = create_serialized_event(ts=ts, id=id)
-        yield self.store.append(ser_event)
+        yield self.store.append([ser_event])
         stored_event = yield self.store.load_events(id)
         self.assertEqual(len(stored_event), 1)
         self.assertEqual(stored_event[0][2], id)

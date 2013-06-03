@@ -27,7 +27,7 @@ class TrackArchiveUnpacked(DomainEvent):
          extra tracks,
         paragliders without tracks.
     '''
-    serializer = 'hmmm, json?'
+    serializer = serializers.JSONSerializer()
 
 
 class ParagliderFoundInArchive(DomainEvent):
@@ -74,27 +74,9 @@ class TrackCreated(DomainEvent):
     '''
     Fired when track need to be created.
     @param aggregate_id: TrackID
-    @param payload: {race_task(checkpoints), track_type}
+    @param payload: {race_task, track_type}
     '''
     serializer = serializers.JSONSerializer()
-
-
-class TrackDataReceived(DomainEvent):
-    '''
-    In offline track fired when track filename is received.
-    @param aggregat_id: TrackID
-    @param payload: track filename.
-    '''
-    serializer = serializers.StringSerializer()
-
-
-class PointsAddedToTrack(DomainEvent):
-    '''
-    Fired after points processing.
-    @param aggregate_id: TrackID.
-    @param payload: array with track points which are considered to be a part of track.
-    '''
-    serializer = 'some byte serializer for numpy arrays.'
 
 
 class TrackCheckpointTaken(DomainEvent):
@@ -106,6 +88,23 @@ class TrackCheckpointTaken(DomainEvent):
     serializer = serializers.TupleOf(serializers.IntSerializer())
 
 
+class TrackStarted(DomainEvent):
+    '''
+    Fired then system decided that competition has been started.
+    @param aggregate_id: TrackID
+    '''
+    serializer = serializers.NoneSerializer()
+
+
+class PointsAddedToTrack(DomainEvent):
+    '''
+    Fired after points processing.
+    @param aggregate_id: TrackID.
+    @param payload: array with track points which are considered to be a part of track.
+    '''
+    serializer = 'some byte serializer for numpy arrays.'
+
+
 class TrackFinishTimeReceived(DomainEvent):
     '''
     Fired then system found time which will be used as finish time.
@@ -115,14 +114,6 @@ class TrackFinishTimeReceived(DomainEvent):
     serializer = serializers.IntSerializer()
 
 
-class TrackStarted(DomainEvent):
-    '''
-    Fired then system decided that competition has been started.
-    @param aggregate_id: TrackID
-    '''
-    serializer = serializers.NoneSerializer()
-
-
 class TrackFinished(DomainEvent):
     '''
     Fired then system decided that competition track finished.
@@ -130,15 +121,6 @@ class TrackFinished(DomainEvent):
     @param payload: None
     '''
     serializer = serializers.NoneSerializer()
-
-
-class TrackStarted(DomainEvent):
-    '''
-    New track started.
-    @param aggregate_id: TrackID
-    @param payload: DomainEvent id from which track starts.
-    '''
-    serializer = serializers.StringSerializer()
 
 
 class TrackEnded(DomainEvent):
@@ -184,14 +166,6 @@ class ContestRaceCreated(DomainEvent):
 
 
 ############## undecided events
-
-class TrackAddedToRace(DomainEvent):
-    '''
-    @param payload: (track_id, contest_number)
-    @type: payload: C{tuple}
-    '''
-    serializer = serializers.TupleOf(serializers.StringSerializer())
-
 
 class TrackerAssigned(DomainEvent):
     '''

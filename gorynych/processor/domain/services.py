@@ -9,7 +9,7 @@ import numpy as np
 import numpy.ma as ma
 
 from gorynych.common.domain.services import point_dist_calculator
-from gorynych.processor.events import TrackEnded
+from gorynych.common.domain.events import TrackEnded
 
 def choose_offline_parser(trackname):
     if trackname.endswith('.igc'): return IGCTrackParser
@@ -93,6 +93,7 @@ class KMLTrackParser(object):
 
 
 class FileParserAdapter(object):
+    type = 'competition_aftertask'
     def __init__(self, dtype):
         self.dtype = dtype
 

@@ -80,9 +80,16 @@ class JSONSerializer(object):
         return json.loads(value)
 
 
-class IntSerializer():
-    pass
+class IntSerializer(object):
+    def to_bytes(self, value):
+        return bytes(value)
+
+    def from_bytes(self, value):
+        return int(value)
 
 
-def NoneSerializer():
-    return None
+class NoneSerializer(object):
+    def to_bytes(self, value):
+        return bytes('')
+    def from_bytes(self, value):
+        return None

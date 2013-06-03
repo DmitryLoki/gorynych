@@ -4,11 +4,12 @@ Track aggregate.
 __author__ = 'Boris Tsema'
 
 import numpy as np
+from zope.interface import Interface
 
 from gorynych.common.domain.model import AggregateRoot, ValueObject, DomainIdentifier
-from gorynych.processor.domain import services
-from gorynych.processor import events
+from gorynych.common.domain import events
 from gorynych.common.domain.types import checkpoint_collection_from_geojson
+from gorynych.processor.domain import services
 
 DTYPE = [('id', 'i8'), ('timestamp', 'i4'), ('lat', 'f4'),
     ('lon', 'f4'), ('alt', 'i2'), ('g_speed', 'f4'), ('v_speed', 'f4'),
@@ -35,19 +36,22 @@ class TrackState(ValueObject):
     '''
     Hold track state. Memento.
     '''
+    states = ['not started', 'started', 'finished', 'landed']
     def __init__(self, events):
-        # Buffer for points. It has fixed length or fixed time amount.
-        self.pbuffer = np.empty(0, dtype=DTYPE)
-        for ev in events:
-            self.mutate(ev)
-        # necessary fields
         self.track_type = None
         self.race_task = None
         self.last_checkpoint = 0
+        self.state = 'not started'
+        self.statechanged_at = None
+        self.started = False
+        self.start_time = None
+        self.pbuffer = np.empty(0, dtype=DTYPE)
         # Time at which track has been ended.
-        self.end_time = 0
+        self.end_time = None
         self.ended = False
         self.finish_time = None
+        for ev in events:
+            self.mutate(ev)
 
     def mutate(self, ev):
         '''
@@ -62,28 +66,44 @@ class TrackState(ValueObject):
             getattr(self, 'apply_' + evname)(ev)
 
     def apply_TrackCreated(self, ev):
-        pass
+        self.track_type = ev.payload['track_type']
+        self.race_task = ev.payload['race_task']
 
-    def apply_TrackEnded(self, ev):
-        if self.state == 'finished':
-            return
-        self.state = ev.payload['state']
-        self.statechanged_at = ev.occured_on
-
-    def apply_PointsAddedToTrack(self, ev):
-        pass
-
-    def apply_TrackFinished(self, ev):
-        self.state = 'finished'
+    def apply_TrackCheckpointTaken(self, ev):
+        n = ev.payload[0]
+        if self.last_checkpoint < n:
+            self.last_checkpoint = n
 
     def apply_TrackStarted(self, ev):
-        pass
+        if not self.started:
+            self.state = 'started'
+            self.start_time = ev.occured_on
+            self.statechanged_at = ev.occured_on
+            self.started = True
+
+    def apply_PointsAddedToTrack(self, ev):
+        self.pbuffer = ev.payload
+
+    def apply_TrackEnded(self, ev):
+        if not self.state == 'finished':
+            self.state = ev.payload['state']
+            self.statechanged_at = ev.occured_on
+        self.ended = True
+        self.end_time = ev.occured_on
+
+    def apply_TrackFinished(self, ev):
+        if not self.state == 'finished':
+            self.state = 'finished'
+            self.statechanged_at = ev.occured_on
 
     def apply_TrackFinishTimeReceived(self, ev):
         self.finish_time = ev.payload
 
     def get_state(self):
-        pass
+        result = dict()
+        result['points'] = self.pbuffer
+        result['state'] = self.state
+        result['statechanged_at'] = self.statechanged_at
 
 
 class Track(AggregateRoot):
@@ -107,9 +127,6 @@ class Track(AggregateRoot):
     def process_data(self, data):
         # Here TrackType read data and return it in good common format.
         data = self.type.read(data)
-        self._accumulate_points(data)
-
-    def _process(self, data):
         # Now TrackType correct points and calculate smth if needed.
         points, evs = self.type.process(self._state, data,
             self.task.start_time, self.task.end_time)
@@ -119,42 +136,13 @@ class Track(AggregateRoot):
         points, ev_list = self.task.process(points, self._state, self.id)
         for ev in ev_list:
             self.apply(ev)
-        # Don't sure about this.
-        self.processed_points, self.points = points[:-1], points[-1]
-        ev = events.TrackDataReceived(self.id, self.processed_points)
-        ev.occured_on = self.processed_points['timestamp'][-1]
+        ev = events.PointsAddedToTrack(self.id, points)
+        ev.occured_on = points['timestamp'][0]
         self.apply(ev)
         # Look for state after processing and do all correctness.
         evlist = self.type.correct(self._state)
         for ev in evlist:
             self.apply(ev)
-
-    def _accumulate_points(self, data):
-        '''
-        Collect enough amount of points, order it and send to processing.
-        '''
-        # TODO: handle receiving of disordered data.
-        pbuffer = self._state.pbuffer
-        if not self.points:
-            # First data received.
-            # Process data and write something in self.points. Also emit events
-            # to fill self._state.pbuffer.
-            self._process(data)
-            return
-        if data['timestamp'][-1] - self.points['timestamp'][0] > self.flush_time:
-            # Got enough points for calculation.
-            self._process(data)
-        else:
-            # Don't hav enough points. Add it to buffer,
-            # but don't forget to check it after flush_time.
-            self.points = self._update_buffer(data)
-
-    def check_buffer(self):
-        '''
-        Called by application service. Check for stale self.points and
-        perform calculation if time is come.
-        '''
-        raise NotImplementedError()
 
     @property
     def state(self):
@@ -172,11 +160,8 @@ class Track(AggregateRoot):
             self._type = track_types(self._state.track_type)
         return self._type
 
-    def _update_buffer(self, data):
-        raise NotImplementedError()
 
-
-class RaceToGoal:
+class RaceToGoal(object):
     '''
     Incapsulate race parameters calculation.
     '''
@@ -243,3 +228,13 @@ class RaceToGoal:
 
         return points, eventlist
 
+
+class ITrackRepository(Interface):
+    def save(track):
+        '''
+        Save track.
+        @param track:
+        @type track:
+        @return:
+        @rtype:
+        '''

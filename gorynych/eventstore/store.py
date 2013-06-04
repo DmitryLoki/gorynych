@@ -59,8 +59,8 @@ ADD_TRIGGER = """
     """
 
 GET_UNDISPATCHED_EVENTS = """
-    SELECT e.event_name, e.aggregate_id, e.aggregate_type, e.event_payload,
-    e.event_id, e.occured_on
+    SELECT e.event_id, e.event_name, e.aggregate_id, e.aggregate_type,
+    e.event_payload, e.occured_on
     FROM events e, dispatch d
     WHERE e.event_id = d.event_id;
     """

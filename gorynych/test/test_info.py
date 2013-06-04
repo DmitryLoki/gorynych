@@ -43,6 +43,7 @@ def create_race(contest_id, checkpoints=None):
         checkpoints = create_geojson_checkpoints()
     params = dict(title="Task 8", race_type='opendistance', bearing=12,
                    checkpoints=checkpoints)
+    print "start race creating..."
     return requests.post('/'.join((URL, 'contest', contest_id, 'race')),
                      data=params)
 
@@ -211,8 +212,7 @@ class ParaglidersTest(unittest.TestCase):
 
 
 class ContestRaceTest(unittest.TestCase):
-    def test_create_and_read_race(self):
-        # TODO: refactor this test by splitting it and creating setUp method.
+    def setUp(self):
         try:
             c_id = create_contest(title='Contest with checkpoints and race')
             p_id = create_persons()
@@ -221,20 +221,25 @@ class ContestRaceTest(unittest.TestCase):
             raise unittest.SkipTest("I need contest and paraglider for test")
         if not (p_id and c_id):
             raise unittest.SkipTest("I need contest and paraglider for test")
+        self.c_id = c_id
+        self.p_id = p_id
 
+    def test_1_create_race(self):
         chs = create_geojson_checkpoints()
-        r = create_race(c_id, chs)
+        print self.c_id
+        r = create_race(self.c_id, chs)
         self.assertEqual(r.status_code, 201)
-        race_id = r.json()['id']
+        # race_id = r.json()['id']
         self.assertDictContainsSubset({'type':'opendistance',
                                        'title':'Task 8',
                                        'start_time': '1347711300',
                                        'end_time': '1347732000'
                                        }, r.json())
 
+    def test_2_get_race(self):
         # Test GET /contest/{id}/race
-        time.sleep(1)
-        r = requests.get('/'.join((URL, 'contest', c_id, 'race')))
+        r = requests.get('/'.join((URL, 'contest', self.c_id, 'race')))
+        print r.text
         self.assertEqual(r.status_code, 200)
         self.assertIsInstance(r.json(), list)
         self.assertDictContainsSubset({'type':'opendistance',
@@ -242,8 +247,15 @@ class ContestRaceTest(unittest.TestCase):
                                        'start_time': '1347711300',
                                        'end_time': '1347732000'}, r.json()[0])
 
+    def test_3_get_concrete_race(self):
+        time.sleep(2)
+        r = requests.get('/'.join((URL, 'contest', self.c_id, 'race')))
+        print r.text
+        race_id = r.json()['id']
+        print race_id
         # Test GET /contest/{id}/race/{id}
-        r = requests.get('/'.join((URL, 'contest', c_id, 'race', race_id)))
+        r = requests.get('/'.join((URL, 'contest', self.c_id, 'race', race_id)))
+        chs = create_geojson_checkpoints()
         result = r.json()
         self.assertEqual(r.status_code, 200)
         self.assertEqual(result['bearing'], '12')
@@ -258,7 +270,7 @@ class ContestRaceTest(unittest.TestCase):
             new_ch_list[i] = item.__geo_interface__
         params = dict(race_title='Changed race', bearing=8, checkpoints=json
             .dumps({'type': 'FeatureCollection', 'features': new_ch_list}))
-        r = requests.put('/'.join((URL, 'contest', c_id, 'race', race_id)),
+        r = requests.put('/'.join((URL, 'contest', self.c_id, 'race', race_id)),
                          data=json.dumps(params))
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['race_title'], 'Changed Race')
@@ -267,7 +279,7 @@ class ContestRaceTest(unittest.TestCase):
                          json.loads(json.dumps(new_ch_list)))
 
         # Test POST /contest/{id}/race/{id}/track_archive
-        r = requests.post('/'.join((URL, 'contest', c_id, 'race', race_id,
+        r = requests.post('/'.join((URL, 'contest', self.c_id, 'race', race_id,
                    'track_archive')), data={'url':'http://airtribune.com/1'})
         self.assertEqual(r.json()['status'],
             "Archive with url http://airtribune.com/1 added.")

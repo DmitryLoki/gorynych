@@ -276,11 +276,15 @@ class TrackArchiveResource(APIResource):
     def read_GET(self, r, p=None):
         if r:
             status = r.track_archive.state
-            found_cn = list(r.track_archive.progress.get('paragliders_found'))
-            parsed_cn = list(r.track_archive.progress.get('parsed_tracks'))
+            found_cn = r.track_archive.progress.get('paragliders_found')
+            parsed_cn = r.track_archive.progress.get('parsed_tracks')
+            if not parsed_cn:
+                parsed_cn = []
+            if not found_cn:
+                found_cn = list()
             return dict(status=status,
-                        found_contest_numbers=found_cn,
-                        parsed_contest_numbers=parsed_cn)
+                        found_contest_numbers=list(found_cn),
+                        parsed_contest_numbers=list(parsed_cn))
 
 
 # TODO: this resource should be in processor package.

@@ -2,11 +2,11 @@ import unittest
 
 import mock
 
-from gorynych.common.domain.events import ParagliderRegisteredOnContest
+from gorynych.common.domain import events
 from gorynych.info.domain.test.helpers import create_contest
 from gorynych.info.domain import contest, person
 from gorynych.common.domain.types import Address, Name, Country
-from gorynych.info.domain.ids import PersonID
+from gorynych.info.domain.ids import PersonID, RaceID
 
 
 class MockedPersonRepository(mock.Mock):
@@ -54,6 +54,22 @@ class ContestFactoryTest(unittest.TestCase):
                           "Contest can be created with wrong times.")
 
 
+class EventsApplyingTest(unittest.TestCase):
+    def test_ContestRaceCreated(self):
+        cont = create_contest(1, 2)
+        rid = RaceID()
+        ev = events.ContestRaceCreated(cont.id, rid)
+        self.assertRaises(AssertionError, cont.apply, ev)
+        cont.apply([ev])
+        self.assertEqual(len(cont.race_ids), 1)
+        cont.apply([ev])
+        self.assertEqual(len(cont.race_ids), 1)
+        rid = RaceID()
+        ev = events.ContestRaceCreated(cont.id, rid)
+        cont.apply([ev])
+        self.assertEqual(len(cont.race_ids), 2)
+
+
 class ContestTest(unittest.TestCase):
     @mock.patch('gorynych.common.infrastructure.persistence.event_store')
     def test_register_paraglider(self, patched):
@@ -85,9 +101,9 @@ class ContestTest(unittest.TestCase):
         mock_calls = event_store.mock_calls
         self.assertEqual(len(mock_calls), 2)
         self.assertEqual(mock_calls[-1], mock.call.persist(
-            ParagliderRegisteredOnContest(p2, cont.id)))
+            events.ParagliderRegisteredOnContest(p2, cont.id)))
         self.assertEqual(mock_calls[-2], mock.call.persist(
-            ParagliderRegisteredOnContest(p1, cont.id)))
+            events.ParagliderRegisteredOnContest(p1, cont.id)))
 
 
     def test_times_changing(self):

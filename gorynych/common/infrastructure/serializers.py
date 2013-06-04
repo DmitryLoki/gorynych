@@ -77,7 +77,7 @@ class JSONSerializer(object):
         return json.dumps(value)
 
     def from_bytes(self, value):
-        return json.loads(value)
+        return json.loads(str(value))
 
 
 class IntSerializer(object):
@@ -85,7 +85,7 @@ class IntSerializer(object):
         return bytes(value)
 
     def from_bytes(self, value):
-        return int(value)
+        return int(str(value))
 
 
 class NoneSerializer(object):

@@ -294,8 +294,33 @@ class TrackArchiveResource(APIResource):
             )
 
 
-# TODO: this resource should be in processor package.
 class RaceTracksResource(APIResource):
+    '''
+    /race/{id}/tracks,
+    /contest/{id}/race/{id}/tracks
+    Return list with tracks information.
+    '''
+    name = 'race_tracks'
+    service_command = dict(GET='get_race_tracks')
+    def read_GET(self, rows, params=None):
+        if rows:
+            result = []
+            for row in rows:
+                if row[2]:
+                    st = int(row[2])
+                else:
+                    st = 'null'
+                if row[3]:
+                    et = int(row[3])
+                else:
+                    et = 'null'
+                result.append(dict(type=row[0], track_id=row[1],
+                    start_time=st, end_time=et))
+            return result
+
+
+# TODO: this resource should be in processor package.
+class TracksResource(APIResource):
     '''
     /race/{id}/tracks
     Return track data and state.

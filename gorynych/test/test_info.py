@@ -44,12 +44,8 @@ def create_race(contest_id, checkpoints=None, race_type='racetogoal',
         checkpoints = create_geojson_checkpoints()
     params = dict(title="Task 8", race_type=race_type,
                    checkpoints=checkpoints)
-<<<<<<< HEAD
     if bearing:
         params['bearing'] = bearing
-=======
-    print "start race creating..."
->>>>>>> issue3229-3129
     return requests.post('/'.join((URL, 'contest', contest_id, 'race')),
                      data=params)
 
@@ -230,12 +226,7 @@ class ContestRaceTest(unittest.TestCase):
 
     def test_1_create_race(self):
         chs = create_geojson_checkpoints()
-<<<<<<< HEAD
-        r = create_race(c_id, chs, race_type='opendistance', bearing=12)
-=======
-        print self.c_id
-        r = create_race(self.c_id, chs)
->>>>>>> issue3229-3129
+        r = create_race(self.c_id, chs, race_type='opendistance', bearing=12)
         self.assertEqual(r.status_code, 201)
         # race_id = r.json()['id']
         self.assertDictContainsSubset({'type':'opendistance',

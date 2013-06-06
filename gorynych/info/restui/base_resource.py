@@ -3,14 +3,13 @@ Resources for RESTful API.
 '''
 import os
 import re
-import json
+import simplejson as json
 from string import Template
 
 import yaml
 
 from twisted.web import resource, server
 from twisted.internet import defer
-from twisted.web.error import UnsupportedMethod
 
 from gorynych.common.exceptions import NoAggregate
 

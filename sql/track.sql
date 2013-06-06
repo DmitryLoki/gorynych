@@ -46,3 +46,19 @@ CREATE TABLE TRACKS_GROUP(
 
   PRIMARY KEY (GROUP_ID, TRACK_ID)
 );
+
+
+-- Select tracks
+SELECT
+  track_type.name,
+  track.track_id,
+  track.start_time,
+  track.end_time
+FROM
+  track_type,
+  tracks_group,
+  track
+WHERE
+  tracks_group.track_id = track.id AND
+  tracks_group.group_id = %s;
+

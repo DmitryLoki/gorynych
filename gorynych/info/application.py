@@ -11,20 +11,6 @@ from gorynych.common.domain.types import checkpoint_from_geojson
 from gorynych.common.domain.events import ContestRaceCreated
 from gorynych.common.application import EventPollingService
 
-GET_EVENTS = """
-    SELECT e.event_name, e.aggregate_id, e.event_payload, e.event_id
-    FROM events e, dispatch d
-    WHERE event_name = %s AND e.event_id = d.event_id;
-    """
-
-EVENT_DISPATCHED = """
-    DELETE FROM dispatch WHERE event_id = %s
-    """
-
-ADD_TRACK_TO_RACE = """
-    INSERT INTO race_tracks (id, contest_number, track_id) VALUES(%s, %s, %s)
-    """
-
 class ApplicationService(EventPollingService):
     polling_interval = 2
 
@@ -287,6 +273,19 @@ class ApplicationService(EventPollingService):
     def add_track_archive(self, params):
         d = self.get_race(params)
         d.addCallback(lambda r: r.add_track_archive(params['url']))
+        return d
+
+    ############## Race Track's work ##################
+    def get_race_tracks(self, params):
+        race_id = params['race_id']
+        ttype = params.get('type')
+        def filtr(rows):
+            if not ttype:
+                return rows
+            return filter(lambda row:row[0] == ttype, rows)
+        d = self.pool.runQuery(persistence.select('tracks', 'track'),
+            (race_id,))
+        d.addCallback(filtr)
         return d
 
     ############## common methods ###################

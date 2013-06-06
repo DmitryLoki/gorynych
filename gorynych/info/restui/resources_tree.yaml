@@ -41,6 +41,9 @@ contest:
                 track_archive:
                   leaf: TrackArchiveResource
                   package: *gorynych
+                tracks:
+                  leaf: RaceTracksResource
+                  package: *gorynych
 person:
   leaf: PersonResourceCollection
   package: *gorynych
@@ -62,4 +65,7 @@ race:
           package: *gorynych
         track_archive:
           leaf: TrackArchiveResource
+          package: *gorynych
+        tracks:
+          leaf: RaceTracksResource
           package: *gorynych

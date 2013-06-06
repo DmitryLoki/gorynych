@@ -10,6 +10,7 @@ import numpy.ma as ma
 
 from gorynych.common.domain.services import point_dist_calculator
 from gorynych.common.domain.events import TrackEnded
+from gorynych.common.exceptions import NoGPSData
 
 def choose_offline_parser(trackname):
     if trackname.endswith('.igc'): return IGCTrackParser
@@ -108,6 +109,8 @@ class FileParserAdapter(object):
         corrector = OfflineCorrectorService()
         try:
             track = corrector.correct_track(data, stime, etime)
+        except NoGPSData as e:
+            raise e
         except Exception as e:
             raise Exception("Error while correcting track: %r " % e)
         track['v_speed'] = vspeed_calculator(track['alt'],
@@ -115,12 +118,12 @@ class FileParserAdapter(object):
         track['g_speed'] = gspeed_calculator(track['lat'],
             track['lon'],
             track['timestamp'])
-        return track
+        return track, []
 
     def correct(self, trackstate, _id):
         if not trackstate.finish_time:
-            return TrackEnded(_id, dict(state='landed'),
-                occured_on=trackstate.pbuffer[ -1]['timestamp'])
+            return [TrackEnded(_id, dict(state='landed'),
+                occured_on=trackstate.pbuffer[ -1]['timestamp'])]
 
 
 class ParaglidingTrackCorrector(object):
@@ -149,7 +152,7 @@ class ParaglidingTrackCorrector(object):
         '''
         ultrahigh_idxs = np.where(points > highborder)
         ultralow_idxs = np.where(points < lowborder)
-        return ultralow_idxs, ultrahigh_idxs
+        return ultralow_idxs[0], ultrahigh_idxs[0]
 
     def _place_alt_in_corridor(self, alt):
         '''
@@ -175,18 +178,27 @@ class ParaglidingTrackCorrector(object):
 
         @param item: array with dtype defined in CompetitionTrack.
         @type item: C{numpy.array}
-        @return:
+        @return: np.array, np.array
         @rtype:
         '''
         # Mark points which is out of self.altmin-self.altmax corridor.
         alts_low, alts_high = self._find_points_outside_corridor(
                                     item['alt'], self.altmin, self.altmax)
-        outside_idxs = np.concatenate(alts_low, alts_high)
+        outside_idxs = np.hstack((alts_low, alts_high))
         outside_idxs.sort()
-        # Delete bounding bad points if any.
-        while outside_idxs[-1] == len(item['timestamp']) - 1:
-            item = np.delete(item, [outside_idxs[-1]])
-            outside_idxs = np.delete(outside_idxs, np.s_[-1])
+        if len(outside_idxs) > 0:
+            # Delete bounding bad points if any.
+            idx = outside_idxs[-1]
+            # while outside_idxs[-1] == (len(item['timestamp']) - 1):
+            last_item = len(item['timestamp']) - 1
+            while idx == last_item:
+                item = np.delete(item, [idx])
+                outside_idxs = np.delete(outside_idxs, np.s_[-1])
+                if len(outside_idxs) > 0:
+                    idx = outside_idxs[-1]
+                    last_item = len(item['timestamp']) - 1
+                else:
+                    break
         # Delete first bounding points if any.
         fb = None
         for i, idx in enumerate(outside_idxs):
@@ -223,8 +235,8 @@ class ParaglidingTrackCorrector(object):
             except Exception as e:
                 raise Exception("while looking for initial exc points %s: %s",
                         dif[0], e)
-            if outside_idxs or exc:
-                if exc:
+            if outside_idxs.any() or exc.any():
+                if exc.any():
                     # Median filter found points. Smooth it.
                     try:
                         # here was some bug, TODO: test it and delete
@@ -234,7 +246,7 @@ class ParaglidingTrackCorrector(object):
                         raise Exception("error while smoothing y: %r, x: %r, exc: %s, "
                            "error: %r" % (y, x, exc, e))
                     counter = 1
-                    while exc and counter < 15:
+                    while exc.any() and counter < 15:
                         exc = self._median_finder(smoothed, dif[1],
                                            kern_size + int(counter / 5) * 2)
                         smoothed = self._interpolate(smoothed, x, exc)
@@ -275,13 +287,13 @@ class ParaglidingTrackCorrector(object):
         filtered[len(filtered) - 1] = np.mean(filtered[kern_size:])
         result = y - signal.medfilt(filtered, kern_size)
         bads = np.where(abs(result) > maxdif)
-        return bads
+        return bads[0]
 
     def _interpolate(self, y, x, exclude=None):
         '''
         Smooth y(x). exclude - list of points to exclude while smoothing.
         '''
-        if exclude:
+        if not exclude is None:
             _x = np.delete(x, exclude)
             y = np.delete(y, exclude)
         else:
@@ -321,13 +333,13 @@ class OfflineCorrectorService:
         @return:
         @rtype:
         '''
-        data = ma.masked_inside(track, stime, etime)
+        data = ma.masked_inside(track['timestamp'], stime, etime)
         track = track.compress(data.mask)
         # Eliminate repetitive points.
         times, indices = np.unique(track['timestamp'], return_index=True)
         track = track[indices]
         # Here we still can has points reversed in time. Fix it.
-        tdifs = np.ediff1d(data['timestamp'], to_begin=1)
+        tdifs = np.ediff1d(track['timestamp'], to_begin=1)
         # At first let's find end of track by timeout, if any.
         track_end_idxs = np.where(tdifs > self.maxtimediff)[0]
         if track_end_idxs:
@@ -349,7 +361,13 @@ class OfflineCorrectorService:
         @rtype: C{numpy.array}
         '''
         # Eliminate points outside task time.
+        assert isinstance(stime, int), "Start time must be integer."
+        assert isinstance(etime, int), "End time must be integer."
+        assert isinstance(track, np.ndarray), "Track must be numpy.array " \
+                                              "type."
         track = self._clean_timestamps(track, stime, etime)
+        if not track['alt'].any():
+            raise NoGPSData("Track don't has GPS altitude.")
         return ParaglidingTrackCorrector().correct_data(track)
 
 
@@ -368,30 +386,4 @@ def runs_of_ones_array(bits):
     run_starts, = np.where(difs > 0)
     run_ends, = np.where(difs < 0)
     return run_starts, run_ends
-
-
-class ParagliderTrackMixin:
-    # I'm not sure that this is needed for offline tracks so I just left it.
-    threshold_speed = 10
-    # Threshold value for 'not started'-'flying' change in km/h.
-    sf_speed = 20
-    # Threshold value for 'flying'-'not started' change in km/h.
-    fs_speed = 10
-    # Time interval in which is allowed for pilot to be slow, seconds.
-    slow_interval = 60
-    alt_interval = 5
-
-    __state = 'not started'
-
-    def sky_earth_definer(self):
-        overspeed_idxs = np.where(self.data['g_speed'] > self.threshold_speed)
-        rs, re = runs_of_ones_array(overspeed_idxs)
-        for i in xrange(len(rs)):
-            if self.data['timestamp'][re[i]] - self.data['timestamp'][re[i]] \
-                    > self.slow_interval:
-                # TODO: wrap it in event.
-                self.__state = 'flying'
-                ts = self.data['timestamp'][re[i]]
-                break
-
 

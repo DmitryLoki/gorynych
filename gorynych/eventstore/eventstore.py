@@ -3,7 +3,6 @@ Store events in system according to Event Sourcing pattern.
 '''
 from datetime import datetime
 import time
-import simplejson as json
 
 from zope.interface import implementer
 
@@ -60,6 +59,7 @@ class EventStore(object):
             event = event_class(aggrid, aggregate_type=aggrtype,
                         occured_on=int(time.mktime(ts.timetuple())))
             event.payload = event.serializer.from_bytes(payload)
+            event.id = id
             return event
 
     def persist(self, event):
@@ -79,8 +79,11 @@ class EventStore(object):
         @return:
         @rtype: C{dict}
         '''
-        result = json.loads(str(event))
-        result['occured_on'] = datetime.fromtimestamp(result['occured_on'])
+        result = dict()
+        result['occured_on'] = datetime.fromtimestamp(event.occured_on)
         result['event_payload'] = event.serializer.to_bytes(event.payload)
+        result['aggregate_type'] = str(event.aggregate_type)
+        result['aggregate_id'] = str(event.aggregate_id)
+        result['event_name'] = str(event.__class__.__name__)
         return result
 

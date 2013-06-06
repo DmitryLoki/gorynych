@@ -45,4 +45,6 @@ class BaseOptions(usage.Options):
         self['dbuser'] = o['db']['user']
         self['dbpassword'] = o['db']['password']
 
-OPTS['apiurl'] = 'http://api.airtribune.com/v' + str(__version__)
+# OPTS['apiurl'] = 'http://api.airtribune.com/v' + str(__version__)
+OPTS['apiurl'] = 'http://localhost:8085'
+OPTS['workdir'] = './'

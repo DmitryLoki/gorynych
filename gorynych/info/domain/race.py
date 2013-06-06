@@ -20,6 +20,8 @@ from gorynych.common.infrastructure import persistence
 from gorynych.common.exceptions import TrackArchiveAlreadyExist
 from gorynych.info.domain.ids import RaceID
 
+# PATTERN = r'https?://airtribune.com/\w+'
+PATTERN = r'https?://localhost:8080/\w+'
 
 class RaceTask(ValueObject):
     type = None
@@ -212,7 +214,7 @@ class Race(AggregateRoot):
         if not self.track_archive.state == 'no archive':
             raise TrackArchiveAlreadyExist("Track archive with url %s "
                                            "has been added already." % url)
-        url_pattern = r'https?://airtribune.com/\w+'
+        url_pattern = PATTERN
         if re.match(url_pattern, url):
             persistence.event_store().persist(ArchiveURLReceived(self.id,
                                                                  url))
@@ -254,12 +256,20 @@ class TrackArchive(object):
         tracks, extra_tracks, pers_without_tracks = ev.payload
         for item in tracks:
             self.progress['paragliders_found'].add(item['contest_number'])
+        for item in extra_tracks:
+            self.progress['extra_tracks'].add(item.split('/')[-1])
+        for item in pers_without_tracks:
+            self.progress['without_tracks'].add(item)
 
     def apply_RaceGotTrack(self, ev):
         self.progress['parsed_tracks'].add(ev.payload['contest_number'])
 
     def apply_TrackArchiveParsed(self, ev):
         self.state = 'parsed'
+
+    def apply_TrackWasNotParsed(self, ev):
+        self.progress['unparsed_tracks'].add((ev.payload['contest_number'],
+                                       ev.payload['reason']))
 
     @property
     def state(self):

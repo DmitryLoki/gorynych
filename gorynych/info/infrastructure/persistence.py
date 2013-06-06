@@ -25,6 +25,7 @@ def create_participants(paragliders_row):
                                                    gl, cn, ti))
     return result
 
+# TODO: simplify repositories.
 
 class PGSQLPersonRepository(object):
     implements(IPersonRepository)
@@ -40,6 +41,8 @@ class PGSQLPersonRepository(object):
         if not data:
             raise NoAggregate("Person")
         result = self._create_person(data[0])
+        event_list = yield pe.event_store().load_events(result.id)
+        result.apply(event_list)
         defer.returnValue(result)
 
     @defer.inlineCallbacks
@@ -131,6 +134,8 @@ class PGSQLRaceRepository(object):
             raise DatabaseValueError("No paragliders has been found for race"
                                      " %s." % race_data[0][1])
         result = self._create_race(race_data[0], pgs)
+        event_list = yield pe.event_store().load_events(result.id)
+        result.apply(event_list)
         defer.returnValue(result)
 
     def _create_race(self, race_data, paragliders_row):

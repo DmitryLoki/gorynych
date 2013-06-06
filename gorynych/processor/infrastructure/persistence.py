@@ -8,7 +8,7 @@ from gorynych.common.infrastructure.persistence import np_as_text
 from gorynych.processor.domain import track
 
 class PickledTrackRepository(object):
-    def persist(self, data):
+    def save(self, data):
         f = open('track_repo', 'wb')
         cPickle.dump(data, f, -1)
         f.close()
@@ -27,13 +27,14 @@ def find_snapshots(data):
     result = []
     if data._state.finish_time:
         result.append(dict(timestamp=data._state.finish_time,
-            shapsnot='finished'))
-    else:
+            snapshot='finished'))
+    elif data._state.end_time:
         result.append(dict(timestamp=data._state.end_time,
-            shapsnot='landed'))
+            snapshot='landed'))
 
-    result.append(dict(timestamp=data._state.start_time,
-        shapsnot='started'))
+    if data._state.start_time:
+        result.append(dict(timestamp=data._state.start_time,
+            snapshot='started'))
     return result
 
 
@@ -46,7 +47,7 @@ class TrackRepository(object):
         return self.pool.runInteraction(self._save_new, obj)
 
     def _save_new(self, cur, obj):
-        cur.execute(NEW_TRACK, (obj.state['start_time'], obj.state['end_time'],
+        cur.execute(NEW_TRACK, (obj._state.start_time, obj._state.end_time,
                                 obj.type.type, str(obj.id)))
         dbid = cur.fetchone()[0]
 
@@ -60,5 +61,4 @@ class TrackRepository(object):
                 snap['snapshot']))
         obj._id = dbid
         return obj
-
 

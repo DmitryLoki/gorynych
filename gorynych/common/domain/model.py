@@ -3,7 +3,6 @@ DDD-model specific base classes.
 '''
 import time
 import uuid
-import simplejson as json
 
 
 from zope.interface import implementer
@@ -173,4 +172,4 @@ class DomainEvent(object):
                       aggregate_type=self.aggregate_type,
                       event_payload=repr(self.payload),
                       occured_on=self.occured_on)
-        return json.dumps(result)
+        return str(result)

@@ -103,19 +103,26 @@ class PGSQLAOSTest(unittest.TestCase):
         ts = int(time.time())
         id = str(uuid.uuid4())
         ser_event = create_serialized_event(ts=ts, id=id)
-        yield self.store.append([ser_event])
+        yield self.store.append([ser_event, ser_event])
 
         stored_event = yield self.pool.runQuery(
             "select * from {tbl} where aggregate_id like %s".format(
                 tbl=EVENTS_TABLE), (id,))
+        self.assertEqual(len(stored_event), 2)
         eid, sname, sid, stype, spayload, sts = stored_event[0]
         self.assertTupleEqual((sname, sid, stype, str(spayload), sts),
             ('event_name', id, 'TestAggregate', 'payload',
             datetime.fromtimestamp(ts)), "Event hasn't been saved correctly.")
 
+        eid2, sname2, sid2, stype2, spayload2, sts2 = stored_event[1]
+        self.assertTupleEqual((sname2, sid2, stype2, str(spayload2), sts2),
+            ('event_name', id, 'TestAggregate', 'payload',
+            datetime.fromtimestamp(ts)), "Event hasn't been saved correctly.")
+
         nondispatched_event = yield self.pool.runQuery("select * from {tbl} "
                    "where event_id=%s".format(tbl=DISPATCH_TABLE), (eid,))
-        self.assertEqual(long(eid), nondispatched_event[0][0])
+        defer.returnValue(self.assertEqual(long(eid),
+            nondispatched_event[0][0]))
 
     @defer.inlineCallbacks
     def test_load_events(self):

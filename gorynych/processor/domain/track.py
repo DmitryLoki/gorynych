@@ -11,7 +11,7 @@ from gorynych.common.domain import events
 from gorynych.common.domain.types import checkpoint_collection_from_geojson
 from gorynych.processor.domain import services
 
-DTYPE = [('id', 'i8'), ('timestamp', 'i4'), ('lat', 'f4'),
+DTYPE = [('id', 'i4'), ('timestamp', 'i4'), ('lat', 'f4'),
     ('lon', 'f4'), ('alt', 'i2'), ('g_speed', 'f4'), ('v_speed', 'f4'),
     ('distance', 'i4')]
 
@@ -23,8 +23,9 @@ def track_types(ttype):
 
 
 def race_tasks(rtask):
+    assert isinstance(rtask, dict), "Race task must be dict."
     tasks = dict(racetogoal=RaceToGoal)
-    res = tasks.get(rtask['type'])
+    res = tasks.get(rtask['race_type'])
     if res:
         return res(rtask)
 
@@ -104,6 +105,7 @@ class TrackState(ValueObject):
         result['points'] = self.pbuffer
         result['state'] = self.state
         result['statechanged_at'] = self.statechanged_at
+        return result
 
 
 class Track(AggregateRoot):
@@ -128,7 +130,7 @@ class Track(AggregateRoot):
         # Here TrackType read data and return it in good common format.
         data = self.type.read(data)
         # Now TrackType correct points and calculate smth if needed.
-        points, evs = self.type.process(self._state, data,
+        points, evs = self.type.process(data,
             self.task.start_time, self.task.end_time)
         for ev in evs:
             self.apply(ev)
@@ -140,7 +142,7 @@ class Track(AggregateRoot):
         ev.occured_on = points['timestamp'][0]
         self.apply(ev)
         # Look for state after processing and do all correctness.
-        evlist = self.type.correct(self._state)
+        evlist = self.type.correct(self._state, self.id)
         for ev in evlist:
             self.apply(ev)
 
@@ -168,9 +170,10 @@ class RaceToGoal(object):
     type = 'racetogoal'
     wp_error = 30
     def __init__(self, task):
-        chlist = task['checkpoints']['features']
+        chlist = task['checkpoints']
         self.checkpoints = checkpoint_collection_from_geojson(chlist)
-        self.start_time, self.end_time = task['start_time'], task['end_time']
+        self.start_time = int(task['start_time'])
+        self.end_time = int(task['end_time'])
 
     def calculate_path(self):
         '''
@@ -210,7 +213,7 @@ class RaceToGoal(object):
             dist = nextchp.distance_to((p['lat'], p['lon']))
             if dist <= self.wp_error and not ended:
                 eventlist.append(
-                    events.TrackCheckpointTaken(_id, (lastchp+1, dist),
+                    events.TrackCheckpointTaken(_id, (lastchp+1, int(dist)),
                                                     occured_on=p['timestamp']))
                 if nextchp.type == 'es':
                     eventlist.append(events.TrackFinishTimeReceived(_id,

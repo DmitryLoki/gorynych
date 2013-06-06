@@ -69,6 +69,15 @@ class RaceCheckpointsChanged(DomainEvent):
     serializer = serializers.GeoObjectsListSerializer(checkpoint_from_geojson)
 
 
+class TrackWasNotParsed(DomainEvent):
+    '''
+    For some reason (error mostly) track wasn't parsed.
+    @param aggregate_id: RaceID
+    @param payload:{contest_number, reason}
+    '''
+    serializer = serializers.JSONSerializer()
+
+
 ###### Track events #############################
 class TrackCreated(DomainEvent):
     '''
@@ -102,7 +111,7 @@ class PointsAddedToTrack(DomainEvent):
     @param aggregate_id: TrackID.
     @param payload: array with track points which are considered to be a part of track.
     '''
-    serializer = 'some byte serializer for numpy arrays.'
+    serializer = serializers.PickleSerializer()
 
 
 class TrackFinishTimeReceived(DomainEvent):

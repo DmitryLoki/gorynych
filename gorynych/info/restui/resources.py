@@ -275,16 +275,23 @@ class TrackArchiveResource(APIResource):
 
     def read_GET(self, r, p=None):
         if r:
-            status = r.track_archive.state
-            found_cn = r.track_archive.progress.get('paragliders_found')
-            parsed_cn = r.track_archive.progress.get('parsed_tracks')
-            if not parsed_cn:
-                parsed_cn = []
-            if not found_cn:
-                found_cn = list()
+            result = dict()
+            keys = ['paragliders_found', 'parsed_tracks', 'unparsed_tracks',
+                'extra_tracks', 'without_tracks']
+            ta = r.track_archive
+            status = ta.state
+            for key in keys:
+                if ta.progress.has_key(key):
+                    result[key] = json.dumps(list(ta.progress[key]))
+                else:
+                    result[key] = json.dumps([])
             return dict(status=status,
-                        found_contest_numbers=list(found_cn),
-                        parsed_contest_numbers=list(parsed_cn))
+                found_contest_numbers=result['paragliders_found'],
+                parsed_contest_numbers=result['parsed_tracks'],
+                unparsed_tracks=result['unparsed_tracks'],
+                extra_tracks=result['extra_tracks'],
+                without_tracks=result['without_tracks']
+            )
 
 
 # TODO: this resource should be in processor package.

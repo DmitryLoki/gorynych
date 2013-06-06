@@ -29,3 +29,8 @@ class TrackArchiveAlreadyExist(Exception):
     '''
     Raised when someone try to add track archive after it has been parsed.
     '''
+
+class NoGPSData(Exception):
+    '''
+    Raised when GPS data is needed but absent.
+    '''

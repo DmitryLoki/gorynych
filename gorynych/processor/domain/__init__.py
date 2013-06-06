@@ -12,6 +12,7 @@ from gorynych import OPTS
 
 
 def get_contest_number(track):
+    track = track.split('/')[-1]
     if track.endswith('.igc'):
         words = track.split('.')
         if len(words) > 2:
@@ -33,10 +34,10 @@ class TrackArchive(ValueObject):
         if not download_dir:
             download_dir = OPTS['workdir']
         self.race_id = str(race_id)
-        if not archive_url.endswith('zip'):
+        self.archive_url = str(archive_url)
+        if not self.archive_url.endswith('zip'):
             raise ValueError("I'm waiting for zip-file link but got %s" %
                              archive_url)
-        self.archive_url = archive_url
         if not os.path.isdir(download_dir):
             raise ValueError("%s is not a directory" % download_dir)
         self.download_dir = download_dir
@@ -117,6 +118,6 @@ class TrackArchive(ValueObject):
                 del paragliders[contest_number]
             else:
                 extra_tracks.append(item)
-        left_paragliders = paragliders.values()
+        left_paragliders = paragliders.keys()
         return tracks, extra_tracks, left_paragliders
 

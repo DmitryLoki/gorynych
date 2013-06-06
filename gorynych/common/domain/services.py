@@ -3,8 +3,8 @@ __author__ = 'Boris Tsema'
 import math
 import decimal
 
-import simplejson as json
-from twisted.web.client import getPage
+import requests
+from twisted.python import log
 
 from gorynych import __version__
 from gorynych.common.exceptions import BadCheckpoint
@@ -12,26 +12,39 @@ from gorynych.common.exceptions import BadCheckpoint
 # TODO: create module with constants (like in twisted?).
 EARTH_RADIUS = 6371000
 
+from twisted.web.client import HTTPClientFactory
+HTTPClientFactory.noisy = False
+
 class APIAccessor(object):
     '''
     Implement asynchronous methods for convinient access to JSON api.
     '''
-    def __init__(self, url='api.airtribune.com', version=None):
+    def __init__(self, url, version=None):
         if not version:
             version = str(__version__)
-        self.url = '/'.join((url, version))
+        # self.url = '/'.join((url, version))
+        self.url = url
 
     def get_track_archive(self, race_id):
         url = '/'.join((self.url, 'race', race_id, 'track_archive'))
-        d = getPage(url)
-        d.addCallback(json.loads)
-        return d
+        return self._return_page(url)
 
     def get_race_task(self, race_id):
         url = '/'.join((self.url, 'race', race_id))
-        d = getPage(url)
-        d.addCallback(json.loads)
-        return d
+        return self._return_page(url)
+
+    def _return_page(self, url):
+        # TODO: rewrite in twisted.
+        # d = getPage(url)
+        r = requests.get(url)
+        try:
+            result = r.json()
+        except Exception as e:
+            log.err("Error while doing json in APIAccessor for %s: %r" %
+                    (r.text, e))
+            raise e
+
+        return result
 
 
 def point_dist_calculator(start_lat, start_lon, end_lat, end_lon):

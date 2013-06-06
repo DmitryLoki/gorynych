@@ -3,9 +3,7 @@ Application Services for info context.
 '''
 import simplejson as json
 
-from twisted.application.service import Service
-from twisted.internet import defer, reactor, task
-from twisted.python import log
+from twisted.internet import defer
 
 from gorynych.info.domain import contest, person, race
 from gorynych.common.infrastructure import persistence
@@ -28,7 +26,7 @@ ADD_TRACK_TO_RACE = """
     """
 
 class ApplicationService(EventPollingService):
-    polling_interval = 0.5
+    polling_interval = 2
 
     ############## Contest Service part #############
     def create_new_contest(self, params):

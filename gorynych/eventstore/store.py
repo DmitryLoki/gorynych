@@ -1,5 +1,4 @@
 # coding=utf-8
-from twisted.internet import defer
 from zope.interface import implementer
 from twisted.python import log
 
@@ -110,20 +109,24 @@ class PGSQLAppendOnlyStore(object):
         @return:
         @rtype:
         '''
-        d = defer.Deferred()
-        assert isinstance(serialized_event, list), "AOStore wait for a list."
-        for ev in serialized_event:
-            self._check_event(ev)
-            d.addCallback(lambda _:
-                self.pool.runOperation(INSERT_INTO_EVENTS.format(
+        def interaction(cur, evlist):
+            for ev in evlist:
+                insert = cur.mogrify(INSERT_INTO_EVENTS.format(
                                             events_table=EVENTS_TABLE), (
                                            ev['event_name'],
                                            ev['aggregate_id'],
                                            ev['aggregate_type'],
                                            ev['event_payload'],
-                                           ev['occured_on'])))
-        d.callback(1)
-        return d
+                                           ev['occured_on']))
+                cur.execute(insert)
+            return
+        assert isinstance(serialized_event, list), "AOStore wait for a list."
+        evlist = []
+        for ev in serialized_event:
+            self._check_event(ev)
+            log.msg("event %s appending" % ev['event_name'])
+            evlist.append(ev)
+        return self.pool.runInteraction(interaction, evlist)
 
     def _check_event(self, ev):
         columns = ['event_name', 'aggregate_id',

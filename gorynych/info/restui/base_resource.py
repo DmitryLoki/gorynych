@@ -213,7 +213,7 @@ class APIResource(resource.Resource):
         method = req.method
         try:
             resource_representation = getattr(self, '_'.join(('read',
-                                          method)))(res, request_params)
+                                      method)))(res, request_params)
         except Exception as error:
             body = "Error %r in resource reading function." % error
             return self._handle_error(req, 500, "ReadError", body), None
@@ -253,7 +253,7 @@ class APIResource(resource.Resource):
                 'application/json'))
         req.write(bytes(body))
         req.finish()
-        return req
+        return server.NOT_DONE_YET
 
     def parameters_from_request(self, req):
         '''

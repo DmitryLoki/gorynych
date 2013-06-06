@@ -24,6 +24,7 @@ class EventPollingService(Service):
         log.msg("DB pool started.")
         self.event_poller.start(self.polling_interval)
         Service.startService(self)
+        log.msg("EventPollinService %s started." % self.__class__.__name__)
 
     def stopService(self):
         self.event_poller.stop()
@@ -39,10 +40,13 @@ class EventPollingService(Service):
         while event_list:
             ev = event_list.pop()
             evname = ev.__class__.__name__
-            if hasattr(self, 'process_' + evname):
-                log.msg("Event %r found" % ev)
-                reactor.callLater(0, getattr(self, 'process_'+ evname), ev)
+            attr = 'process_' + evname
+            if hasattr(self, attr):
+                log.msg("Calling %s in %s" % (attr,
+                                            self.__class__.__name__))
+                reactor.callLater(0, getattr(self, attr), ev)
 
     def event_dispatched(self, ev_id):
         ev_id = long(ev_id)
+        log.msg("deleting dispatched event", ev_id)
         return self.pool.runOperation(EVENT_DISPATCHED, (ev_id,))

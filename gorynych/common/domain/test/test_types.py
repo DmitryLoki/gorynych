@@ -83,6 +83,10 @@ class CheckpointTest(unittest.TestCase):
         self.assertEqual(ch2.name, 'A01')
 
         self.assertIsInstance(ch4.geometry, Point)
+        self.assertAlmostEqual(ch2.__geo_interface__['geometry'][
+            'coordinates'][0], 42.502, 3)
+        self.assertAlmostEqual(ch2.__geo_interface__['geometry'][
+            'coordinates'][1], 0.798, 3)
 
     def test_geo_interface(self):
         ch1 = types.Checkpoint(name='A01', geometry=Point(53, 1),

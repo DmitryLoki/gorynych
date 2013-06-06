@@ -2,6 +2,7 @@
 Serializers for system.
 '''
 import simplejson as json
+import cPickle
 # XXX: try don't relate on info package
 from gorynych.info.domain import ids
 from gorynych.common import exceptions
@@ -52,7 +53,6 @@ class GeoObjectsListSerializer(object):
         return result
 
 
-# TODO: classes for serializing collections.
 class TupleOf(object):
     def __init__(self, serializer):
         self.serializer = serializer
@@ -74,7 +74,7 @@ class TupleOf(object):
 class JSONSerializer(object):
 
     def to_bytes(self, value):
-        return json.dumps(value)
+        return buffer(json.dumps(value))
 
     def from_bytes(self, value):
         return json.loads(str(value))
@@ -93,3 +93,11 @@ class NoneSerializer(object):
         return bytes('')
     def from_bytes(self, value):
         return None
+
+
+class PickleSerializer(object):
+    def to_bytes(self, value):
+        return buffer(cPickle.dumps(value, -1))
+
+    def from_bytes(self, value):
+        return cPickle.loads(str(value))

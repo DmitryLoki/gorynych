@@ -56,13 +56,13 @@ class ContestFactory(object):
 class Contest(AggregateRoot):
 
     def __init__(self, contest_id, start_time, end_time, address):
+        super(Contest, self).__init__()
         self.id = contest_id
         self._title = ''
         self._timezone = ''
         self._start_time = start_time
         self._end_time = end_time
         self.address = address
-        # {person_id:{role:'..', contest_number:1, glider:'glider'},}
         self._participants = dict()
         self.race_ids = set()
 

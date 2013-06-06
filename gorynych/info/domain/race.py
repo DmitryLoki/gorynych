@@ -80,20 +80,20 @@ class RaceFactory(object):
             race_id = RaceID()
         elif isinstance(kw['race_id'], str):
             race_id = RaceID.fromstring(kw['race_id'])
-        race = Race(race_id)
+        result = Race(race_id)
         race_type = ''.join(race_type.strip().lower().split())
         if race_type in RACETASKS.keys():
-            race.task = RACETASKS[race_type]()
+            result.task = RACETASKS[race_type]()
         else:
             raise ValueError("Unknown race type.")
-        race.title = title
-        race.timezone = timezone
-        race = self._fill_with_paragliders(race, paragliders)
-        race.checkpoints = checkpoints
+        result.title = title
+        result.timezone = timezone
+        result = self._fill_with_paragliders(result, paragliders)
+        result.checkpoints = checkpoints
         if race_type == 'opendistance':
-            race.task.bearing = kw['bearing']
+            result.task.bearing = kw['bearing']
 
-        return race
+        return result
 
     def _fill_with_paragliders(self, race, paragliders):
         '''
@@ -107,13 +107,12 @@ class RaceFactory(object):
 
 class Race(AggregateRoot):
     def __init__(self, race_id):
+        super(Race, self).__init__()
         self.id = race_id
-
         self.task = None
         self._checkpoints = []
         self._title = ''
         self.timelimits = ()
-        # {contest_number: Paraglider}
         self.paragliders = dict()
         self._timezone = pytz.utc
 

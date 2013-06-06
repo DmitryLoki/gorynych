@@ -92,7 +92,8 @@ class AggregateRoot(object):
     Base class for aggregate roots.
     '''
     _id = None
-    events = []
+    def __init__(self):
+        self.events = []
 
     def apply(self, elist=None):
         '''

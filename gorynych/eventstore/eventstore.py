@@ -3,12 +3,11 @@ Store events in system according to Event Sourcing pattern.
 '''
 from datetime import datetime
 import time
-import simplejson as json
 
 from zope.interface import implementer
 
 from gorynych.eventstore.interfaces import IEventStore
-from gorynych.info.domain import events
+from gorynych.common.domain import events
 
 
 @implementer(IEventStore)
@@ -25,6 +24,10 @@ class EventStore(object):
         @rtype: C{list}.
         '''
         d = self.store.load_events(str(id))
+        return d.addCallback(self._construct_event_list)
+
+    def load_undispatched_events(self):
+        d = self.store.load_undispatched_events()
         return d.addCallback(self._construct_event_list)
 
     def _construct_event_list(self, stored_events):
@@ -56,11 +59,17 @@ class EventStore(object):
             event = event_class(aggrid, aggregate_type=aggrtype,
                         occured_on=int(time.mktime(ts.timetuple())))
             event.payload = event.serializer.from_bytes(payload)
+            event.id = id
             return event
 
     def persist(self, event):
-        serialized_event = self._serialize(event)
-        return self.store.append(serialized_event)
+        if isinstance(event, list):
+            to_store = list()
+            for ev in event:
+                to_store.append(self._serialize(ev))
+        else:
+            to_store = [self._serialize(event)]
+        return self.store.append(to_store)
 
     def _serialize(self, event):
         '''
@@ -70,8 +79,11 @@ class EventStore(object):
         @return:
         @rtype: C{dict}
         '''
-        result = json.loads(str(event))
-        result['occured_on'] = datetime.fromtimestamp(result['occured_on'])
+        result = dict()
+        result['occured_on'] = datetime.fromtimestamp(event.occured_on)
         result['event_payload'] = event.serializer.to_bytes(event.payload)
+        result['aggregate_type'] = str(event.aggregate_type)
+        result['aggregate_id'] = str(event.aggregate_id)
+        result['event_name'] = str(event.__class__.__name__)
         return result
 

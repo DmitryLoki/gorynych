@@ -6,6 +6,7 @@ Clients register a repository instance which implement corresponding interface.
 For retreiving repository instance client use interface class as id.
 
 '''
+from io import BytesIO
 import os
 import re
 
@@ -123,3 +124,10 @@ def _operation(name, tagname, filename=None):
         command = re.search(pattern, f.read(), re.IGNORECASE)
     return command.group(1)
 
+
+def np_as_text(data):
+    cpy = BytesIO()
+    for row in data:
+        cpy.write('\t'.join([repr(x) for x in row]) + '\n')
+    cpy.seek(0)
+    return(cpy)

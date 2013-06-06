@@ -1,11 +1,8 @@
 import json
-import cPickle
 import os
-import sys
-from random import randint
+import time
 
 from shapely.geometry import Point
-from txpostgres import txpostgres
 import mock
 import requests
 
@@ -14,15 +11,18 @@ from twisted.trial import unittest
 
 from gorynych.test.test_info import create_geojson_checkpoints
 from gorynych.common.domain.types import Checkpoint
-from gorynych.processor import trfltfs
-from gorynych.processor.services import trackservice
-from gorynych import OPTS
+from gorynych.processor.services.trackservice import ProcessorService, TrackService
+from gorynych.processor.domain import track
+from gorynych.info.domain.ids import RaceID, PersonID
+from gorynych.common.domain import events
 
 
 URL = 'http://localhost:8085'
 data = open(os.path.join(os.path.dirname(__file__), '1120-5321.json'),
                 'r').read()
 DATA = json.loads(data)
+
+test_race = json.loads('{"race_title":"Test Trackservice Task","race_type":"racetogoal","start_time":"1347704100","end_time":"1347724800","bearing":"None","checkpoints":{"type": "FeatureCollection", "features": [{"geometry": {"type": "Point", "coordinates": [43.9785, 6.48]}, "type": "Feature", "properties": {"close_time": 1347724800, "radius": 1, "name": "D01", "checkpoint_type": "to", "open_time": 1347704100}}, {"geometry": {"type": "Point", "coordinates": [43.9785, 6.48]}, "type": "Feature", "properties": {"close_time": 1347724800, "radius": 3000, "name": "D01", "checkpoint_type": "ss", "open_time": 1347707700}}, {"geometry": {"type": "Point", "coordinates": [44.3711, 6.3098]}, "type": "Feature", "properties": {"close_time": 1347724800, "radius": 21000, "name": "B46", "checkpoint_type": "ordinal", "open_time": 1347704100}}, {"geometry": {"type": "Point", "coordinates": [43.9511, 6.3708]}, "type": "Feature", "properties": {"close_time": 1347724800, "radius": 2000, "name": "B20", "checkpoint_type": "ordinal", "open_time": 1347704100}}, {"geometry": {"type": "Point", "coordinates": [44.0455, 6.3602]}, "type": "Feature", "properties": {"close_time": 1347724800, "radius": 400, "name": "B43", "checkpoint_type": "ordinal", "open_time": 1347704100}}, {"geometry": {"type": "Point", "coordinates": [43.9658, 6.5578]}, "type": "Feature", "properties": {"close_time": 1347724800, "radius": 1500, "name": "B37", "checkpoint_type": "es", "open_time": 1347704100}}, {"geometry": {"type": "Point", "coordinates": [43.9658, 6.5578]}, "type": "Feature", "properties": {"close_time": 1347724800, "radius": 1000, "name": "B37", "checkpoint_type": "goal", "open_time": 1347704100}}]}}')
 
 def create_checkpoints():
     ch_keys = DATA['waypoints'].keys()
@@ -52,10 +52,11 @@ def create_checkpoints():
 
 def create_contest(title='Test TrackService contest'):
     params = dict(title=title, start_time=1,
-                  end_time=sys.maxint,
+                  end_time=int(time.time()),
                   place = 'La France', country='ru',
                   hq_coords='43.3,23.1', timezone='Europe/Paris')
     r = requests.post(URL + '/contest', data=params)
+    print r.text
     return r.json()['id']
 
 
@@ -82,85 +83,100 @@ def create_race(contest_id, checkpoints=None):
     return requests.post('/'.join((URL, 'contest', contest_id, 'race')),
                          data=params)
 
+def raise_callback():
+    d = defer.Deferred()
+    d.addCallback(lambda x: None)
+    d.callback(1)
+    return d
 
 class ParsingTest(unittest.TestCase):
+
     def test_parsing(self):
         # create contest, person, register paragliders, create race:
         cont_id = create_contest()
+        print "contest created: ", cont_id
         register_paragliders_on_contest(cont_id)
+        print "paragliders registered"
         race = create_race(cont_id,
                            create_geojson_checkpoints(create_checkpoints()))
         print race.text
         race_id = race.json()['id']
-        self.init_task(race_id)
+        # self.init_task(race_id)
         r = requests.post('/'.join((URL, 'contest', cont_id, 'race',
                                     race_id, 'track_archive')),
-                                      data={'url': 'http://airtribune.com/1'})
+                                  data={'url':
+                                      'http://localhost:8080/16items.zip'})
         print r.text
         print r.status_code
 
-    def init_task(self, race_id):
-        task = trfltfs.init_task(race_id)
-        self.assertIsInstance(task, dict)
-        self.assertTrue(task.has_key('window_is_open'))
+
+class TestProcessorService(unittest.TestCase):
+    def setUp(self):
+        self.ps = ProcessorService(1)
+        self.pe_patch = mock.patch('gorynych.processor.services.trackservice.pe')
+        self.pe = self.pe_patch.start()
+
+    def tearDown(self):
+        self.pe_patch.stop()
+
+    def test_inform_about_paragliders(self):
+        i0 = {'person_id': 'person_id', 'trackfile':'1.igc',
+            'contest_number': '1'}
+        i1, i2 = [], []
+        rid = RaceID()
+        es = mock.Mock()
+        self.pe.event_store.return_value = es
+        es.persist.return_value = raise_callback()
+        result = self.ps._inform_about_paragliders([[i0], i1, i2], rid)
+
+        ev1 = events.ParagliderFoundInArchive(rid, payload=i0)
+        ev2 = events.TrackArchiveUnpacked(rid, payload=[[i0], i1, i2])
+        expected = [mock.call(ev1), mock.call(ev2)]
+        self.assertListEqual(es.persist.mock_calls, expected)
 
 
-# class PrepareDataTest(unittest.TestCase):
-#     def setUp(self):
-#         self.skipTest("Don't has time for correct test.")
-#         filename = '/Users/asumch2n/PycharmProjects/gorynych/8bec41ac-d96d-41c9-8f45-9ed74890c12a.processed.pickle'
-#         f = open(filename, 'rb')
-#         self.tracs = cPickle.load(f)
-#         f.close()
-#         self.track_number = randint(0, 100)
-#         self.tid = long(randint(0, 1000000))
-#
-#     def test_prepare_data(self):
-#         trac = self.tracs[self.track_number]
-#         data = trackservice.prepare_data((self.tid,), trac)
-#         self.assertEqual(data.ndim, 1)
-#         self.assertEqual(data.shape, (len(trac['alt']),))
-#         self.assertEqual(data['id'][randint(0, 200)], self.tid)
-#         print data[:5]
-#
-#     def test_prepare_binary(self):
-#         trac = self.tracs[self.track_number]
-#         data = trackservice.prepare_data((self.tid,), trac)
-#         a = trackservice.prepare_binary(data)
-#         f = open('prepare_binary', 'wb')
-#         f.write(a.read())
-#         f.close()
-#
-#     def test_prepare_text(self):
-#         trac = self.tracs[self.track_number]
-#         data = trackservice.prepare_data((self.tid,), trac)
-#         a = trackservice.prepare_text(data)
-#         f = open('prepare_text', 'w')
-#         f.write(a.read())
-#         f.close()
+class TestTrackService(unittest.TestCase):
 
-# class TracksInsertionTest(unittest.TestCase):
-#     def setUp(self):
-#         self.pool = txpostgres.ConnectionPool(None, host=OPTS['db']['host'],
-#                                               database=OPTS['db']['database'],
-#                                               user=OPTS['db']['user'],
-#                                               password=OPTS['db']['password'], min=5)
-#         filename = '/Users/asumch2n/PycharmProjects/gorynych/8bec41ac-d96d-41c9-8f45-9ed74890c12a.processed.pickle'
-#         f = open(filename, 'rb')
-#         self.tracs = cPickle.load(f)
-#         return self.pool.start()
-#
-#     def tearDown(self):
-#         return self.pool.close()
-#
-#     @defer.inlineCallbacks
-#     @mock.patch('gorynych.common.infrastructure.persistence.event_store')
-#     def test_insert_offline_tracks(self, patched):
-#         patched.return_value = mock.MagicMock()
-#         race_id = '8bec41ac-d96d-41c9-8f45-9ed74890c12a'
-#         trac = [self.tracs[4]]
-#
-#         serv = trackservice.TrackService(self.pool)
-#         serv.poll_for_events = mock.Mock()
-#         # yield serv.startService()
-#         yield serv.insert_offline_tracks(trac, race_id)
+    @defer.inlineCallbacks
+    def test_get_aggregate(self):
+        es = mock.Mock()
+        es.load_events = mock.Mock()
+        es.load_events.return_value = self.track_created(tid)
+        ts = TrackService(mock.Mock(), es, mock.Mock())
+        self.assertEqual(len(ts.aggregates), 0)
+
+        tid = track.TrackID()
+        d = yield ts._get_aggregate(tid)
+        self.assertIsInstance(d, track.Track)
+        self.assertEqual(d.id, tid)
+        self.assertEqual(len(ts.aggregates), 1)
+
+        d2 = yield ts._get_aggregate(tid)
+        self.assertIsInstance(d2, track.Track)
+        self.assertEqual(len(ts.aggregates), 1)
+
+    def track_created(self, tid):
+        e1 = events.TrackCreated(tid,
+            dict(track_type='competition_aftertask', race_task=test_race))
+        return [e1]
+
+    @defer.inlineCallbacks
+    def test_process_ParagliderFoundInArchive(self):
+        es = mock.Mock()
+        es.persist.return_value = raise_callback()
+        ts = TrackService(mock.Mock(), es, mock.Mock())
+        ts.execute_ProcessData = mock.Mock()
+        ts.append_track_to_race_and_person = mock.Mock()
+        ts.event_dispatched = mock.Mock()
+
+        rid = RaceID.fromstring('r-f4887979-257d-482d-a15c-e87e6eeba2b8')
+        ev = events.ParagliderFoundInArchive(rid)
+        ev.payload = dict(trackfile='trackfile.2.igc', contest_number='2',
+            person_id=PersonID())
+
+        result = yield ts.process_events([ev])
+        ts.process_ParagliderFoundInArchive = mock.Mock()
+        ts.process_ParagliderFoundInArchive.assert_called_with(1)
+        print result
+
+

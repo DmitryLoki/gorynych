@@ -3,15 +3,13 @@ Application Services for info context.
 '''
 import simplejson as json
 
-from zope.interface import Interface
-from twisted.application.service import Service
-from twisted.internet import defer, reactor, task
-from twisted.python import log
+from twisted.internet import defer
 
 from gorynych.info.domain import contest, person, race
 from gorynych.common.infrastructure import persistence
 from gorynych.common.domain.types import checkpoint_from_geojson
-from gorynych.info.domain import events
+from gorynych.common.domain.events import ContestRaceCreated
+from gorynych.common.application import EventPollingService
 
 GET_EVENTS = """
     SELECT e.event_name, e.aggregate_id, e.event_payload, e.event_id
@@ -27,132 +25,8 @@ ADD_TRACK_TO_RACE = """
     INSERT INTO race_tracks (id, contest_number, track_id) VALUES(%s, %s, %s)
     """
 
-class TrackerService(Interface):
-    '''
-    Application Service which work with Tracker aggregate.
-    '''
-
-    def create_tracker(tracker_id, device_id, device_type):
-        '''
-        Create new tracker.
-        @param tracker_id:
-        @type tracker_id:
-        @param device_id:
-        @type device_id:
-        @param device_type:
-        @type device_type:
-        @return: new tracker
-        @rtype: Tracker
-        '''
-
-    def change_tracker_name(tracker_id, new_name):
-        '''
-
-        @param tracker_id:
-        @type tracker_id:
-        @param new_name:
-        @type new_name:
-        @return: changed tracker
-        @rtype: Tracker
-        '''
-
-    def get_tracker(tracker_id):
-        '''
-
-        @param tracker_id:
-        @type tracker_id:
-        @return: a tracker
-        @rtype: Tracker
-        '''
-
-    def get_trackers(tracker_ids):
-        '''
-        Get a bunch of trackers
-        @param tracker_ids:
-        @type tracker_ids: list
-        @return: a list of trackers,
-        @rtype: Tracker
-        '''
-
-    def assign_tracker_to(tracker_id, assignee_id):
-        '''
-        Assign a tracker with tracker_id to person or transport with
-        assignee_id.
-        @param tracker_id:
-        @type tracker_id:
-        @param assignee_id:
-        @type assignee_id:
-        @return:
-        @rtype:
-        '''
-
-    def unassign_tracker(tracker_id):
-        '''
-        Unassign tracker with tracker_id from someone if tracker is assigned.
-        @param tracker_id:
-        @type tracker_id:
-        @return:
-        @rtype:
-        '''
-
-
-class ApplicationService(Service):
-    def __init__(self, pool, event_store=None):
-        if not event_store:
-            event_store = persistence.event_store()
-        self.event_store = event_store
-        self.pool = pool
-        self.event_poller = task.LoopingCall(self.poll_for_events)
-
-    def poll_for_events(self):
-        # log.msg("polling")
-        d = self.pool.runQuery(GET_EVENTS, ('TrackAddedToRace',))
-        d.addCallback(self.process_event_list)
-        return d
-
-    def process_event_list(self, event_list):
-        while event_list:
-            # TODO: rewrite
-            name, aggrid, payload, event_id = event_list.pop()
-            reactor.callLater(0, getattr(self, 'process_'+str(name)),
-                              aggrid, payload, event_id)
-
-    @defer.inlineCallbacks
-    def process_TrackAddedToRace(self, race_id, payload, event_id):
-        payload = str(payload[1:-1]).split(',')
-        track_id, contest_number = payload[0], payload[1]
-
-        # d = self._get_aggregate(str(race_id), race.IRaceRepository)
-        # d.addCallback(lambda r:
-        # (setattr(r.paragliders[int(contest_number)],
-        #          'contest_track_id', track_id), r)[1])
-        # d.addCallback(persistence.get_repository(race.IRaceRepository).save)
-        # log.msg("Processed race_id %s track_id %s" %(race_id, track_id))
-        # d.addCallback(lambda _:self.pool.runOperation(EVENT_DISPATCHED,
-        #                                               (event_id,)))
-        # XXX: this is workaround. Remove then PGSQLRaceRepository will be
-        # implemented.
-        try:
-            yield self.pool.runOperation("INSERT into race (id, "
-                                       "race_id) VALUES (1, %s)", (race_id,))
-        except:
-            pass
-        log.msg("Inserting track %s for race" % track_id)
-        yield self.pool.runOperation(ADD_TRACK_TO_RACE, (1, contest_number,
-                                                       track_id))
-        yield self.pool.runOperation(EVENT_DISPATCHED, (event_id,))
-
-    def startService(self):
-        log.msg("Starting DB pool.")
-        # d = defer.Deferred()
-        d = self.event_store.store.initialize()
-        d.addCallback(lambda _: self.event_poller.start(0.5))
-        d.addCallback(lambda _:Service.startService(self))
-        return d.addCallback(lambda _: log.msg("Service started."))
-
-    # def stopService(self):
-    #     Service.stopService(self)
-    #     return self.pool.close()
+class ApplicationService(EventPollingService):
+    polling_interval = 2
 
     ############## Contest Service part #############
     def create_new_contest(self, params):
@@ -327,12 +201,16 @@ class ApplicationService(Service):
                                       change)
 
     ############## Race Service part ################
+    def get_race(self, params):
+        return self._get_aggregate(params['race_id'], race.IRaceRepository)
+
     @defer.inlineCallbacks
     def create_new_race_for_contest(self, params):
         cont = yield self._get_aggregate(params['contest_id'],
                                 contest.IContestRepository)
         paragliders = cont.paragliders
         plist = []
+        # TODO: make it thinner.
         for key in paragliders:
             pers = yield self._get_aggregate(key, person.IPersonRepository)
             plist.append(contest.Paraglider(key, pers.name, pers.country,
@@ -345,11 +223,9 @@ class ApplicationService(Service):
                                    params['checkpoints'],
                                    bearing=params.get('bearing'))
         # TODO: do it transactionally.
-        yield persistence.event_store().persist(events.ContestRaceCreated(
+        yield persistence.event_store().persist(ContestRaceCreated(
             cont.id, r.id))
         yield persistence.get_repository(race.IRaceRepository).save(r)
-        # yield persistence.get_repository(contest.IContestRepository).save(
-        #     cont)
         defer.returnValue(r)
 
     def get_contest_races(self, params):
@@ -376,8 +252,7 @@ class ApplicationService(Service):
         @return:
         @rtype:
         '''
-        r = yield self._get_aggregate(params['race_id'],
-                                      race.IRaceRepository)
+        r = yield self.get_race(params)
         c = yield self._get_aggregate(params['contest_id'],
                                       contest.IContestRepository)
         defer.returnValue((c, r))
@@ -404,20 +279,15 @@ class ApplicationService(Service):
                 r.bearing = params['bearing']
             return r
 
-        d = self._get_aggregate(params['race_id'], race.IRaceRepository)
+        d = self.get_race(params)
         d.addCallback(change)
         d.addCallback(persistence.get_repository(race.IRaceRepository).save)
         return d
 
-    def get_race_paragliders(self, params):
-        return self._get_aggregate(params['race_id'], race.IRaceRepository)
-
-    def get_race(self, params):
-        return self._get_aggregate(params['race_id'], race.IRaceRepository)
-
     def add_track_archive(self, params):
-        d = self._get_aggregate(params['race_id'], race.IRaceRepository)
-        return d.addCallback(lambda r: r.add_track_archive(params['url']))
+        d = self.get_race(params)
+        d.addCallback(lambda r: r.add_track_archive(params['url']))
+        return d
 
     ############## common methods ###################
     def _get_aggregate(self, id, repository):

@@ -1,227 +1,212 @@
-# coding=utf-8
-import psycopg2
-from twisted.application.service import Service
+import time
+
 from twisted.python import log
-from twisted.internet import task, reactor, threads, defer
-import numpy as np
-from io import BytesIO
-from struct import pack
+from twisted.internet import threads, defer
 
-from gorynych.common.infrastructure import persistence
-from gorynych.processor import trfltfs
-from gorynych.common.domain.model import DomainIdentifier
-from gorynych.processor import events
-from gorynych import OPTS
-
-GET_EVENTS = """
-    SELECT e.event_name, e.aggregate_id, e.event_payload, e.event_id
-    FROM events e, dispatch d
-    WHERE (event_name = %s OR event_name = %s) AND e.event_id = d.event_id;
-    """
-
-NEW_TRACK = """
-    INSERT INTO track (start_time, end_time, track_type, track_id)
-    VALUES (%s, %s, (SELECT id FROM track_type WHERE name=%s), %s)
-    RETURNING ID;
-    """
-INSERT_SNAPSHOT = """
-    INSERT INTO track_snapshot (timestamp, id, snapshot) VALUES(%s, %s, %s)
-    """
+from gorynych.common.domain import events
+from gorynych.common.exceptions import NoGPSData
+from gorynych.common.infrastructure import persistence as pe
+from gorynych.processor.domain import TrackArchive, track
+from gorynych.common.application import EventPollingService
+from gorynych.common.domain.services import APIAccessor
 
 
-def find_snapshots(item, dbid):
-    result = []
-    if item.has_key('finish_time'):
-        sn = dict(timestamp=int(item['finish_time']),
-                  id=long(dbid),
-                  snapshot="finished")
-        result.append(sn)
-    else:
-        sn = dict(timestamp=int(item['times'][-1]),
-                  id=long(dbid),
-                  snapshot="landed")
-        result.append(sn)
-    return result
+API = APIAccessor('http://localhost:8085')
+
+ADD_TRACK_TO_GROUP = """
+    INSERT INTO TRACKS_GROUP VALUES (%s,
+        (SELECT ID FROM TRACK WHERE TRACK_ID=%s));
+"""
+
+class ProcessorService(EventPollingService):
+    '''
+    Orchestrate track creation and parsing.
+    '''
+    in_progress = dict()
+    ttl = 180
+    @defer.inlineCallbacks
+    def process_ArchiveURLReceived(self, ev):
+        '''
+        Download and process track archive.
+        '''
+        race_id = ev.aggregate_id
+        url = ev.payload
+        log.msg("URL received ", url)
+        if url in self.in_progress and time.time() - self.in_progress[url] <\
+                self.ttl:
+            log.msg("Archive in process")
+            # Don't process one url simultaneously.
+            defer.returnValue('')
+        else:
+            res = yield defer.maybeDeferred(API.get_track_archive, str(race_id))
+        if res['status'] == 'no archive':
+            self.in_progress[url] = time.time()
+            ta = TrackArchive(str(race_id), url)
+            log.msg("Start unpacking archive %s for race %s" % (url, race_id))
+            archinfo = yield threads.deferToThread(ta.process_archive)
+            yield self._inform_about_paragliders(archinfo, race_id)
+        yield self.event_dispatched(ev.id)
+
+    def _inform_about_paragliders(self, archinfo, race_id):
+        '''
+        Inform system about finded paragliders, then inform system about
+        succesfull archive unpacking.
+        @param archinfo: ([{person_id, trackfile, contest_number}],
+        [trackfile,], [person_id,])
+        @type race_id: C{str}
+        '''
+        # TODO: add events for extra tracks and left paragliders.
+        tracks, extra_tracks, left_paragliders = archinfo
+        dlist = []
+        es = pe.event_store()
+        for di in tracks:
+            ev = events.ParagliderFoundInArchive(race_id, payload=di, aggregate_type='race')
+            dlist.append(es.persist(ev))
+        d = defer.DeferredList(dlist, fireOnOneErrback=True)
+        d.addCallback(lambda _:es.persist(events
+                .TrackArchiveUnpacked(race_id, payload=archinfo, aggregate_type='race')))
+        d.addCallback(lambda _:log.msg("Track archive for race %s unpacked"
+                                       % race_id))
+        return d
+
+    @defer.inlineCallbacks
+    def process_RaceGotTrack(self, ev):
+        if ev.id in self.in_progress and (
+                time.time() - self.in_progress[ev.id]) < self.ttl:
+            defer.returnValue('')
+        self.in_progress[ev.id] = time.time()
+        race_id = ev.aggregate_id
+        track_id = ev.payload['track_id']
+        try:
+            log.msg(">>>Adding track %s to group %s <<<" % (track_id,
+                                str(race_id)))
+            yield self.pool.runOperation(ADD_TRACK_TO_GROUP, (str(race_id),
+                track_id))
+        except Exception as e:
+            log.msg("Track %s hasn't been added to group %s because of %r" %
+                    (track_id, race_id, e))
+        res = yield defer.maybeDeferred(API.get_track_archive, str(race_id))
+        processed = len(res['progress']['parsed_tracks']) + len(
+            res['progress']['unparsed_tracks'])
+        if len(res['progress']['paragliders_found']) == processed and not (
+                res['status'] == 'parsed'):
+            yield pe.event_store().persist(events.TrackArchiveParsed(
+                race_id, aggregate_type='race'))
+        yield self.event_dispatched(ev.id)
 
 
-class TrackService(Service):
+class TrackService(EventPollingService):
     '''
     TrackService parse track archive.
     '''
-    def __init__(self, pool):
-        self.pool = pool
-        self.event_poller = task.LoopingCall(self.poll_for_events)
+    polling_interval = 2
+    in_progress = dict()
+    ttl = 100
 
-    def startService(self):
-        d = self.pool.start()
-        d.addCallback(lambda _: log.msg("DB pool started."))
-        d.addCallback(lambda _: self.event_poller.start(2))
-        return d.addCallback(lambda _: Service.startService(self))
+    def __init__(self, pool, event_store, track_repository):
+        EventPollingService.__init__(self, pool, event_store)
+        self.aggregates = dict()
+        self.track_repository = track_repository
 
-    def stopService(self):
-        self.event_poller.stop()
-        Service.stopService(self)
-        return self.pool.close()
+    def process_ParagliderFoundInArchive(self, ev):
+        '''
+        After this message TrackService start to listen events for this
+         track.
+        @param ev:
+        @type ev:
+        @return:
+        @rtype:
+        '''
+        trackfile = ev.payload['trackfile']
+        person_id = ev.payload['person_id']
+        contest_number = ev.payload['contest_number']
+        if trackfile in self.in_progress and (time.time() -
+                                self.in_progress[trackfile] < self.ttl):
+            log.msg("trackfile for %s in progress" % contest_number)
+            # Don't process one url simultaneously.
+            return
+        self.in_progress[trackfile] = time.time()
+        log.msg("Got trackfile for paraglider %s" % person_id)
+        race_id = ev.aggregate_id
+        try:
+            race_task = API.get_race_task(str(race_id))
+        except Exception as e:
+            log.msg("Error in API call: %r" % e)
+            race_task = None
+        if not isinstance(race_task, dict):
+            log.msg("Race task wasn't received from API: %r" % race_task)
+            defer.returnValue('')
+        track_type = 'competition_aftertask'
+        track_id = track.TrackID()
 
-    def poll_for_events(self):
-        d = self.pool.runQuery(GET_EVENTS, ('ArchiveURLReceived',
-                                                        'TrackArchiveParsed'))
-        d.addCallback(self.process_events)
+        tc = events.TrackCreated(track_id)
+        tc.payload = dict(race_task=race_task, track_type=track_type)
+        def no_altitude_failure(failure):
+            failure.trap(NoGPSData)
+            log.err("Track %s don't has GPS altitude" % contest_number)
+            ev = events.TrackWasNotParsed(race_id, aggregate_type='race')
+            ev.payload = dict(contest_number=contest_number,
+                reason=failure.getErrorMessage())
+            d = self.event_store.persist(ev)
+            return d
+
+        d = self.event_store.persist(tc)
+        d.addCallback(lambda _:self.execute_ProcessData(track_id, trackfile))
+        d.addCallback(lambda _:log.msg("Trackfile %s processed" % person_id))
+        d.addCallback(lambda _:self.append_track_to_race_and_person(race_id,
+            track_id, track_type, contest_number, person_id))
+        d.addCallback(lambda _:log.msg("trackfile %s data appended" % person_id))
+        d.addErrback(no_altitude_failure)
+        d.addCallback(lambda _:self.event_dispatched(ev.id))
         return d
 
-    def process_events(self, events):
-        while events:
-            name, aggrid, payload, event_id = events.pop()
-            reactor.callLater(0, getattr(self, 'process_'+str(name)),
-                aggrid, payload, event_id)
+    def execute_ProcessData(self, track_id, data):
+        return self.update(track_id, 'process_data', data)
 
-    def process_ArchiveURLReceived(self, aggregate_id, payload, event_id):
-        # d = self.create_track_archive(aggregate_id, payload)
-        # d.addCallback(lambda ta: (ta, ta.download()))
-        # d.addCallback(lambda ta, filename: (ta, ta.unarchive(filename)))
-        # d.addCallback(lambda ta, namelist: (ta, ta.get_track_files(namelist)))
-        # d.addCallback(lambda ta, filelist: ta.parse(filelist))
-        # processor = OfflineTracksProcessor(race_info)
-        # processor.calculate(corrected_data)
+    @defer.inlineCallbacks
+    def update(self, aggregate_id, method, *args, **kwargs):
+        aggr = yield defer.maybeDeferred(self._get_aggregate, aggregate_id)
+        getattr(aggr, method)(*args, **kwargs)
+        # Persist points, state and events if any.
+        yield self.persist(aggr)
 
-        race_id = str(aggregate_id)
-        archive = self.get_url(str(payload))
-        # копипаста из старого кода с некоторыми вкраплениями.
-        task = trfltfs.init_task(race_id)
-        par = trfltfs.Parser(task, archive, race_id)
+    @defer.inlineCallbacks
+    def _get_aggregate(self, _id):
+        if not self.aggregates.get(_id):
+            elist = yield self.event_store.load_events(_id)
+            t = track.Track(_id, events=elist)
+            self.aggregates[_id] = t
+        defer.returnValue(self.aggregates[_id])
 
-        f_list = par.get_filelist()
-        for f in f_list:
-            par.parse(f)
-        del f_list
-        par.clean_data()
-        parsed_data = par.datalist[::]
-        pic(par.datalist, race_id, 'parsed')
-        del par
-        log.msg("go to correct data for a list with length %s", len(parsed_data))
-
-        #try:
-        corrected_data = trfltfs.correct_data(parsed_data)
-        pic(corrected_data, race_id, 'corrected')
-        del parsed_data
-        log.msg("Data corrected")
-        # calculate speeds and distance to Goal
-        calculator = trfltfs.BatchProcessor(task, race_id)
-        calculated_values = calculator.calculate(corrected_data)
-        del calculator
-        log.msg("Values calculated")
-        pic(calculated_values, race_id, 'processed')
-        log.msg("Ready for inserting")
-        return self.insert_offline_tracks(calculated_values, race_id,
-                                          event_id)
-
-    def insert_offline_tracks(self, tracksdata, race_id, event_id):
+    def append_track_to_race_and_person(self, race_id, track_id, track_type,
+            contest_number, person_id):
         '''
-        @param tracksdata: list of dicts which looks like
-        {'_id': 'contest_number', 'name': 'name', 'surname': 'surname',
-        'country': 'country', 'nid': 'person_id',
-        'glider_number': glider_number,
-        'alt':[int], 'lon': [str], 'lat':[str], 'times':[int],
-        'v_speed':float, 'h_speed':float, 'left_distance':int}
+        When track is ready to be shown send messages for Race and Person to
+         append this track to them.
+        @param race_id:
+        @type race_id:
+        @param track_id:
+        @type track_id:
+        @param track_type:
+        @type track_type:
+        @param contest_number:
+        @type contest_number:
+        @param person_id:
+        @type person_id:
+        @return:
+        @rtype:
         '''
-        # psycopg2 can't user copy_from in async mode. This is a SashaGrey
-        # workaround
-        conn = psycopg2.connect(database=OPTS['db']['database'],
-                                host=OPTS['db']['host'],
-                                user=OPTS['db']['user'],
-                                password=OPTS['db']['password'])
-        cur = conn.cursor()
-        for i, item in enumerate(tracksdata):
-            track_id = str(DomainIdentifier())
-            cur.execute(NEW_TRACK, (item['times'][0],item['times'][-1],
-                                   'competition aftertask', track_id))
-            dbid = cur.fetchone()
-            data = prepare_text(prepare_data(dbid, item))
-            snaps = find_snapshots(item, dbid[0])
-            for snap in snaps:
-                cur.execute(INSERT_SNAPSHOT, (snap['timestamp'], snap['id'],
-                snap['snapshot']))
-            cur.copy_expert("COPY track_data FROM STDIN ", data)
-            persistence.event_store().persist(
-                events.PersonGotTrack(item['nid'], track_id, 'person'))
-            persistence.event_store().persist(
-                 events.TrackAddedToRace(race_id,
-                                         (track_id, item['glider_number']),
-                                         'race'))
-            log.msg("Inserted track ", i)
-        cur.execute("DELETE FROM dispatch WHERE event_id=%s", (event_id,))
-        conn.commit()
-        log.msg('Tracks has been inserted successfully.')
-        return conn.close()
-        # log.msg("Start data inserting.")
-        # print "INSERTING"
-        # def inserting_transaction(cur):
-        #     d = defer.Deferred()
-        #     log.msg("In transaction function.")
-        #     print "IN TRANSACTION"
-        #     for i, item in enumerate(tracksdata):
-        #         print "ITEM", i
-        #         this create new track and return it's id
-                # track_id = str(DomainIdentifier())
-                # d.addCallback(lambda _: cur.execute(NEW_TRACK,
-                #                                   (item['times'][0],
-                #                            item['times'][-1],
-                #                            'competition aftertask',
-                #                            track_id)))
-                # d.addCallback(lambda _: cur.fetchone())
+        rgt = events.RaceGotTrack(race_id, aggregate_type='race')
+        rgt.payload = dict(contest_number=contest_number,
+            track_type=track_type, track_id=str(track_id))
+        ptc = events.PersonGotTrack(person_id, str(track_id),
+            aggregate_type='person')
+        return self.event_store.persist([rgt, ptc])
 
-                # d.addCallback(prepare_binary, item)
-                # d.addCallback(lambda x: cur.copy_expert(
-                #     "COPY track_data FROM STDIN WITH BINARY", x))
-                # Inform person and race about new tracks.
-                # d.addCallback(lambda _: persistence.event_store().persist(
-                #     events.PersonGotTrack(item['nid'], track_id, 'person')))
-                # d.addCallback(lambda _: persistence.event_store().persist(
-                #     events.TrackAddedToRace(race_id, track_id, 'race')))
-
-                # d.addCallback(lambda _:log.msg("Track inserted."))
-                # d.callback(1)
-            # return d
-        # return self.pool.runInteraction(inserting_transaction)
-
-
-    # def create_track_archive(self, race_id, payload):
-    #     '''
-    #
-    #     @param race_id:
-    #     @type race_id:
-    #     @return:
-    #     @rtype: L{Parser} instance
-    #     '''
-    #     dlist = [self.get_race_info(race_id),
-    #              self.get_paragliders_info(race_id)]
-    #     d = defer.gatherResults(dlist)
-    #     d.addCallback(lambda x: TrackArchive(payload, self, x[0], x[1]))
-    #     return d
-
-
-    # def get_race_info(self, race_id):
-    #     url = ''
-    #     return self.get_url(url)
-
-    # def get_paragliders_info(self, race_id):
-    #     url = ''
-    #     return self.get_url(url)
-
-    def get_url(self, url):
-        '''
-        Download file from url.
-        @param url:
-        @type url: C{str}
-        @return: path to file.
-        @rtype: C{str}
-        '''
-        log.msg("I'VE GOT URL!!!", url)
-        return '/home/gorynych/data/0.1/1120-5321.zip'
-        # return filename
-
-    # def unarchive(self, filename):
-    #     return threads.deferToThread(archive_service, filename)
+    def persist(self, aggr):
+        d = self.event_store.persist(aggr.changes)
+        d.addCallback(lambda _:self.track_repository.save(aggr))
+        return d
 
 
 def pic(x, name, suf):
@@ -233,66 +218,3 @@ def pic(x, name, suf):
     except Exception as e:
         print "in pic", str(e)
 
-def prepare_data(trackdb_id, item):
-    '''
-    Convert data from dict to numpy array for inserting into db.
-    @param trackdb_id:
-    @type trackdb_id:
-    @param item:
-    @type item:
-    @return: 2d-array which looks like table in DB.
-    @rtype: numpy.array
-    '''
-    log.msg("Preparing for ", trackdb_id)
-    dtype = [('id', 'i8'), ('timestamp', 'i4'), ('lat', 'f4'),
-             ('lon', 'f4'),
-             ('alt', 'i2'), ('g_speed', 'f4'), ('v_speed', 'f4'),
-             ('distance', 'i4')]
-    # rows, columns
-    shape = len(item['times'])
-    # creating numpy data
-    data = np.empty(shape, dtype)
-    data['id'] = np.ones(shape) * long(trackdb_id[0])
-    data['timestamp'] = np.array(item['times'])
-    data['lat'] = np.array(item['lat'])
-    data['lon'] = np.array(item['lon'])
-    data['alt'] = np.array(item['alt'])
-    data['g_speed'] = np.array(item['h_speed'])
-    data['v_speed'] = np.array(item['v_speed'])
-    data['distance'] = np.array(item['left_distance'])
-    return data
-
-def prepare_binary(data):
-    '''
-    Prepare binary file for inserting into PostgreSQL.
-    Was taken from http://stackoverflow.com/questions/8144002/use-binary-copy-table-from-with-psycopg2/8150329#8150329
-    '''
-
-    # Preparing binary data for inserting into db.
-    pgcopy_dtype = [('num_fields', '>i2')]
-    for field, dtype in data.dtype.descr:
-        pgcopy_dtype += [(field + '_length', '>i4'),
-                         (field, dtype.replace('<', '>'))]
-    pgcopy = np.empty(data.shape, pgcopy_dtype)
-    pgcopy['num_fields'] = len(data.dtype)
-    for i in range(len(data.dtype)):
-        field = data.dtype.names[i]
-        # field length in bytes
-        pgcopy[field + '_length'] = data.dtype[i].alignment
-        pgcopy[field] = data[field]
-    log.msg("Binary prepared")
-
-    cpy = BytesIO()
-    # Write as specified: http://www.postgresql.org/docs/current/interactive/sql-copy.html
-    cpy.write(pack('!11sii', b'PGCOPY\n\377\r\n\0', 0, 0))
-    cpy.write(pgcopy.tostring()) # all rows
-    cpy.write(pack('!h', -1)) # file trailer
-    cpy.seek(0)
-    return(cpy)
-
-def prepare_text(data):
-    cpy = BytesIO()
-    for row in data:
-        cpy.write('\t'.join([repr(x) for x in row]) + '\n')
-    cpy.seek(0)
-    return(cpy)

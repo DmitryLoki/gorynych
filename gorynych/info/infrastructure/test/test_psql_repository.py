@@ -29,14 +29,12 @@ class PersonRepositoryTest(unittest.TestCase):
 
     def setUp(self):
         self.repo = PGSQLPersonRepository(POOL)
-        d = POOL.start()
-        d.addCallback(lambda _:db_helpers.initDB('person', POOL))
-        return d
+        POOL.start()
+        db_helpers.initDB('person', POOL)
 
     def tearDown(self):
-        d = db_helpers.tearDownDB('person', POOL)
-        d.addCallback(lambda _:POOL.close())
-        return d
+        db_helpers.tearDownDB('person', POOL)
+        POOL.close()
 
     @defer.inlineCallbacks
     def test_save_new(self):
@@ -93,14 +91,11 @@ class ContestRepositoryTest(unittest.TestCase):
 
     def setUp(self):
         self.repo = PGSQLContestRepository(POOL)
-        d = POOL.start()
-        d.addCallback(lambda _:db_helpers.initDB('contest', POOL))
-        return d
+        POOL.start()
+        return db_helpers.initDB('contest', POOL)
 
     def tearDown(self):
-       d = db_helpers.tearDownDB('contest', POOL)
-       d.addCallback(lambda _:POOL.close())
-       return d
+       return db_helpers.tearDownDB('contest', POOL)
 
     @defer.inlineCallbacks
     def test_get_by_id(self):

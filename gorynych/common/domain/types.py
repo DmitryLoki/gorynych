@@ -5,6 +5,7 @@ import simplejson as json
 
 from shapely.geometry import shape
 from gorynych.common.domain.model import ValueObject
+from gorynych.common.domain.services import point_dist_calculator
 
 
 class Name(ValueObject):
@@ -104,6 +105,27 @@ class Checkpoint(ValueObject):
         if self.open_time and self.close_time:
             assert int(self.close_time) > int(self.open_time), \
                 "Checkpoint close_time must be after open_time."
+        # Distance to something.
+        self.distance = 0
+
+    def distance_to(self, point):
+        '''
+        Calculate distance from point to checkpoint.
+        @param point:
+        @type point: C{tuple} or C{Checkpoint}
+        @return:
+        @rtype: C{float}
+        '''
+        if isinstance(point, tuple):
+            lat, lon = point
+        elif isinstance(point, Checkpoint):
+            lat = point.__geo_interface__['geometry']['coordinates'][0]
+            lon = point.__geo_interface__['geometry']['coordinates'][1]
+        else:
+            raise TypeError("Unknown type %s" % type(point))
+        _lat = self.__geo_interface__['geometry']['coordinates'][0]
+        _lon = self.__geo_interface__['geometry']['coordinates'][1]
+        return point_dist_calculator(lat, lon, _lat, _lon)
 
     @property
     def __geo_interface__(self):

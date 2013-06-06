@@ -33,7 +33,9 @@ class BaseOptions(usage.Options):
     optParameters = [
         ['environment', 'e', 'develop'],
         ['config', 'c', None],
-        ['poolthreads', 'pt', 5, None, int]
+        ['poolthreads', 'pt', 5, None, int],
+        ['workdir', '', './'],
+        ['apiurl', 'url', 'http://api.airtribune.com/']
     ]
 
     def postOptions(self):
@@ -43,3 +45,6 @@ class BaseOptions(usage.Options):
         self['dbuser'] = o['db']['user']
         self['dbpassword'] = o['db']['password']
 
+# OPTS['apiurl'] = 'http://api.airtribune.com/v' + str(__version__)
+OPTS['apiurl'] = 'http://localhost:8085'
+OPTS['workdir'] = './'

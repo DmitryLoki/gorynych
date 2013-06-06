@@ -60,3 +60,6 @@ race:
         paragliders:
           leaf: RaceParagliderResourceCollection
           package: *gorynych
+        track_archive:
+          leaf: TrackArchiveResource
+          package: *gorynych

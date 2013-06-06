@@ -39,3 +39,17 @@ class GeoObjectsListSerializerTest(unittest.TestCase):
         self.assertIsInstance(from_bts[0], Checkpoint)
 
 
+
+class JSONSerializerTest(unittest.TestCase):
+    def test_to_bytes(self):
+        a = [dict(a='b', c='d'), 1, None, 'a', False]
+        res = serializers.JSONSerializer().to_bytes(a)
+        self.assertIsInstance(res, bytes)
+
+
+class PickleSerializer(unittest.TestCase):
+    def test_test(self):
+        import numpy as np
+        a = np.arange(5)
+        s = serializers.PickleSerializer()
+        self.assertTrue((a == s.from_bytes(s.to_bytes(a))).all())

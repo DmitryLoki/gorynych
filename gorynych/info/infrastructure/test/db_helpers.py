@@ -9,9 +9,9 @@ from twisted.enterprise import adbapi
 from gorynych import OPTS
 from gorynych.common.infrastructure import persistence as pe
 
-POOL = adbapi.ConnectionPool('psycopg2', host=OPTS['db']['host'],
-    database=OPTS['db']['database'], user=OPTS['db']['user'],
-    password=OPTS['db']['password'])
+POOL = adbapi.ConnectionPool('psycopg2', host=OPTS['dbhost'],
+    database=OPTS['dbname'], user=OPTS['dbuser'],
+    password=OPTS['dbpassword'])
 
 
 @defer.inlineCallbacks

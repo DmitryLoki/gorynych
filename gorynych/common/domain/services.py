@@ -6,7 +6,7 @@ import decimal
 import requests
 from twisted.python import log
 
-from gorynych import __version__
+from gorynych import __version__, OPTS
 from gorynych.common.exceptions import BadCheckpoint
 
 # TODO: create module with constants (like in twisted?).
@@ -19,11 +19,12 @@ class APIAccessor(object):
     '''
     Implement asynchronous methods for convinient access to JSON api.
     '''
-    def __init__(self, url, version=None):
+    def __init__(self, url=None, version=None):
         if not version:
             version = str(__version__)
-        # self.url = '/'.join((url, version))
-        self.url = url
+        if not url:
+            url = OPTS['apiurl']
+        self.url = '/'.join((url, version))
 
     def get_track_archive(self, race_id):
         url = '/'.join((self.url, 'race', race_id, 'track_archive'))

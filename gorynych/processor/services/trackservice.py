@@ -11,7 +11,7 @@ from gorynych.common.application import EventPollingService
 from gorynych.common.domain.services import APIAccessor
 
 
-API = APIAccessor('http://localhost:8085')
+API = APIAccessor()
 
 ADD_TRACK_TO_GROUP = """
     INSERT INTO TRACKS_GROUP VALUES (%s,

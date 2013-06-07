@@ -1,4 +1,4 @@
--- DB schema for gorynych.
+﻿-- DB schema for gorynych.
 -- Here I assume that database has been prepared already.
 
 -- Aggregate Person ---------------------------------------
@@ -152,6 +152,7 @@ CREATE TABLE TRACK_SNAPSHOT(
 CREATE TABLE TRACKS_GROUP(
   GROUP_ID TEXT ,
   TRACK_ID INT REFERENCES TRACK(ID) ON DELETE CASCADE ,
+  TRACK_LABEL TEXT,
 
   PRIMARY KEY (GROUP_ID, TRACK_ID)
 );

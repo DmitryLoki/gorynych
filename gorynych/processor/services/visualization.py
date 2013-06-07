@@ -14,126 +14,86 @@ from twisted.application.service import Service
 
 
 SELECT_DATA = """
-    WITH ids AS (
-        SELECT
-          tr.id AS id,
-          rt.contest_number as contest_number
-        FROM
-          track tr,
-          race_tracks rt,
-          race r
-        WHERE
-          rt.track_id = tr.track_id AND   
-          rt.id = r.id AND
-          r.race_id = %s)
     SELECT
-          t.timestamp,
-          string_agg(
-            concat_ws(',', i.contest_number, t.lat::text, t.lon::text, t.alt::text, t.v_speed::text, t.g_speed::text, t.distance::text),
-          ';')
-        FROM
-          track_data t,
-          ids i
-        WHERE
-          t.id = i.id AND
-          t.timestamp BETWEEN %s AND %s
-        GROUP BY
-          t.timestamp
-        ORDER BY
-          t.timestamp;
+      t.timestamp,
+      string_agg(
+        concat_ws(',', tg.track_label, t.lat::text, t.lon::text, t.alt::text, t.v_speed::text, t.g_speed::text, t.distance::text),
+      ';')
+    FROM
+      track_data t,
+      tracks_group tg
+    WHERE
+      t.id = tg.track_id AND
+      tg.group_id = %s AND
+      t.timestamp BETWEEN %s AND %s
+    GROUP BY
+      t.timestamp
+    ORDER BY
+      t.timestamp;
     """
 
 SELECT_DATA_SNAPSHOTS = """
-    WITH ids AS (
-        SELECT
-          tr.id AS id,
-          rt.contest_number as contest_number
-        FROM
-          track tr,
-          race_tracks rt,
-          race r
-        WHERE
-          rt.track_id = tr.track_id AND   
-          rt.id = r.id AND
-          r.race_id = %s)
     SELECT
-      s.timestamp, s.snapshot, i.contest_number
+      s.timestamp,
+      s.snapshot,
+      tg.track_label
     FROM
       track_snapshot s,
-      ids i
+      tracks_group tg
     WHERE
-      s.id = i.id AND
-      s.timestamp BETWEEN %s AND %s
+      s.id = tg.track_id AND
+      tg.group_id = %s AND
+      s.timestamp BETWEEN %s AND %s;
     """
 
 GET_HEADERS_DATA = """
-    WITH ids AS (
-        SELECT
-          tr.id AS id,
-          race_tracks.contest_number
-        FROM
-          track tr,
-          race_tracks,
-          race
-        WHERE
-          race_tracks.track_id = tr.track_id AND
-          race_tracks.id = race.id AND
-          race.race_id = %s),
-
-          tdata AS (
+    WITH tdata AS (
             SELECT
               timestamp,
               concat_ws(',', lat::text, lon::text, alt::text, v_speed::text, g_speed::text, distance::text) as data,
               td.id,
               row_number() OVER(PARTITION BY td.id ORDER BY td.timestamp DESC) AS rk
             FROM track_data td,
-                ids
+                tracks_group tg
             WHERE
-              td.id = ids.id
+              td.id = tg.track_id
+              AND tg.group_id = %s
               AND td."timestamp" BETWEEN %s AND %s)
 
     SELECT
-      i.contest_number, t.data, t.timestamp
+      tg.track_label, t.data, t.timestamp
     FROM
       tdata t,
-      ids i
+      tracks_group tg
     WHERE
       t.rk = 1 AND
-      i.id = t.id;
+      tg.track_id = t.id;
   """
 
 GET_HEADERS_SNAPSHOTS = """
-    WITH ids AS (
-        SELECT
-          tr.id AS id,
-          race_tracks.contest_number
-        FROM
-          track tr,
-          race_tracks,
-          race
-        WHERE
-          race_tracks.track_id = tr.track_id AND
-          race_tracks.id = race.id AND
-          race.race_id = %s),
+    WITH
       snaps AS (
         SELECT
           snapshot,
           timestamp,
           ts.id AS id,
+          tg.track_label as track_label,
           row_number() OVER(PARTITION BY ts.id ORDER BY ts.timestamp DESC) AS rk
-        FROM track_snapshot ts,
-            ids
+        FROM
+            track_snapshot ts,
+            tracks_group tg
         WHERE
-          ts.id = ids.id
+          ts.id = tg.track_id AND
+          tg.group_id = %s
           AND ts.timestamp <= %s)
     SELECT
-      i.contest_number, s.snapshot, s.timestamp
+      s.track_label, s.snapshot, s.timestamp
     FROM
       snaps s,
-      ids i
+      tracks_group tg
     WHERE
       s.rk = 1
-      AND s.id = i.id;
+      AND s.id = tg.track_id;
     """
 
 class TrackVisualizationService(Service):
@@ -156,7 +116,7 @@ class TrackVisualizationService(Service):
     def get_track_data(self, params):
         t1 = time.time()
         result = dict()
-        race_id = params['race_id']
+        race_id = params['group_id']
         from_time = int(params['from_time'])
         to_time = int(params['to_time'])
         start_positions = params.get('start_positions')
@@ -240,7 +200,6 @@ class TrackVisualizationService(Service):
             result[int(row[0])][row[2]]['state'] = row[1]
 
         return result
-
 
 
 def parse_result(data):

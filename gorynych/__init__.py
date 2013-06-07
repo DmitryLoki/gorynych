@@ -5,18 +5,13 @@ import yaml
 import os
 from twisted.python import usage
 
-__version__ = 0.1
-# Set GOR_ENV to develop if version is odd and not environment variable is set.
-if 10 * __version__ % 2:
-    if not os.getenv('GOR_ENV', None):
-        os.environ['GOR_ENV'] = 'develop'
+__version__ = '0.1.6'
 
-config = os.path.join(os.path.dirname(__file__), 'config.yaml')
-env = os.getenv('GOR_ENV', 'default').lower()
+BASEDIR = os.path.dirname(__file__)
 
-def get_opts(env, filename=None):
-    if not filename:
-        filename = config
+def get_opts_from_config(env, filename):
+    if not filename.startswith('/'):
+        filename = os.path.join(BASEDIR, filename)
     if os.path.isfile(filename):
         with open(filename, 'r') as f:
             configs = yaml.safe_load(f)
@@ -26,25 +21,25 @@ def get_opts(env, filename=None):
             result.update(configs.get(env, ''))
         return result
 
-OPTS = get_opts(env)
-
 
 class BaseOptions(usage.Options):
     optParameters = [
         ['environment', 'e', 'develop'],
-        ['config', 'c', None],
+        ['config', 'c', 'config.yaml'],
         ['poolthreads', 'pt', 5, None, int],
         ['workdir', '', './'],
         ['apiurl', 'url', 'http://api.airtribune.com/']
     ]
 
     def postOptions(self):
-        o = get_opts(self['environment'], self['config'])
-        self['dbhost'] = o['db']['host']
-        self['dbname'] = o['db']['database']
-        self['dbuser'] = o['db']['user']
-        self['dbpassword'] = o['db']['password']
+        o = get_opts_from_config(self['environment'], self['config'])
+        if o:
+            for key in o:
+                self[key] = o[key]
 
-# OPTS['apiurl'] = 'http://api.airtribune.com/v' + str(__version__)
-OPTS['apiurl'] = 'http://localhost:8085'
-OPTS['workdir'] = './'
+    def parseArgs(self, *args):
+        pass
+
+
+OPTS = BaseOptions()
+OPTS.parseOptions()

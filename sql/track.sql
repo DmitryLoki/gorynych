@@ -43,6 +43,23 @@ CREATE TABLE TRACK_SNAPSHOT(
 CREATE TABLE TRACKS_GROUP(
   GROUP_ID TEXT ,
   TRACK_ID INT REFERENCES TRACK(ID) ON DELETE CASCADE ,
+  TRACK_LABEL TEXT,
 
   PRIMARY KEY (GROUP_ID, TRACK_ID)
 );
+
+
+-- Select tracks
+SELECT
+  track_type.name,
+  track.track_id,
+  track.start_time,
+  track.end_time
+FROM
+  track_type,
+  tracks_group,
+  track
+WHERE
+  tracks_group.track_id = track.id AND
+  tracks_group.group_id = %s;
+

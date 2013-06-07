@@ -17,6 +17,7 @@ ROLES = frozenset(['paraglider', 'organizator'])
 
 class Person(AggregateRoot):
     def __init__(self, person_id, name, country, email, regdate):
+        super(Person, self).__init__()
         self.id = person_id
         self.email = email
         self._name = name
@@ -143,7 +144,7 @@ class IPersonRepository(Interface):
         @rtype:
         '''
 
-#     def get_list(limit, offset):  # @NoSelf
-#         '''
-#         Return list of a person 
-#         '''
+    def get_list(limit, offset):
+        '''
+        Return list of a person
+        '''

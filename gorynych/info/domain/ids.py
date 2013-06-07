@@ -77,8 +77,8 @@ class TrackerID(DomainIdentifier):
     '''
     def __init__(self):
         _uid = uuid.uuid4().hex
-        self._id = '-'.join(('trck', _uid))
+        self._id = '-'.join(('trckr', _uid))
 
     def _string_is_valid_id(self, string):
-        return namespace_uuid_validator(string, 'trck')
+        return namespace_uuid_validator(string, 'trckr')
 

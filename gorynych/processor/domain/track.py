@@ -2,11 +2,13 @@
 Track aggregate.
 '''
 __author__ = 'Boris Tsema'
+import uuid
 
 import numpy as np
 from zope.interface import Interface
 
 from gorynych.common.domain.model import AggregateRoot, ValueObject, DomainIdentifier
+from gorynych.info.domain.ids import namespace_uuid_validator
 from gorynych.common.domain import events
 from gorynych.common.domain.types import checkpoint_collection_from_geojson
 from gorynych.processor.domain import services
@@ -30,7 +32,17 @@ def race_tasks(rtask):
         return res(rtask)
 
 
-class TrackID(DomainIdentifier): pass
+class TrackID(DomainIdentifier):
+    '''
+    trck-749e0d12574a4d4594e72488461574d0'
+    namespace-uuid4.hex
+    '''
+    def __init__(self):
+        _uid = uuid.uuid4().hex
+        self._id = '-'.join(('trck', _uid))
+
+    def _string_is_valid_id(self, string):
+        return namespace_uuid_validator(string, 'trck')
 
 
 class TrackState(ValueObject):

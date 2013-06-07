@@ -31,9 +31,9 @@ def create_serialized_event(ts=None, id=None):
     result['occured_on'] = datetime.fromtimestamp(ts)
     return result
 
-POOL = adbapi.ConnectionPool('psycopg2', host=OPTS['db']['host'],
-    database=OPTS['db']['database'], user=OPTS['db']['user'],
-    password=OPTS['db']['password'])
+POOL = adbapi.ConnectionPool('psycopg2', host=OPTS['dbhost'],
+    database=OPTS['dbname'], user=OPTS['dbuser'],
+    password=OPTS['dbpassword'])
 
 class PGSQLAOSInitTest(unittest.TestCase):
 

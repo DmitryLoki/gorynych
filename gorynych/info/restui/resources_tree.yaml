@@ -12,6 +12,24 @@ aliases:
   track_index: &track_index
     'trck-[a-z0-9]+'
 
+race:
+  leaf: Placeholder
+  package: *gorynych
+  tree:
+    *race_index:
+      leaf: RaceResource
+      package: *gorynych
+      tree: &concrete_race_tree
+        paragliders:
+          leaf: RaceParagliderResourceCollection
+          package: *gorynych
+        track_archive:
+          leaf: TrackArchiveResource
+          package: *gorynych
+        tracks:
+          leaf: RaceTracksResource
+          package: *gorynych
+
 contest:
   leaf: ContestResourceCollection
   package: *gorynych
@@ -34,13 +52,8 @@ contest:
             *race_index:
               leaf: ContestRaceResource
               package: *gorynych
-              tree:
-                paraglider:
-                  leaf: RaceParagliderResourceCollection
-                  package: *gorynych
-                track_archive:
-                  leaf: TrackArchiveResource
-                  package: *gorynych
+              tree: *concrete_race_tree
+
 person:
   leaf: PersonResourceCollection
   package: *gorynych
@@ -49,17 +62,4 @@ person:
       leaf: PersonResource
       package: *gorynych
 
-race:
-  leaf: Placeholder
-  package: *gorynych
-  tree:
-    *race_index:
-      leaf: RaceResource
-      package: *gorynych
-      tree:
-        paragliders:
-          leaf: RaceParagliderResourceCollection
-          package: *gorynych
-        track_archive:
-          leaf: TrackArchiveResource
-          package: *gorynych
+

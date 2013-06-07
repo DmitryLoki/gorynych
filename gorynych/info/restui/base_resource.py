@@ -3,14 +3,13 @@ Resources for RESTful API.
 '''
 import os
 import re
-import json
+import simplejson as json
 from string import Template
 
 import yaml
 
 from twisted.web import resource, server
 from twisted.internet import defer
-from twisted.web.error import UnsupportedMethod
 
 from gorynych.common.exceptions import NoAggregate
 
@@ -271,7 +270,8 @@ class APIResource(resource.Resource):
         # to se in result {'contest': some_id} but want to see
         # {'contest_id': some_id}.
         maps = {'contest': 'contest_id', 'person': 'person_id',
-                'race': 'race_id', 'paraglider': 'person_id'}
+                'race': 'race_id', 'paraglider': 'person_id',
+            'group':'group_id'}
 
         result = dict()
         if req.method == "PUT":

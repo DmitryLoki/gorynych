@@ -317,3 +317,14 @@ class ApplicationService(EventPollingService):
         d.addCallback(persistence.get_repository(repo_interface).get_list,
                       offset)
         return d
+
+    ######################## cleaning room #####################
+    def apply_PersonGotTrack(self, ev):
+        return self.event_dispatched(ev.id)
+
+    def apply_ParagliderRegisteredOnContest(self, ev):
+        return self.event_dispatched(ev.id)
+
+    def apply_TrackCreated(self, ev):
+        return self.event_dispatched(ev.id)
+

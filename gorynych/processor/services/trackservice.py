@@ -15,7 +15,7 @@ API = APIAccessor('http://localhost:8085')
 
 ADD_TRACK_TO_GROUP = """
     INSERT INTO TRACKS_GROUP VALUES (%s,
-        (SELECT ID FROM TRACK WHERE TRACK_ID=%s));
+        (SELECT ID FROM TRACK WHERE TRACK_ID=%s), %s);
 """
 
 class ProcessorService(EventPollingService):
@@ -77,11 +77,12 @@ class ProcessorService(EventPollingService):
         self.in_progress[ev.id] = time.time()
         race_id = ev.aggregate_id
         track_id = ev.payload['track_id']
+        cn = ev.payload.get('contest_number')
         try:
             log.msg(">>>Adding track %s to group %s <<<" % (track_id,
                                 str(race_id)))
             yield self.pool.runOperation(ADD_TRACK_TO_GROUP, (str(race_id),
-                track_id))
+                track_id, cn))
         except Exception as e:
             log.msg("Track %s hasn't been added to group %s because of %r" %
                     (track_id, race_id, e))

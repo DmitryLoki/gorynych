@@ -1,7 +1,7 @@
 __author__ = 'Boris Tsema'
 
 from twisted.application.service import Service
-from twisted.internet import task, reactor
+from twisted.internet import task, reactor, defer
 from twisted.python import log
 
 
@@ -13,8 +13,13 @@ class EventPollingService(Service):
     '''
     Start to read events from db on start.
     '''
+    dont_dispatch = set(['PersonGotTrack', 'PointsAddedToTrack', 'RaceCheckpointsChanged',
+        'ContestRaceCreated', 'ParagliderRegisteredOnContest', 'TrackCheckpointTaken', 'TrackFinished',
+        'TrackFinishTimeReceived', 'TrackStarted'])
     polling_interval = 2
+
     def __init__(self, pool, event_store):
+        self.in_progress = set()
         self.pool = pool
         self.event_store = event_store
         self.event_poller = task.LoopingCall(self.poll_for_events)
@@ -36,17 +41,24 @@ class EventPollingService(Service):
         d.addCallback(self.process_events)
         return d
 
+    @defer.inlineCallbacks
     def process_events(self, event_list):
         while event_list:
             ev = event_list.pop()
+            if ev.id in self.in_progress:
+                continue
             evname = ev.__class__.__name__
+            if evname in self.dont_dispatch:
+                yield self.event_dispatched(ev.id)
             attr = 'process_' + evname
             if hasattr(self, attr):
-                log.msg("Calling %s in %s" % (attr,
-                                            self.__class__.__name__))
+                #log.msg("Calling %s in %s" % (attr,
+                                            #self.__class__.__name__))
                 reactor.callLater(0, getattr(self, attr), ev)
 
     def event_dispatched(self, ev_id):
+        if ev_id in self.in_progress:
+            self.in_progress.remove(ev_id)
         ev_id = long(ev_id)
         log.msg("deleting dispatched event", ev_id)
         return self.pool.runOperation(EVENT_DISPATCHED, (ev_id,))

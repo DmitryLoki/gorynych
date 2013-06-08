@@ -39,7 +39,7 @@ class PGSQLPersonRepository(object):
         data = yield self.pool.runQuery(pe.select('person'),
                                         (str(person_id),))
         if not data:
-            raise NoAggregate("Person")
+            raise NoAggregate("Person %s" % person_id)
         result = self._create_person(data[0])
         event_list = yield pe.event_store().load_events(result.id)
         result.apply(event_list)

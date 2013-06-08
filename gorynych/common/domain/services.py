@@ -22,8 +22,12 @@ class APIAccessor(object):
     def __init__(self, url=None, version=None):
         if not version:
             version = str(__version__)
+        if not version.startswith('v'):
+            version = 'v' + version
         if not url:
             url = OPTS['apiurl']
+            if url.endswith('/'):
+                url = url[:-1]
         self.url = '/'.join((url, version))
 
     def get_track_archive(self, race_id):
@@ -35,16 +39,15 @@ class APIAccessor(object):
         return self._return_page(url)
 
     def _return_page(self, url):
-        # TODO: rewrite in twisted.
-        # d = getPage(url)
         r = requests.get(url)
+        if not r.status_code == 200:
+            return None
         try:
             result = r.json()
         except Exception as e:
             log.err("Error while doing json in APIAccessor for %s: %r" %
                     (r.text, e))
             raise e
-
         return result
 
 

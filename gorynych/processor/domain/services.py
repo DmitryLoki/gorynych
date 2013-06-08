@@ -189,7 +189,6 @@ class ParaglidingTrackCorrector(object):
         if len(outside_idxs) > 0:
             # Delete bounding bad points if any.
             idx = outside_idxs[-1]
-            # while outside_idxs[-1] == (len(item['timestamp']) - 1):
             last_item = len(item['timestamp']) - 1
             while idx == last_item:
                 item = np.delete(item, [idx])
@@ -202,7 +201,7 @@ class ParaglidingTrackCorrector(object):
         # Delete first bounding points if any.
         fb = None
         for i, idx in enumerate(outside_idxs):
-            while outside_idxs[i] == i:
+            if outside_idxs[i] == i:
                 fb = i
         if fb:
             item = np.delete(item, np.s_[:fb + 1])

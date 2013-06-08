@@ -53,8 +53,8 @@ def create_checkpoints():
 def create_contest(title='Test TrackService contest'):
     params = dict(title=title, start_time=1,
                   end_time=int(time.time()),
-                  place = 'La France', country='ru',
-                  hq_coords='43.3,23.1', timezone='Europe/Paris')
+                  place = 'Saint Andre les Alpes', country='FR',
+                  hq_coords='43.5,6.5', timezone='Europe/Paris')
     r = requests.post(URL + '/contest', data=params)
     print r.text
     return r.json()['id']
@@ -78,7 +78,7 @@ def register_paragliders_on_contest(cont_id):
 def create_race(contest_id, checkpoints=None):
     if not checkpoints:
         checkpoints = create_geojson_checkpoints()
-    params = dict(title="Test TrackService Task", race_type='racetogoal',
+    params = dict(title="Task 9", race_type='racetogoal',
                   checkpoints=checkpoints)
     return requests.post('/'.join((URL, 'contest', contest_id, 'race')),
                          data=params)
@@ -93,7 +93,7 @@ class ParsingTest(unittest.TestCase):
 
     def test_parsing(self):
         # create contest, person, register paragliders, create race:
-        cont_id = create_contest()
+        cont_id = create_contest("12TH FAI EUROPEAN PARAGLIDING CHAMPIONSHIP")
         print "contest created: ", cont_id
         register_paragliders_on_contest(cont_id)
         print "paragliders registered"
@@ -105,7 +105,7 @@ class ParsingTest(unittest.TestCase):
         r = requests.post('/'.join((URL, 'contest', cont_id, 'race',
                                     race_id, 'track_archive')),
                                   data={'url':
-                                      'http://localhost:8080/16items.zip'})
+                                      'http://airtribune.com:8087/1120-5321.zip'})
         print r.text
         print r.status_code
 

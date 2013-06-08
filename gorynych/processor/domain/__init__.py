@@ -8,7 +8,7 @@ import zipfile
 import requests
 
 from gorynych.common.domain.model import ValueObject
-from gorynych import OPTS
+from gorynych import OPTS, __version__
 
 
 def get_contest_number(track):
@@ -78,7 +78,8 @@ class TrackArchive(ValueObject):
         @return: {contest_number:person_id}
         @rtype: C{dict}
         '''
-        url = '/'.join((OPTS['apiurl'], 'race', self.race_id,
+        # TODO: something wrong here...
+        url = '/'.join((OPTS['apiurl'],'v' + str(__version__), 'race', self.race_id,
                         'paragliders'))
         r = requests.get(url)
         res = r.json()

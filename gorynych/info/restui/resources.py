@@ -271,7 +271,7 @@ class TrackArchiveResource(APIResource):
 
     def read_POST(self, result, p=None):
         if result:
-            return dict(status=str(result))
+            return dict(result=str(result))
 
     def read_GET(self, r, p=None):
         if r:

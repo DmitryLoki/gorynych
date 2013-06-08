@@ -124,7 +124,7 @@ class PGSQLAppendOnlyStore(object):
         evlist = []
         for ev in serialized_event:
             self._check_event(ev)
-            log.msg("event %s appending" % ev['event_name'])
+            #log.msg("event %s appending" % ev['event_name'])
             evlist.append(ev)
         return self.pool.runInteraction(interaction, evlist)
 

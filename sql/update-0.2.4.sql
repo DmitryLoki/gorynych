@@ -76,3 +76,7 @@ CREATE TABLE TRACKS_GROUP(
 
   PRIMARY KEY (GROUP_ID, TRACK_ID)
 );
+
+ALTER TABLE race
+   ADD COLUMN start_limit_time integer,
+   ADD COLUMN end_limit_time integer;

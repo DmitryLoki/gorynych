@@ -140,7 +140,7 @@ class PGSQLRaceRepository(object):
 
     def _create_race(self, race_data, paragliders_row):
         # TODO: repository knows too much about Race's internals. Think about it
-        i, rid, t, st, et, tz, rt, _chs, _aux = race_data
+        i, rid, t, st, et, tz, rt, _chs, _aux, slt, elt = race_data
         ps = create_participants(paragliders_row)
         chs = checkpoint_collection_from_geojson(_chs)
 
@@ -150,7 +150,7 @@ class PGSQLRaceRepository(object):
         else:
             b = None
         result = self.factory.create_race(t, rt, tz, ps, chs, race_id=rid,
-                                          bearing=b)
+                                          bearing=b, timelimits=(slt, elt))
         result._start_time = st
         result._end_time = et
         result._id = long(i)
@@ -208,13 +208,16 @@ class PGSQLRaceRepository(object):
 
     def _get_values_from_obj(self, obj):
         result = dict()
-        bearing = None
+        bearing = ''
         if obj.type == 'opendistance':
+            if obj.task.bearing is None:
+                raise ValueError("Race don't have bearing.")
             bearing = json.dumps(dict(bearing = int(obj.task.bearing)))
         result['race'] = (obj.title, obj.start_time, obj.end_time,
                           obj.timezone, obj.type,
                           geojson_feature_collection(obj.checkpoints),
-                          bearing, str(obj.id))
+                          bearing, obj.timelimits[0], obj.timelimits[1],
+                          str(obj.id))
         result['paragliders'] = []
         for key in obj.paragliders:
             p = obj.paragliders[key]

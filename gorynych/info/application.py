@@ -214,7 +214,8 @@ class ApplicationService(EventPollingService):
         r = factory.create_race(params['title'], params['race_type'],
                                    cont.timezone, plist,
                                    params['checkpoints'],
-                                   bearing=params.get('bearing'))
+                                   bearing=params.get('bearing'),
+                                timelimits=(cont.start_time, cont.end_time))
         # TODO: do it transactionally.
         yield persistence.event_store().persist(ContestRaceCreated(
             cont.id, r.id))

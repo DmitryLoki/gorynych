@@ -86,6 +86,9 @@ class RaceFactory(object):
             result.task = RACETASKS[race_type]()
         else:
             raise ValueError("Unknown race type.")
+        timelimits = kw.get('timelimits')
+        if timelimits:
+            result.timelimits = timelimits
         result.title = title
         result.timezone = timezone
         result = self._fill_with_paragliders(result, paragliders)
@@ -122,7 +125,7 @@ class Race(AggregateRoot):
 
     @title.setter
     def title(self, value):
-        self._title = value.strip().title()
+        self._title = value.strip()
 
     @property
     def type(self):
@@ -177,6 +180,13 @@ class Race(AggregateRoot):
         '''
         if checkpoints == self._checkpoints:
             return
+        st, et = times_from_checkpoints(checkpoints)
+        if self.timelimits and (
+                    st < self.timelimits[0] or et > self.timelimits[1]):
+            raise ValueError(
+                "Race start time or end time out of contest start time:end "
+                "time interval %s-%s." % self.timelimits
+            )
         old_checkpoints = deepcopy(self._checkpoints)
         self._checkpoints = checkpoints
         if not self._invariants_are_correct():
@@ -187,8 +197,7 @@ class Race(AggregateRoot):
         except (TypeError, ValueError) as e:
             self._rollback_set_checkpoints(old_checkpoints)
             raise e
-        self.start_time, self.end_time = times_from_checkpoints(
-                                                        self._checkpoints)
+        self.start_time, self.end_time = st, et
         # Notify other systems about checkpoints changing if previous
         # checkpoints existed.
         if old_checkpoints:

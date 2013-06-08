@@ -87,7 +87,7 @@ def times_from_checkpoints(checkpoints):
             if int(point.close_time) > end_time:
                 end_time = int(point.close_time)
     if start_time < end_time:
-        return start_time, end_time
+        return int(start_time), int(end_time)
     else:
         raise BadCheckpoint("Wrong or absent times in checkpoints.")
 

@@ -195,13 +195,13 @@ class Contest(AggregateRoot):
         self._title = value.strip().title()
 
     def register_paraglider(self, person_id, glider, contest_number):
-        paraglider_before = deepcopy(self._participants.get(person_id))
+        paragliders_before = deepcopy(self._participants)
 
         glider = glider.strip().split(' ')[0].lower()
         self._participants[person_id] = dict(role='paraglider',
             contest_number=int(contest_number), glider=glider)
         if not self._invariants_are_correct():
-            self._rollback_register_paraglider(paraglider_before, person_id)
+            self._participants = paragliders_before
             raise ValueError("Paraglider must have unique contest number.")
         persistence.event_store().persist(ParagliderRegisteredOnContest(
                             person_id, self.id))
@@ -211,6 +211,7 @@ class Contest(AggregateRoot):
         """
         Check next invariants for contest:
         every paraglider has unique contest_number
+        context start_time is less then end_time
         """
         contest_numbers = set()
         paragliders = set()
@@ -225,6 +226,7 @@ class Contest(AggregateRoot):
         return all_contest_numbers_uniq and end_after_start
 
     def _rollback_register_paraglider(self, paraglider_before, person_id):
+        # TODO: this function should rollback all paragliders. Am I need this function?
         self._participants[person_id] = paraglider_before
 
     def apply_ContestRaceCreated(self, ev):
@@ -240,6 +242,7 @@ class Contest(AggregateRoot):
 
         for key in kwargs.keys():
             if key == 'contest_number':
+                # TODO: check necessity of this.
                 kwargs[key] = int(kwargs[key])
             if key == 'glider':
                 kwargs[key] = kwargs[key].strip().split(' ')[0].lower()
@@ -247,7 +250,7 @@ class Contest(AggregateRoot):
 
         if not self._invariants_are_correct():
             self._participants[person_id] = old_person
-            raise ValueError("Paraglider must have unique contest number.")
+            raise ValueError("Contest invariants violated.")
 
 
 

@@ -9,7 +9,7 @@ import unittest
 
 from gorynych.info.domain.test.helpers import create_checkpoints
 
-URL = 'http://localhost:8085'
+URL = 'http://localhost:8086'
 
 def create_contest(title='Contest with paragliders'):
     params = dict(title=title, start_time=1,
@@ -22,9 +22,9 @@ def create_contest(title='Contest with paragliders'):
     return r.json()['id']
 
 
-def create_persons():
+def create_persons(reg_date=None):
     params = dict(name='Vasylyi', surname='Doe', country='SS',
-        email='vasya@example.com', reg_date='2012,12,12')
+        email='vasya@example.com', reg_date=reg_date)
     r = requests.post(URL + '/person', data=params)
     return r.json()['id']
 
@@ -173,7 +173,7 @@ class ParaglidersTest(unittest.TestCase):
     def test_1_register_paragliders(self):
         try:
             cont_id = create_contest()
-            pers_id = create_persons()
+            pers_id = create_persons(reg_date='2012,12,12')
         except Exception:
             raise unittest.SkipTest("Contest and persons hasn't been created"
                                     ".")

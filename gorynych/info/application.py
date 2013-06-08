@@ -152,7 +152,14 @@ class ApplicationService(EventPollingService):
     ############## Person Service part ##############
     def create_new_person(self, params):
         factory = person.PersonFactory()
-        year, month, day = params['reg_date'].split(',')
+        regdate = params.get('reg_date')
+        if regdate:
+            try:
+                year, month, day = regdate.split(',')
+            except ValueError:
+                raise ValueError("Wrong regdate has been passed on pilot creation: %s" % regdate)
+        else:
+            year, month, day = None, None, None
         pers = factory.create_person(params['name'], params['surname'],
                                      params['country'], params['email'], year,
                                      month, day)

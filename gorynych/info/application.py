@@ -325,13 +325,3 @@ class ApplicationService(EventPollingService):
                       offset)
         return d
 
-    ######################## cleaning room #####################
-    def apply_PersonGotTrack(self, ev):
-        return self.event_dispatched(ev.id)
-
-    def apply_ParagliderRegisteredOnContest(self, ev):
-        return self.event_dispatched(ev.id)
-
-    def apply_TrackCreated(self, ev):
-        return self.event_dispatched(ev.id)
-

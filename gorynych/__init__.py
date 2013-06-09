@@ -5,7 +5,7 @@ import yaml
 import os
 from twisted.python import usage
 
-__version__ = '0.1.4'
+__version__ = '0.2'
 
 BASEDIR = os.path.dirname(__file__)
 

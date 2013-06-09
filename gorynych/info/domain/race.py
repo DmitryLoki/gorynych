@@ -20,7 +20,7 @@ from gorynych.common.infrastructure import persistence
 from gorynych.common.exceptions import TrackArchiveAlreadyExist
 from gorynych.info.domain.ids import RaceID
 
-PATTERN = r'https?://airtribune.com:8087/\w+'
+PATTERN = r'https?://airtribune.com/\w+'
 #PATTERN = r'https?://localhost:8080/\w+'
 
 class RaceTask(ValueObject):

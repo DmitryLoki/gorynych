@@ -9,10 +9,9 @@ from gorynych.info.domain import contest, person, race
 from gorynych.common.infrastructure import persistence
 from gorynych.common.domain.types import checkpoint_from_geojson
 from gorynych.common.domain.events import ContestRaceCreated
-from gorynych.common.application import EventPollingService
+from gorynych.common.application import EventPollingService, DBPoolService
 
-class ApplicationService(EventPollingService):
-    polling_interval = 2
+class ApplicationService(DBPoolService):
 
     ############## Contest Service part #############
     def create_new_contest(self, params):

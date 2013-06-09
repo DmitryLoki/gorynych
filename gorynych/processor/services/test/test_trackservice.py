@@ -1,6 +1,7 @@
 import json
 import os
 import time
+from random import randint
 
 from shapely.geometry import Point
 import mock
@@ -63,10 +64,11 @@ def create_contest(title='Test TrackService contest'):
 def register_paragliders_on_contest(cont_id):
     pilots = DATA['pilots']
     for key in pilots.keys():
+        email = 's@s.ru' + str(randint(1, 10000))
         params = dict(name=pilots[key]['name'].split(' ')[0],
                            surname=pilots[key]['name'].split(' ')[1],
                            country='ru',
-                           email='s@s.ru', reg_date='2012,12,12')
+                           email=email, reg_date='2012,12,12')
         r = requests.post(URL + '/person', data=params)
         pers_id = r.json()['id']
         params = dict(person_id=pers_id, glider='mantra',
@@ -93,7 +95,7 @@ class ParsingTest(unittest.TestCase):
 
     def test_parsing(self):
         # create contest, person, register paragliders, create race:
-        cont_id = create_contest("12TH FAI EUROPEAN PARAGLIDING CHAMPIONSHIP")
+        cont_id = create_contest("12TH FAI EUROPEAN PARAGLIDING CHAMPIONSHIP" + str(randint(1, 100)))
         print "contest created: ", cont_id
         register_paragliders_on_contest(cont_id)
         print "paragliders registered"

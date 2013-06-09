@@ -131,8 +131,22 @@ class TrackService(EventPollingService):
             return d
 
         log.msg("Start creating track %s for paraglider %s" % (track_id, person_id))
-        d = self.event_store.persist(tc)
-        d.addCallback(lambda _:self.execute_ProcessData(track_id, trackfile))
+
+        t = track.Track(track_id, [tc])
+        t.changes.append(tc)
+        try:
+            t.process_data(trackfile)
+        except Exception as e:
+            ev = events.TrackWasNotParsed(race_id, aggregate_type='race')
+            ev.payload = dict(contest_number=contest_number,
+                reason=repr(e.message))
+            d = self.event_store.persist(ev)
+            return d
+
+        d = self.persist(t)
+
+        #d = self.event_store.persist(tc)
+        #d.addCallback(lambda _:self.execute_ProcessData(track_id, trackfile))
         d.addCallback(lambda _:log.msg("Track %s processed and saved." % contest_number))
         d.addCallback(lambda _:self.append_track_to_race_and_person(race_id,
             track_id, track_type, contest_number, person_id))

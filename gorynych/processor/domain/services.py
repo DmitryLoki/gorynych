@@ -41,7 +41,7 @@ class IGCTrackParser(object):
                 if int(altline[5:]):
                     # Use altitude from GPS.
                     alt.append(int(altline[5:]))
-                elif int(altline[:5]):
+                else:
                     # Use altitude from barometer.
                     alt.append(altline[:5])
         result = sc.empty(len(ts), dtype=self.dtype)

@@ -5,9 +5,10 @@ Tests for info context.
 import json
 import time
 import random
+import unittest
 
 import requests
-from twisted.trial import unittest
+# from twisted.trial import unittest
 
 from gorynych.info.domain.test.helpers import create_checkpoints
 
@@ -25,9 +26,12 @@ def create_contest(title='Contest with paragliders'):
     return r, title
 
 
-def create_persons(reg_date=None):
-    email = 'vasya@example.com'+ str(random.randint(1, 1000000))
-    params = dict(name='Vasylyi', surname='Doe', country='SS',
+def create_persons(reg_date=None, email=None, name=None):
+    if not email:
+        email = 'vasya@example.com'+ str(random.randint(1, 1000000))
+    if not name:
+        name='Vasylyi'
+    params = dict(name=name, surname='Doe', country='SS',
         email=email, reg_date=reg_date)
     r = requests.post(URL + '/person', data=params)
     return r, email
@@ -133,6 +137,11 @@ class PersonAPITest(unittest.TestCase):
         r2 = requests.get(link)
         self.assertEqual(r2.status_code, 200)
         self.assertEqual(r2.json()['id'], result['id'])
+
+    def test_create_duplicated_person(self):
+        r, email = create_persons()
+        r2, email2 = create_persons(email=email, name='Alexey')
+        self.assertEqual(r.json()['id'], r2.json()['id'])
 
     def test_3_get_person(self):
         r = requests.get(self.url)
@@ -305,3 +314,5 @@ class ContestRaceTest(unittest.TestCase):
                                       r.json()[0])
 
 
+if __name__ == '__main__':
+    unittest.main()

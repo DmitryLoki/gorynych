@@ -135,3 +135,14 @@ class PGSQLAOSTest(unittest.TestCase):
         stored_event = yield self.store.load_events(id)
         self.assertEqual(len(stored_event), 1)
         self.assertEqual(stored_event[0][2], id)
+
+    @defer.inlineCallbacks
+    def test_load_undispatched(self):
+        ts = int(time.time())
+        ser_event = create_serialized_event(ts=ts, id=4)
+        ser_event2 = create_serialized_event(ts=ts, id=5)
+        yield self.store.append([ser_event, ser_event2])
+        und = yield self.store.load_undispatched_events()
+        self.assertEqual(len(und), 2)
+        und2 = yield self.store.load_undispatched_events()
+        self.assertEqual(len(und2), 0)

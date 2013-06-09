@@ -9,6 +9,10 @@ EVENT_DISPATCHED = """
     DELETE FROM dispatch WHERE event_id = %s
     """
 
+RETURN_UNDISPATCHED = """
+    UPDATE dispatch SET TAKEN=FALSE, TIME=NOW() WHERE event_id=%s;
+    """
+
 class EventPollingService(Service):
     '''
     Start to read events from db on start.
@@ -16,7 +20,7 @@ class EventPollingService(Service):
     dont_dispatch = set(['PersonGotTrack', 'PointsAddedToTrack', 'RaceCheckpointsChanged',
         'ContestRaceCreated', 'ParagliderRegisteredOnContest', 'TrackCheckpointTaken', 'TrackFinished',
         'TrackFinishTimeReceived', 'TrackStarted'])
-    polling_interval = 2
+    polling_interval = 1
 
     def __init__(self, pool, event_store):
         self.in_progress = set()
@@ -52,9 +56,13 @@ class EventPollingService(Service):
                 yield self.event_dispatched(ev.id)
             attr = 'process_' + evname
             if hasattr(self, attr):
-                #log.msg("Calling %s in %s" % (attr,
-                                            #self.__class__.__name__))
+                log.msg("Calling %s in %s" % (attr,
+                                            self.__class__.__name__))
                 reactor.callLater(0, getattr(self, attr), ev)
+            else:
+                log.msg("Event %s returns undispatched from %s" % (evname,
+                                                    self.__class__.__name__))
+                yield self.pool.runOperation(RETURN_UNDISPATCHED, (ev.id,))
 
     def event_dispatched(self, ev_id):
         if ev_id in self.in_progress:

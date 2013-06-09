@@ -26,7 +26,12 @@ CREATE_DISPATCH_TABLE = """
     -- Таблица, в которой хранятся идентификаторы неопубликованных событий.
     CREATE TABLE IF NOT EXISTS {dispatch_table} (
     -- Идентификатор события
-    EVENT_ID bigint NOT NULL
+    EVENT_ID bigint NOT NULL,
+
+      TAKEN BOOLEAN DEFAULT FALSE ,
+      TIME TIMESTAMP DEFAULT NOW(),
+
+  PRIMARY KEY (EVENT_ID)
     );
     """
 
@@ -60,8 +65,12 @@ ADD_TRIGGER = """
 GET_UNDISPATCHED_EVENTS = """
     SELECT e.event_id, e.event_name, e.aggregate_id, e.aggregate_type,
     e.event_payload, e.occured_on
-    FROM events e, dispatch d
-    WHERE e.event_id = d.event_id;
+    FROM {events_table} e, {dispatch_table} d
+    WHERE e.event_id = d.event_id
+        AND d.taken = false
+        ORDER BY d.time
+        LIMIT 5
+        FOR UPDATE;
     """
 
 EVENTS_TABLE = 'events'
@@ -124,7 +133,6 @@ class PGSQLAppendOnlyStore(object):
         evlist = []
         for ev in serialized_event:
             self._check_event(ev)
-            #log.msg("event %s appending" % ev['event_name'])
             evlist.append(ev)
         return self.pool.runInteraction(interaction, evlist)
 
@@ -147,5 +155,15 @@ class PGSQLAppendOnlyStore(object):
                             events_table=EVENTS_TABLE), (aggregate_id,))
 
     def load_undispatched_events(self):
-        return self.pool.runQuery(GET_UNDISPATCHED_EVENTS)
+        def get_events(cur):
+            cur.execute(GET_UNDISPATCHED_EVENTS.format(events_table=EVENTS_TABLE, dispatch_table=DISPATCH_TABLE))
+            rows = cur.fetchall()
+            ids = []
+            for row in rows:
+                ids.append(row[0])
+            for id in ids:
+                cur.execute("UPDATE "+DISPATCH_TABLE+" SET TAKEN=TRUE "
+                            "WHERE event_id=%s" % (id,))
+            return rows
+        return self.pool.runInteraction(get_events)
 

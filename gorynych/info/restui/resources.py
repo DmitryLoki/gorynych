@@ -218,7 +218,7 @@ class RaceParagliderResourceCollection(APIResource):
     /race/{id}/paragliders
     '''
     name = 'race_paraglider_collection'
-    service_command = dict(GET='get_race_paragliders')
+    service_command = dict(GET='get_race')
 
     def read_GET(self, r, request_params=None):
         if r:
@@ -266,15 +266,61 @@ class TrackArchiveResource(APIResource):
     contest/{id}/race/{id}/trackarchive
     '''
     name = 'track_archive'
-    service_command = dict(POST='add_track_archive')
+    templates = dict(GET='track_archive_GET', POST='track_archive_POST')
+    service_command = dict(POST='add_track_archive', GET='get_race')
 
-    def read_POST(self, smth, p=None):
-        if smth:
-            return dict(status=str(smth))
+    def read_POST(self, result, p=None):
+        if result:
+            return dict(result=str(result))
+
+    def read_GET(self, r, p=None):
+        if r:
+            result = dict()
+            keys = ['paragliders_found', 'parsed_tracks', 'unparsed_tracks',
+                'extra_tracks', 'without_tracks']
+            ta = r.track_archive
+            status = ta.state
+            for key in keys:
+                if ta.progress.has_key(key):
+                    result[key] = json.dumps(list(ta.progress[key]))
+                else:
+                    result[key] = json.dumps([])
+            return dict(status=status,
+                found_contest_numbers=result['paragliders_found'],
+                parsed_contest_numbers=result['parsed_tracks'],
+                unparsed_tracks=result['unparsed_tracks'],
+                extra_tracks=result['extra_tracks'],
+                without_tracks=result['without_tracks']
+            )
+
+
+class RaceTracksResource(APIResource):
+    '''
+    /race/{id}/tracks,
+    /contest/{id}/race/{id}/tracks
+    Return list with tracks information.
+    '''
+    name = 'race_tracks'
+    service_command = dict(GET='get_race_tracks')
+    def read_GET(self, rows, params=None):
+        if rows:
+            result = []
+            for row in rows:
+                if row[2]:
+                    st = int(row[2])
+                else:
+                    st = 'null'
+                if row[3]:
+                    et = int(row[3])
+                else:
+                    et = 'null'
+                result.append(dict(type=row[0], track_id=row[1],
+                    start_time=st, end_time=et))
+            return result
 
 
 # TODO: this resource should be in processor package.
-class RaceTracksResource(APIResource):
+class TracksResource(APIResource):
     '''
     /race/{id}/tracks
     Return track data and state.

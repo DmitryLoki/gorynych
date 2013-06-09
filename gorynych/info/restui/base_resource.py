@@ -3,14 +3,13 @@ Resources for RESTful API.
 '''
 import os
 import re
-import json
+import simplejson as json
 from string import Template
 
 import yaml
 
 from twisted.web import resource, server
 from twisted.internet import defer
-from twisted.web.error import UnsupportedMethod
 
 from gorynych.common.exceptions import NoAggregate
 
@@ -87,6 +86,7 @@ class APIResource(resource.Resource):
     renderers = {'application/json': json_renderer}
     name = 'APIResource'
     service_command = {}
+    templates = {}
 
     def __init__(self, tree, service):
         resource.Resource.__init__(self)
@@ -213,16 +213,17 @@ class APIResource(resource.Resource):
             'application/json')
         req.setResponseCode(200)
         # will try to translate resource object into dictionary.
+        method = req.method
         try:
             resource_representation = getattr(self, '_'.join(('read',
-                                          req.method)))(res, request_params)
+                                      method)))(res, request_params)
         except Exception as error:
             body = "Error %r in resource reading function." % error
             return self._handle_error(req, 500, "ReadError", body), None
 
         try:
-            body = self.renderers[content_type](resource_representation,
-                self.name)
+            tmpl = self.templates.get(method, self.name)
+            body = self.renderers[content_type](resource_representation, tmpl)
         except KeyError as error:
             body = 'While rendering answer as %s. Error message is %r' % (
                 content_type, error)
@@ -255,7 +256,7 @@ class APIResource(resource.Resource):
                 'application/json'))
         req.write(bytes(body))
         req.finish()
-        return req
+        return server.NOT_DONE_YET
 
     def parameters_from_request(self, req):
         '''
@@ -269,7 +270,8 @@ class APIResource(resource.Resource):
         # to se in result {'contest': some_id} but want to see
         # {'contest_id': some_id}.
         maps = {'contest': 'contest_id', 'person': 'person_id',
-                'race': 'race_id', 'paraglider': 'person_id'}
+                'race': 'race_id', 'paraglider': 'person_id',
+            'group':'group_id'}
 
         result = dict()
         if req.method == "PUT":

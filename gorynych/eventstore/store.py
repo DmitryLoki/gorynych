@@ -26,7 +26,12 @@ CREATE_DISPATCH_TABLE = """
     -- Таблица, в которой хранятся идентификаторы неопубликованных событий.
     CREATE TABLE IF NOT EXISTS {dispatch_table} (
     -- Идентификатор события
-    EVENT_ID bigint NOT NULL
+    EVENT_ID bigint NOT NULL,
+
+      TAKEN BOOLEAN DEFAULT FALSE ,
+      TIME TIMESTAMP DEFAULT NOW(),
+
+  PRIMARY KEY (EVENT_ID)
     );
     """
 
@@ -55,6 +60,17 @@ ADD_TRIGGER = """
     CREATE TRIGGER {trigger_name}
     AFTER INSERT ON {events_table}
     FOR EACH ROW EXECUTE PROCEDURE {func_name}();
+    """
+
+GET_UNDISPATCHED_EVENTS = """
+    SELECT e.event_id, e.event_name, e.aggregate_id, e.aggregate_type,
+    e.event_payload, e.occured_on
+    FROM {events_table} e, {dispatch_table} d
+    WHERE e.event_id = d.event_id
+        AND d.taken = false
+        ORDER BY d.time
+        LIMIT 5
+        FOR UPDATE;
     """
 
 EVENTS_TABLE = 'events'
@@ -98,22 +114,34 @@ class PGSQLAppendOnlyStore(object):
         '''
         Append events from stream to store.
         @param serialized_event:
-        @type serialized_event:
+        @type serialized_event: C{list}
         @return:
         @rtype:
         '''
+        def interaction(cur, evlist):
+            for ev in evlist:
+                insert = cur.mogrify(INSERT_INTO_EVENTS.format(
+                                            events_table=EVENTS_TABLE), (
+                                           ev['event_name'],
+                                           ev['aggregate_id'],
+                                           ev['aggregate_type'],
+                                           ev['event_payload'],
+                                           ev['occured_on']))
+                cur.execute(insert)
+            return
+        assert isinstance(serialized_event, list), "AOStore wait for a list."
+        evlist = []
+        for ev in serialized_event:
+            self._check_event(ev)
+            evlist.append(ev)
+        return self.pool.runInteraction(interaction, evlist)
+
+    def _check_event(self, ev):
         columns = ['event_name', 'aggregate_id',
-           'aggregate_type', 'event_payload', 'occured_on']
+            'aggregate_type', 'event_payload', 'occured_on']
         for col in columns:
-            if not serialized_event.has_key(col):
+            if not ev.has_key(col):
                 raise KeyError("Argument %s is missed" % col)
-        return self.pool.runOperation(INSERT_INTO_EVENTS.format(
-            events_table=EVENTS_TABLE), (
-                       serialized_event['event_name'],
-                       serialized_event['aggregate_id'],
-                       serialized_event['aggregate_type'],
-                       serialized_event['event_payload'],
-                       serialized_event['occured_on']))
 
     def load_events(self, aggregate_id):
         '''
@@ -125,3 +153,17 @@ class PGSQLAppendOnlyStore(object):
         '''
         return self.pool.runQuery(READ_EVENTS.format(
                             events_table=EVENTS_TABLE), (aggregate_id,))
+
+    def load_undispatched_events(self):
+        def get_events(cur):
+            cur.execute(GET_UNDISPATCHED_EVENTS.format(events_table=EVENTS_TABLE, dispatch_table=DISPATCH_TABLE))
+            rows = cur.fetchall()
+            ids = []
+            for row in rows:
+                ids.append(row[0])
+            for id in ids:
+                cur.execute("UPDATE "+DISPATCH_TABLE+" SET TAKEN=TRUE "
+                            "WHERE event_id=%s" % (id,))
+            return rows
+        return self.pool.runInteraction(get_events)
+

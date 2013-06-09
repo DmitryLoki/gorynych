@@ -7,17 +7,6 @@ from twisted.web import server
 from twisted.enterprise import adbapi
 
 from gorynych import BaseOptions
-from gorynych.info.application import ApplicationService
-from gorynych.info.restui import base_resource
-# import persistence staff
-from gorynych.info.domain.contest import IContestRepository
-from gorynych.info.domain.race import IRaceRepository
-from gorynych.info.domain.person import IPersonRepository
-from gorynych.common.infrastructure import persistence
-from gorynych.eventstore.eventstore import EventStore
-from gorynych.eventstore.store import PGSQLAppendOnlyStore
-from gorynych.info.infrastructure.persistence import PGSQLContestRepository,\
-    PGSQLPersonRepository, PGSQLRaceRepository
 
 class Options(BaseOptions):
     optParameters = [
@@ -34,13 +23,25 @@ def makeService(config, services=None):
     @return:
     @rtype:
     '''
+    from gorynych.info.application import ApplicationService
+    from gorynych.info.restui import base_resource
+    # import persistence staff
+    from gorynych.info.domain.contest import IContestRepository
+    from gorynych.info.domain.race import IRaceRepository
+    from gorynych.info.domain.person import IPersonRepository
+    from gorynych.common.infrastructure import persistence
+    from gorynych.eventstore.eventstore import EventStore
+    from gorynych.eventstore.store import PGSQLAppendOnlyStore
+    from gorynych.info.infrastructure.persistence import PGSQLContestRepository, PGSQLPersonRepository, PGSQLRaceRepository
+
     if not services:
         services = service.MultiService()
 
     pool = adbapi.ConnectionPool('psycopg2', database=config['dbname'],
                                  user=config['dbuser'],
                                  password=config['dbpassword'],
-                                 host=config['dbhost'])
+                                 host=config['dbhost'], cp_max=10,
+                                 cp_reconnect=True)
 
     # EventStore init
     event_store = EventStore(PGSQLAppendOnlyStore(pool))

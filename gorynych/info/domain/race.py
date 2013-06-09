@@ -2,8 +2,8 @@
 Aggregate Race.
 '''
 __author__ = 'Boris Tsema'
+from collections import defaultdict
 from copy import deepcopy
-import decimal
 import re
 
 import pytz
@@ -13,12 +13,15 @@ from zope.interface.interfaces import Interface
 from gorynych.common.domain.model import AggregateRoot, ValueObject,\
                                         DomainEvent
 from gorynych.common.domain.types import Checkpoint
-from gorynych.common.exceptions import BadCheckpoint
-from gorynych.info.domain.events import RaceCheckpointsChanged,\
-                                        ArchiveURLReceived
+from gorynych.common.domain.services import times_from_checkpoints
+from gorynych.common.domain.events import ArchiveURLReceived, \
+    RaceCheckpointsChanged
 from gorynych.common.infrastructure import persistence
+from gorynych.common.exceptions import TrackArchiveAlreadyExist
 from gorynych.info.domain.ids import RaceID
 
+PATTERN = r'https?://airtribune.com:8087/\w+'
+#PATTERN = r'https?://localhost:8080/\w+'
 
 class RaceTask(ValueObject):
     type = None
@@ -77,20 +80,23 @@ class RaceFactory(object):
             race_id = RaceID()
         elif isinstance(kw['race_id'], str):
             race_id = RaceID.fromstring(kw['race_id'])
-        race = Race(race_id)
+        result = Race(race_id)
         race_type = ''.join(race_type.strip().lower().split())
         if race_type in RACETASKS.keys():
-            race.task = RACETASKS[race_type]()
+            result.task = RACETASKS[race_type]()
         else:
             raise ValueError("Unknown race type.")
-        race.title = title
-        race.timezone = timezone
-        race = self._fill_with_paragliders(race, paragliders)
-        race.checkpoints = checkpoints
+        timelimits = kw.get('timelimits')
+        if timelimits:
+            result.timelimits = timelimits
+        result.title = title
+        result.timezone = timezone
+        result = self._fill_with_paragliders(result, paragliders)
+        result.checkpoints = checkpoints
         if race_type == 'opendistance':
-            race.task.bearing = kw['bearing']
+            result.task.bearing = kw['bearing']
 
-        return race
+        return result
 
     def _fill_with_paragliders(self, race, paragliders):
         '''
@@ -102,33 +108,15 @@ class RaceFactory(object):
         return race
 
 
-class CheckpointsAreAddedToRace(DomainEvent):
-    '''
-    Raised when someone try to add track archive after it has been parsed.
-    '''
-    def __init__(self, event_id, checkpoints):
-        self.checkpoints = checkpoints
-        DomainEvent.__init__(self, event_id)
-
-
-class TrackArchiveAlreadyExist(Exception):
-    '''
-    Raised when someone try to add track archive after it has been parsed.
-    '''
-
-
 class Race(AggregateRoot):
     def __init__(self, race_id):
+        super(Race, self).__init__()
         self.id = race_id
-
         self.task = None
         self._checkpoints = []
         self._title = ''
         self.timelimits = ()
-        # {contest_number: Paraglider}
         self.paragliders = dict()
-        self._start_time = decimal.Decimal('infinity')
-        self._end_time = 1
         self._timezone = pytz.utc
 
     @property
@@ -137,7 +125,7 @@ class Race(AggregateRoot):
 
     @title.setter
     def title(self, value):
-        self._title = value.strip().title()
+        self._title = value.strip()
 
     @property
     def type(self):
@@ -155,27 +143,9 @@ class Race(AggregateRoot):
     @bearing.setter
     def bearing(self, value):
         if not self.type == 'opendistance':
-            raise TypeError("Bearing can't be set for race type %s" % race
-            .type)
+            raise TypeError("Bearing can't be set for race type %s" %
+                            self.type)
         self.task.bearing = int(value)
-
-    @property
-    def start_time(self):
-        '''
-        Time on which race begun.
-        @return: Epoch time in seconds.
-        @rtype: C{int}
-        '''
-        return self._start_time
-
-    @property
-    def end_time(self):
-        '''
-        Time when race is ended
-        @return: Epoch time in seconds.
-        @rtype: C{int}
-        '''
-        return self._end_time
 
     @property
     def timezone(self):
@@ -210,6 +180,13 @@ class Race(AggregateRoot):
         '''
         if checkpoints == self._checkpoints:
             return
+        st, et = times_from_checkpoints(checkpoints)
+        if self.timelimits and (
+                    st < self.timelimits[0] or et > self.timelimits[1]):
+            raise ValueError(
+                "Race start time or end time out of contest start time:end "
+                "time interval %s-%s." % self.timelimits
+            )
         old_checkpoints = deepcopy(self._checkpoints)
         self._checkpoints = checkpoints
         if not self._invariants_are_correct():
@@ -220,12 +197,12 @@ class Race(AggregateRoot):
         except (TypeError, ValueError) as e:
             self._rollback_set_checkpoints(old_checkpoints)
             raise e
-        self._get_times_from_checkpoints(self._checkpoints)
+        self.start_time, self.end_time = st, et
         # Notify other systems about checkpoints changing if previous
         # checkpoints existed.
         if old_checkpoints:
-            persistence.event_store().persist(RaceCheckpointsChanged(self.id,
-                                                                checkpoints))
+            persistence.event_store().persist(
+                                RaceCheckpointsChanged(self.id, checkpoints))
 
     def _invariants_are_correct(self):
         has_paragliders = len(self.paragliders) > 0
@@ -236,33 +213,16 @@ class Race(AggregateRoot):
     def _rollback_set_checkpoints(self, old_checkpoints):
         self._checkpoints = old_checkpoints
 
-    def _get_times_from_checkpoints(self, checkpoints):
-        start_time = self._start_time
-        end_time = self._end_time
-        for point in checkpoints:
-            if point.open_time and point.open_time < start_time:
-                start_time = point.open_time
-            if point.close_time and point.close_time > end_time:
-                end_time = point.close_time
-        if start_time < end_time:
-            self._start_time = start_time
-            self._end_time = end_time
-        else:
-            raise BadCheckpoint("Wrong or absent times in checkpoints.")
-
     @property
     def track_archive(self):
-        events = persistence.event_store().load_events(str(self.id))
-        # and now events is Deferred instance :(
-        # TODO: pass list to TrackArchive, not deferred.
-        track_archive = TrackArchive(events)
+        track_archive = TrackArchive(self.events)
         return track_archive
 
     def add_track_archive(self, url):
-        if not self.track_archive.state == 'new':
+        if not self.track_archive.state == 'no archive':
             raise TrackArchiveAlreadyExist("Track archive with url %s "
-                                           "already parsed.")
-        url_pattern = r'https?://airtribune.com/\w+'
+                                           "has been added already." % url)
+        url_pattern = PATTERN
         if re.match(url_pattern, url):
             persistence.event_store().persist(ArchiveURLReceived(self.id,
                                                                  url))
@@ -280,28 +240,53 @@ class Race(AggregateRoot):
 
 
 class TrackArchive(object):
+    states = ['no archive', 'unpacked', 'parsed']
     def __init__(self, events):
-        self.state = 'new'
-        self.progress = 'nothing has been done'
-        # for event in events:
-        #     self.apply(event)
+        self._state = 'no archive'
+        self.progress = defaultdict(set)
+        for event in events:
+            self.apply(event)
 
-    def apply(self, event):
+    def apply(self, ev):
         '''
         Apply event from list one by one.
-        @param event: event from list
-        @type event: subclasses of L{DomainEvent}
+        @param ev: event from list
+        @type ev: subclasses of L{DomainEvent}
         @return:
         @rtype:
         '''
-        try:
-            getattr(self, '_'.join(('when', event.__class__.__name__.lower(
-                ))))(event)
-        except AttributeError:
-            pass
+        evname = ev.__class__.__name__
+        if hasattr(self, 'apply_' + evname):
+            getattr(self, 'apply_' + evname)(ev)
 
-    def when_archiveurlreceived(self, event):
-        self.state = 'work is started'
+    def apply_TrackArchiveUnpacked(self, ev):
+        self.state = 'unpacked'
+        tracks, extra_tracks, pers_without_tracks = ev.payload
+        for item in tracks:
+            self.progress['paragliders_found'].add(item['contest_number'])
+        for item in extra_tracks:
+            self.progress['extra_tracks'].add(item.split('/')[-1])
+        for item in pers_without_tracks:
+            self.progress['without_tracks'].add(item)
+
+    def apply_RaceGotTrack(self, ev):
+        self.progress['parsed_tracks'].add(ev.payload['contest_number'])
+
+    def apply_TrackArchiveParsed(self, ev):
+        self.state = 'parsed'
+
+    def apply_TrackWasNotParsed(self, ev):
+        self.progress['unparsed_tracks'].add((ev.payload['contest_number'],
+                                       ev.payload['reason']))
+
+    @property
+    def state(self):
+        return self._state
+
+    @state.setter
+    def state(self, state):
+        if self.states.index(self.state) < self.states.index(state):
+            self._state = state
 
 
 class IRaceRepository(Interface):

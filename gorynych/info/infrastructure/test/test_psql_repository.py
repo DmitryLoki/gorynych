@@ -5,6 +5,7 @@ Test PostgreSQL implementation of IPersonRepository.
 __author__ = 'Boris Tsema'
 from datetime import datetime
 import time
+from random import randint
 
 from twisted.trial import unittest
 from twisted.internet import defer
@@ -29,18 +30,23 @@ class PersonRepositoryTest(unittest.TestCase):
 
     def setUp(self):
         self.repo = PGSQLPersonRepository(POOL)
-        d = POOL.start()
-        d.addCallback(lambda _:db_helpers.initDB('person', POOL))
-        return d
+        self.patch = mock.patch('gorynych.info.infrastructure.persistence.pe'
+                           '.event_store')
+        self.pe = self.patch.start()
+        m = mock.Mock()
+        m.load_events.return_value = []
+        self.pe.return_value = m
+        return db_helpers.initDB('person', POOL)
 
     def tearDown(self):
-        d = db_helpers.tearDownDB('person', POOL)
-        d.addCallback(lambda _:POOL.close())
-        return d
+        del self.repo
+        self.patch.stop()
+        return db_helpers.tearDownDB('person', POOL)
 
     @defer.inlineCallbacks
     def test_save_new(self):
-        pers = create_person()
+        email = 'a@a.ru_' + str(randint(1, 10000))
+        pers = create_person(email=email)
         saved_pers = yield self.repo.save(pers)
         self.assertEqual(pers, saved_pers,
                          'Something strange happend while saving.')
@@ -49,7 +55,7 @@ class PersonRepositoryTest(unittest.TestCase):
         self.assertEqual(len(db_row), 1)
         db_row = db_row[0]
         self.assertTupleEqual(('John', 'Doe', 'UA', str(pers.id)),
-                              (db_row[0], db_row[1], db_row[2], db_row[5]))
+                          (db_row[0], db_row[1], db_row[2], db_row[5]))
 
     @defer.inlineCallbacks
     def test_get_by_id(self):
@@ -87,20 +93,28 @@ class PersonRepositoryTest(unittest.TestCase):
         s = yield self.repo.save(saved_pers)
         db_row = yield POOL.runQuery(pe.select('person'), (str(p_id),))
         self.assertTupleEqual(('Asfa', 'US'), (db_row[0][0], db_row[0][2]))
-        
+
+    @defer.inlineCallbacks
+    def test_save_duplicate(self):
+
+        email = 'a@a.ru'
+        pers = create_person(email=email)
+        pers2 = create_person(email=email)
+        saved_pers = yield self.repo.save(pers)
+        saved_pers2 = yield self.repo.save(pers)
+        self.assertNotEqual(pers.id, pers2.id)
+        self.assertEqual(saved_pers.id, saved_pers2.id)
+
 
 class ContestRepositoryTest(unittest.TestCase):
 
     def setUp(self):
         self.repo = PGSQLContestRepository(POOL)
-        d = POOL.start()
-        d.addCallback(lambda _:db_helpers.initDB('contest', POOL))
-        return d
+        POOL.start()
+        return db_helpers.initDB('contest', POOL)
 
     def tearDown(self):
-       d = db_helpers.tearDownDB('contest', POOL)
-       d.addCallback(lambda _:POOL.close())
-       return d
+       return db_helpers.tearDownDB('contest', POOL)
 
     @defer.inlineCallbacks
     def test_get_by_id(self):

@@ -1,17 +1,17 @@
-package: &gorynych
+package: &processor
+  !!python/module:gorynych.processor.restui.resources
+package: &info
   !!python/module:gorynych.info.restui.resources
 aliases:
   uuid: &uuid
     '[a-z0-9]+-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+'
+  race_index: &race_index
+    'r-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+'
 
-race:
+group:
   leaf: Placeholder
-  package: *gorynych
+  package: *info
   tree:
-    *uuid:
-      leaf: RaceResource
-      package: *gorynych
-      tree:
-        tracks:
-          leaf: RaceTracksResource
-          package: *gorynych
+    *race_index:
+      leaf: TracksResource
+      package: *processor

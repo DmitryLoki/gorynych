@@ -9,14 +9,13 @@ from gorynych.common.domain.model import AggregateRoot
 from gorynych.common.domain.types import Name, Country
 from gorynych.info.domain.ids import PersonID, TrackerID
 
-# First registration was occured in 2012 year.
-MINYEAR = 2012
 
 # Person can participate in contest with one of this roles.
 ROLES = frozenset(['paraglider', 'organizator'])
 
 class Person(AggregateRoot):
     def __init__(self, person_id, name, country, email, regdate):
+        super(Person, self).__init__()
         self.id = person_id
         self.email = email
         self._name = name
@@ -95,23 +94,9 @@ class PersonFactory(object):
         @type country: str
         @param email: registration email, it's an id for person.
         @type email: str
-        @param year: year of person registration
-        @type year: int
-        @param month: month of person registration
-        @type month: int
-        @param day: day of person registration
-        @type day: int
         @return: a new person
         @rtype: Person
         '''
-        if not year and not month and not day:
-            today = datetime.date.today()
-            year, month, day = today.year, today.month, today.day
-        year, month, day = int(year), int(month), int(day)
-        if not MINYEAR <= year <= datetime.date.today().year:
-            raise ValueError("Year is out of range %s-%s" %
-                             (MINYEAR, datetime.date.today().year))
-
         if not person_id:
             person_id = PersonID()
         elif not isinstance(person_id, PersonID):
@@ -120,7 +105,7 @@ class PersonFactory(object):
                         Name(name, surname),
                         Country(country),
                         email,
-                        datetime.date(year, month, day))
+                        datetime.date.today())
         return person
 
 
@@ -143,7 +128,7 @@ class IPersonRepository(Interface):
         @rtype:
         '''
 
-#     def get_list(limit, offset):  # @NoSelf
-#         '''
-#         Return list of a person 
-#         '''
+    def get_list(limit, offset):
+        '''
+        Return list of a person
+        '''

@@ -37,9 +37,13 @@ class IGCTrackParser(object):
                                                    '%d%m%y%H%M%S'))))
                 lat.append(self.latitude(line[7:15]))
                 lon.append(self.longitude(line[15:24]))
-                # TODO: rewrite with one region.
-                # Use altitude from GPS only.
-                alt.append(float(line[25:35][5:10]))
+                altline = line[25:35]
+                if int(altline[5:]):
+                    # Use altitude from GPS.
+                    alt.append(int(altline[5:]))
+                elif int(altline[:5]):
+                    # Use altitude from barometer.
+                    alt.append(altline[:5])
         result = sc.empty(len(ts), dtype=self.dtype)
         result['timestamp'] = sc.array(ts)
         result['lat'] = sc.array(lat)

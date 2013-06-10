@@ -9,6 +9,7 @@ import requests
 
 from gorynych.common.domain.model import ValueObject
 from gorynych import OPTS, __version__
+from twisted.python import log
 
 
 def get_contest_number(track):
@@ -111,7 +112,10 @@ class TrackArchive(ValueObject):
         extra_tracks = []
         tracks = []
         for idx, item in enumerate(tracklist):
-            contest_number = get_contest_number(item)
+            try:
+                contest_number = get_contest_number(item)
+            except:
+                continue
             if paragliders.has_key(contest_number):
                 tracks.append(dict(person_id=paragliders[contest_number],
                                    trackfile=item,

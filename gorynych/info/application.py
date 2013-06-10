@@ -216,9 +216,10 @@ class ApplicationService(DBPoolService):
                                    bearing=params.get('bearing'),
                                 timelimits=(cont.start_time, cont.end_time))
         # TODO: do it transactionally.
-        yield persistence.event_store().persist(ContestRaceCreated(
-            cont.id, r.id))
-        yield persistence.get_repository(race.IRaceRepository).save(r)
+        d = persistence.get_repository(race.IRaceRepository).save(r)
+        d.addCallback(lambda _:persistence.event_store().persist(ContestRaceCreated(
+            cont.id, r.id)))
+        yield d
         defer.returnValue(r)
 
     def get_contest_races(self, params):

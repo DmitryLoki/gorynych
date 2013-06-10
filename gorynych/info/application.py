@@ -262,7 +262,15 @@ class ApplicationService(DBPoolService):
         def change(r):
             if params.has_key('checkpoints'):
                 # TODO: make in thinner
-                ch_list = json.loads(params['checkpoints'])['features']
+                if isinstance(params['checkpoints'], str):
+                    try:
+                        ch_list = json.loads(params['checkpoints'])['features']
+                    except Exception as e:
+                        raise ValueError("Problems with checkpoint reading: %r .Got %s, %r" % (e, type(params['checkpoints']), params['checkpoints']))
+                elif isinstance(params['checkpoints'], dict):
+                    ch_list = params['checkpoints']['features']
+                else:
+                    raise ValueError("Problems with checkpoint reading: got %s, %r" % (type(params['checkpoints']), params['checkpoints']))
                 checkpoints = []
                 for ch in ch_list:
                     checkpoints.append(checkpoint_from_geojson(ch))

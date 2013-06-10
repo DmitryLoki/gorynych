@@ -19,7 +19,7 @@ class EventPollingService(Service):
     '''
     dont_dispatch = set(['PersonGotTrack', 'PointsAddedToTrack', 'RaceCheckpointsChanged',
         'ContestRaceCreated', 'ParagliderRegisteredOnContest', 'TrackCheckpointTaken', 'TrackFinished',
-        'TrackFinishTimeReceived', 'TrackStarted', 'TrackEnded', 'TrackCreated', 'TrackArchiveUnpacked', 'TrackArchiveParsed'])
+        'TrackFinishTimeReceived', 'TrackStarted', 'TrackEnded', 'TrackCreated', 'TrackArchiveUnpacked', 'TrackArchiveParsed', 'TrackWasNotParsed'])
     polling_interval = 1
 
     def __init__(self, pool, event_store):

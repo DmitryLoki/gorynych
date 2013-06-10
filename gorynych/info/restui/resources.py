@@ -1,4 +1,6 @@
 import simplejson as json
+import pytz
+from datetime import datetime
 from gorynych.info.restui.base_resource import APIResource
 from gorynych.common.domain import types
 
@@ -111,7 +113,9 @@ class ContestRaceResource(APIResource):
             result['contest_title'] = cont.title
             result['country'] = cont.country
             result['place'] = cont.place
-            result['timezone'] = cont.timezone
+            result['timeoffset'] = datetime.fromtimestamp(result[
+                'start_time'],
+                pytz.timezone(cont.timezone)).strftime('%z')
             return result
 
     def read_PUT(self, r, request_params=None):

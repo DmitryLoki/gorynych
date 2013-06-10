@@ -212,6 +212,7 @@ class RaceToGoal(object):
         @rtype: (np.array, list)
         '''
         eventlist = []
+        self.calculate_path()
         lastchp = taskstate.last_checkpoint
         if lastchp < len(self.checkpoints) - 1:
             nextchp = self.checkpoints[lastchp + 1]

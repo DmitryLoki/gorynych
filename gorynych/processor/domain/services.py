@@ -345,7 +345,7 @@ class OfflineCorrectorService:
         tdifs = np.ediff1d(track['timestamp'], to_begin=1)
         # At first let's find end of track by timeout, if any.
         track_end_idxs = np.where(tdifs > self.maxtimediff)[0]
-        if track_end_idxs:
+        if len(track_end_idxs)>0:
             track_end_idxs = track_end_idxs[0]
             track = track[:track_end_idxs]
             tdifs = tdifs[:track_end_idxs]

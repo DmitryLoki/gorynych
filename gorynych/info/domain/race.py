@@ -184,8 +184,8 @@ class Race(AggregateRoot):
         if self.timelimits and (
                     st < self.timelimits[0] or et > self.timelimits[1]):
             raise ValueError(
-                "Race start time or end time out of contest start time:end "
-                "time interval %s-%s." % self.timelimits
+                "Race start time %s or end time %s out of contest start time:end "
+                "time interval %s-%s." % (st, et, self.timelimits[0], self.timelimits[1])
             )
         old_checkpoints = deepcopy(self._checkpoints)
         self._checkpoints = checkpoints

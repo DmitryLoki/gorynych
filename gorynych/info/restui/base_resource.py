@@ -10,6 +10,7 @@ import yaml
 
 from twisted.web import resource, server
 from twisted.internet import defer
+from twisted.python import log
 
 from gorynych.common.exceptions import NoAggregate
 
@@ -140,6 +141,7 @@ class APIResource(resource.Resource):
         # get parameters from request
         try:
             request_params = self.parameters_from_request(request)
+            log.msg("request params: ", request_params)
         except Exception as error:
             self._handle_error(request, 400, "Bad input parameters or URI",
                 repr(error))

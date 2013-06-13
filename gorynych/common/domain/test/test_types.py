@@ -173,5 +173,19 @@ class CheckpointTest(unittest.TestCase):
         res = types.geojson_feature_collection(ch_list)
         self.assertIsInstance(res, str)
 
+    def test_distance_to(self):
+        point1 = {'geometry': {'type': 'Point', 'coordinates': [0.0, 1.0]},
+            'type': 'Feature',
+            'properties': {'name': "A01", 'radius': 400,
+                'open_time': 12345, 'close_time': 123456}}
+        point2 = {'geometry': {'type': 'Point', 'coordinates': [0.0, 2.0]},
+            'type': 'Feature',
+            'properties': {'name': "A01", 'radius': 400,
+                'open_time': 12345, 'close_time': 123456}}
+        ch1 = types.Checkpoint.from_geojson(point1)
+        ch2 = types.Checkpoint.from_geojson(point2)
+        self.assertEqual(int(ch1.distance_to(ch2)), 111319)
+
+
 if __name__ == '__main__':
     unittest.main()

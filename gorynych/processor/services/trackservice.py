@@ -22,8 +22,6 @@ class ProcessorService(EventPollingService):
     '''
     Orchestrate track creation and parsing.
     '''
-    in_progress = dict()
-    ttl = 180
     @defer.inlineCallbacks
     def process_ArchiveURLReceived(self, ev):
         '''
@@ -32,15 +30,8 @@ class ProcessorService(EventPollingService):
         race_id = ev.aggregate_id
         url = ev.payload
         log.msg("URL received ", url)
-        if url in self.in_progress and time.time() - self.in_progress[url] <\
-                self.ttl:
-            log.msg("Archive in process")
-            # Don't process one url simultaneously.
-            defer.returnValue('')
-        else:
-            res = yield defer.maybeDeferred(API.get_track_archive, str(race_id))
-        if res['status'] == 'no archive':
-            self.in_progress[url] = time.time()
+        res = yield defer.maybeDeferred(API.get_track_archive, str(race_id))
+        if res and res['status'] == 'no archive':
             ta = TrackArchive(str(race_id), url)
             log.msg("Start unpacking archive %s for race %s" % (url, race_id))
             archinfo = yield threads.deferToThread(ta.process_archive)
@@ -71,10 +62,6 @@ class ProcessorService(EventPollingService):
 
     @defer.inlineCallbacks
     def process_RaceGotTrack(self, ev):
-        if ev.id in self.in_progress and (
-                time.time() - self.in_progress[ev.id]) < self.ttl:
-            defer.returnValue('')
-        self.in_progress[ev.id] = time.time()
         race_id = ev.aggregate_id
         track_id = ev.payload['track_id']
         cn = ev.payload.get('contest_number')
@@ -87,9 +74,10 @@ class ProcessorService(EventPollingService):
             log.msg("Track %s hasn't been added to group %s because of %r" %
                     (track_id, race_id, e))
         res = yield defer.maybeDeferred(API.get_track_archive, str(race_id))
-        processed = len(res['progress']['parsed_tracks']) + len(
-            res['progress']['unparsed_tracks'])
-        if len(res['progress']['paragliders_found']) == processed and not (
+        if res:
+            processed = len(res['progress']['parsed_tracks']) + len(
+                res['progress']['unparsed_tracks'])
+        if res and len(res['progress']['paragliders_found']) == processed and not (
                 res['status'] == 'parsed'):
             yield pe.event_store().persist(events.TrackArchiveParsed(
                 race_id, aggregate_type='race'))
@@ -100,9 +88,6 @@ class TrackService(EventPollingService):
     '''
     TrackService parse track archive.
     '''
-    polling_interval = 2
-    in_progress = dict()
-    ttl = 100
 
     def __init__(self, pool, event_store, track_repository):
         EventPollingService.__init__(self, pool, event_store)
@@ -121,12 +106,6 @@ class TrackService(EventPollingService):
         trackfile = ev.payload['trackfile']
         person_id = ev.payload['person_id']
         contest_number = ev.payload['contest_number']
-        if trackfile in self.in_progress and (time.time() -
-                                self.in_progress[trackfile] < self.ttl):
-            log.msg("trackfile for %s in progress" % contest_number)
-            # Don't process one url simultaneously.
-            return
-        self.in_progress[trackfile] = time.time()
         log.msg("Got trackfile for paraglider %s" % person_id)
         race_id = ev.aggregate_id
         try:
@@ -151,12 +130,27 @@ class TrackService(EventPollingService):
             d = self.event_store.persist(ev)
             return d
 
-        d = self.event_store.persist(tc)
-        d.addCallback(lambda _:self.execute_ProcessData(track_id, trackfile))
-        d.addCallback(lambda _:log.msg("Trackfile %s processed" % person_id))
+        log.msg("Start creating track %s for paraglider %s" % (track_id, person_id))
+
+        t = track.Track(track_id, [tc])
+        t.changes.append(tc)
+        try:
+            t.process_data(trackfile)
+        except Exception as e:
+            ev = events.TrackWasNotParsed(race_id, aggregate_type='race')
+            ev.payload = dict(contest_number=contest_number,
+                reason=repr(e.message))
+            d = self.event_store.persist(ev)
+            return d
+
+        d = self.persist(t)
+
+        #d = self.event_store.persist(tc)
+        #d.addCallback(lambda _:self.execute_ProcessData(track_id, trackfile))
+        d.addCallback(lambda _:log.msg("Track %s processed and saved." % contest_number))
         d.addCallback(lambda _:self.append_track_to_race_and_person(race_id,
             track_id, track_type, contest_number, person_id))
-        d.addCallback(lambda _:log.msg("trackfile %s data appended" % person_id))
+        d.addCallback(lambda _:log.msg("track %s events appended" % contest_number))
         d.addErrback(no_altitude_failure)
         d.addCallback(lambda _:self.event_dispatched(ev.id))
         return d
@@ -202,9 +196,11 @@ class TrackService(EventPollingService):
             track_type=track_type, track_id=str(track_id))
         ptc = events.PersonGotTrack(person_id, str(track_id),
             aggregate_type='person')
+        log.msg("Append events for track %s" % track_id)
         return self.event_store.persist([rgt, ptc])
 
     def persist(self, aggr):
+        log.msg("Persist aggregate %s" % aggr.id)
         d = self.event_store.persist(aggr.changes)
         d.addCallback(lambda _:self.track_repository.save(aggr))
         return d

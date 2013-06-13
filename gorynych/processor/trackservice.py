@@ -20,7 +20,7 @@ def makeService(config, services=None):
     pool = adbapi.ConnectionPool('psycopg2', database=config['dbname'],
         user=config['dbuser'],
         password=config['dbpassword'],
-        host=config['dbhost'])
+        host=config['dbhost'], cp_max=16)
 
     # EventStore init
     event_store = EventStore(PGSQLAppendOnlyStore(pool))

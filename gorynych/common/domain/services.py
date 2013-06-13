@@ -22,8 +22,12 @@ class APIAccessor(object):
     def __init__(self, url=None, version=None):
         if not version:
             version = str(__version__)
+        if not version.startswith('v'):
+            version = 'v' + version
         if not url:
             url = OPTS['apiurl']
+            if url.endswith('/'):
+                url = url[:-1]
         self.url = '/'.join((url, version))
 
     def get_track_archive(self, race_id):
@@ -35,16 +39,15 @@ class APIAccessor(object):
         return self._return_page(url)
 
     def _return_page(self, url):
-        # TODO: rewrite in twisted.
-        # d = getPage(url)
         r = requests.get(url)
+        if not r.status_code == 200:
+            return None
         try:
             result = r.json()
         except Exception as e:
             log.err("Error while doing json in APIAccessor for %s: %r" %
                     (r.text, e))
             raise e
-
         return result
 
 
@@ -52,6 +55,9 @@ def point_dist_calculator(start_lat, start_lon, end_lat, end_lon):
     """Return distance between two points in float
     TODO: analyze function and rewrite on Cython or C if needed
     """
+    # raise ValueError(repr(start_lat), repr(start_lon), repr(end_lat),
+    #     type(end_lon))
+    # raise ValueError(start_lat, start_lon, end_lat, end_lon)
     start_lat = float(math.radians(float(start_lat)))
     start_lon = float(math.radians(float(start_lon)))
     end_lat = float(math.radians(float(end_lat)))
@@ -84,7 +90,7 @@ def times_from_checkpoints(checkpoints):
             if int(point.close_time) > end_time:
                 end_time = int(point.close_time)
     if start_time < end_time:
-        return start_time, end_time
+        return int(start_time), int(end_time)
     else:
         raise BadCheckpoint("Wrong or absent times in checkpoints.")
 

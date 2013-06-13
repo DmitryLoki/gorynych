@@ -5,6 +5,7 @@ import simplejson as json
 
 from twisted.internet import defer
 from zope.interface import implements
+import psycopg2
 
 from gorynych.info.domain.contest import Paraglider, IContestRepository, ContestFactory
 from gorynych.info.domain.ids import PersonID
@@ -36,10 +37,11 @@ class PGSQLPersonRepository(object):
 
     @defer.inlineCallbacks
     def get_by_id(self, person_id):
+
         data = yield self.pool.runQuery(pe.select('person'),
                                         (str(person_id),))
         if not data:
-            raise NoAggregate("Person")
+            raise NoAggregate("Person %s" % person_id)
         result = self._create_person(data[0])
         event_list = yield pe.event_store().load_events(result.id)
         result.apply(event_list)
@@ -75,17 +77,24 @@ class PGSQLPersonRepository(object):
             result._id = data_row[6]
             return result
 
+    @defer.inlineCallbacks
     def save(self, pers):
-        d = None
         if pers._id:
-            d = self.pool.runOperation(pe.update('person'),
+            yield self.pool.runOperation(pe.update('person'),
                                        self._extract_sql_fields(pers))
-            d.addCallback(lambda _: pers)
+            result = pers
         else:
-            d = self.pool.runQuery(pe.insert('person'),
+            try:
+                data = yield self.pool.runQuery(pe.insert('person'),
                                    self._extract_sql_fields(pers))
-            d.addCallback(self._process_insert_result, pers)
-        return d
+            except psycopg2.IntegrityError as e:
+                if e.pgcode == '23505':
+                    pid = yield self.pool.runQuery(pe.select('by_email',
+                                            'person'), (str(pers.email),))
+                    result = yield self.get_by_id(pid[0][0])
+                    defer.returnValue(result)
+            result = yield self._process_insert_result(data, pers)
+        defer.returnValue(result)
 
     def _extract_sql_fields(self, pers=None):
         if pers is None:
@@ -140,7 +149,7 @@ class PGSQLRaceRepository(object):
 
     def _create_race(self, race_data, paragliders_row):
         # TODO: repository knows too much about Race's internals. Think about it
-        i, rid, t, st, et, tz, rt, _chs, _aux = race_data
+        i, rid, t, st, et, tz, rt, _chs, _aux, slt, elt = race_data
         ps = create_participants(paragliders_row)
         chs = checkpoint_collection_from_geojson(_chs)
 
@@ -150,7 +159,7 @@ class PGSQLRaceRepository(object):
         else:
             b = None
         result = self.factory.create_race(t, rt, tz, ps, chs, race_id=rid,
-                                          bearing=b)
+                                          bearing=b, timelimits=(slt, elt))
         result._start_time = st
         result._end_time = et
         result._id = long(i)
@@ -208,13 +217,16 @@ class PGSQLRaceRepository(object):
 
     def _get_values_from_obj(self, obj):
         result = dict()
-        bearing = None
+        bearing = ''
         if obj.type == 'opendistance':
+            if obj.task.bearing is None:
+                raise ValueError("Race don't have bearing.")
             bearing = json.dumps(dict(bearing = int(obj.task.bearing)))
         result['race'] = (obj.title, obj.start_time, obj.end_time,
                           obj.timezone, obj.type,
                           geojson_feature_collection(obj.checkpoints),
-                          bearing, str(obj.id))
+                          bearing, obj.timelimits[0], obj.timelimits[1],
+                          str(obj.id))
         result['paragliders'] = []
         for key in obj.paragliders:
             p = obj.paragliders[key]

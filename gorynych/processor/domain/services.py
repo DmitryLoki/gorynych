@@ -37,9 +37,13 @@ class IGCTrackParser(object):
                                                    '%d%m%y%H%M%S'))))
                 lat.append(self.latitude(line[7:15]))
                 lon.append(self.longitude(line[15:24]))
-                # TODO: rewrite with one region.
-                # Use altitude from GPS only.
-                alt.append(float(line[25:35][5:10]))
+                altline = line[25:35]
+                if int(altline[5:]):
+                    # Use altitude from GPS.
+                    alt.append(int(altline[5:]))
+                else:
+                    # Use altitude from barometer.
+                    alt.append(altline[:5])
         result = sc.empty(len(ts), dtype=self.dtype)
         result['timestamp'] = sc.array(ts)
         result['lat'] = sc.array(lat)
@@ -102,7 +106,7 @@ class FileParserAdapter(object):
         try:
             parsed_track = choose_offline_parser(data)(self.dtype).parse(data)
         except Exception as e:
-            raise Exception("Error while parsing file: %r " % e)
+            raise Exception("Error while parsing file: %r , %s" % (e, data))
         return parsed_track
 
     def process(self, data, stime, etime):
@@ -124,6 +128,7 @@ class FileParserAdapter(object):
         if not trackstate.finish_time:
             return [TrackEnded(_id, dict(state='landed'),
                 occured_on=trackstate.pbuffer[ -1]['timestamp'])]
+        return []
 
 
 class ParaglidingTrackCorrector(object):
@@ -189,7 +194,6 @@ class ParaglidingTrackCorrector(object):
         if len(outside_idxs) > 0:
             # Delete bounding bad points if any.
             idx = outside_idxs[-1]
-            # while outside_idxs[-1] == (len(item['timestamp']) - 1):
             last_item = len(item['timestamp']) - 1
             while idx == last_item:
                 item = np.delete(item, [idx])
@@ -202,7 +206,7 @@ class ParaglidingTrackCorrector(object):
         # Delete first bounding points if any.
         fb = None
         for i, idx in enumerate(outside_idxs):
-            while outside_idxs[i] == i:
+            if outside_idxs[i] == i:
                 fb = i
         if fb:
             item = np.delete(item, np.s_[:fb + 1])
@@ -342,7 +346,7 @@ class OfflineCorrectorService:
         tdifs = np.ediff1d(track['timestamp'], to_begin=1)
         # At first let's find end of track by timeout, if any.
         track_end_idxs = np.where(tdifs > self.maxtimediff)[0]
-        if track_end_idxs:
+        if len(track_end_idxs)>0:
             track_end_idxs = track_end_idxs[0]
             track = track[:track_end_idxs]
             tdifs = tdifs[:track_end_idxs]

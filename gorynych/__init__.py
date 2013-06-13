@@ -5,7 +5,7 @@ import yaml
 import os
 from twisted.python import usage
 
-__version__ = '0.1.6'
+__version__ = '0.2'
 
 BASEDIR = os.path.dirname(__file__)
 
@@ -28,7 +28,7 @@ class BaseOptions(usage.Options):
         ['config', 'c', 'config.yaml'],
         ['poolthreads', 'pt', 5, None, int],
         ['workdir', '', './'],
-        ['apiurl', 'url', 'http://api.airtribune.com/']
+        ['apiurl', 'url', 'http://api.airtribune.com']
     ]
 
     def postOptions(self):
@@ -42,4 +42,4 @@ class BaseOptions(usage.Options):
 
 
 OPTS = BaseOptions()
-OPTS.parseOptions()
+OPTS.parseOptions([])

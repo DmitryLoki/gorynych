@@ -1,10 +1,12 @@
-import json
+import simplejson as json
 import os
 import time
+from random import randint
 
 from shapely.geometry import Point
 import mock
 import requests
+import numpy as np
 
 from twisted.internet import defer
 from twisted.trial import unittest
@@ -12,7 +14,7 @@ from twisted.trial import unittest
 from gorynych.test.test_info import create_geojson_checkpoints
 from gorynych.common.domain.types import Checkpoint
 from gorynych.processor.services.trackservice import ProcessorService, TrackService
-from gorynych.processor.domain import track
+from gorynych.processor.domain import track, services
 from gorynych.info.domain.ids import RaceID, PersonID
 from gorynych.common.domain import events
 
@@ -53,8 +55,8 @@ def create_checkpoints():
 def create_contest(title='Test TrackService contest'):
     params = dict(title=title, start_time=1,
                   end_time=int(time.time()),
-                  place = 'La France', country='ru',
-                  hq_coords='43.3,23.1', timezone='Europe/Paris')
+                  place = 'Saint Andre les Alpes', country='FR',
+                  hq_coords='43.5,6.5', timezone='Europe/Paris')
     r = requests.post(URL + '/contest', data=params)
     print r.text
     return r.json()['id']
@@ -63,10 +65,11 @@ def create_contest(title='Test TrackService contest'):
 def register_paragliders_on_contest(cont_id):
     pilots = DATA['pilots']
     for key in pilots.keys():
+        email = 's@s.ru' + str(randint(1, 10000))
         params = dict(name=pilots[key]['name'].split(' ')[0],
                            surname=pilots[key]['name'].split(' ')[1],
                            country='ru',
-                           email='s@s.ru', reg_date='2012,12,12')
+                           email=email, reg_date='2012,12,12')
         r = requests.post(URL + '/person', data=params)
         pers_id = r.json()['id']
         params = dict(person_id=pers_id, glider='mantra',
@@ -78,7 +81,7 @@ def register_paragliders_on_contest(cont_id):
 def create_race(contest_id, checkpoints=None):
     if not checkpoints:
         checkpoints = create_geojson_checkpoints()
-    params = dict(title="Test TrackService Task", race_type='racetogoal',
+    params = dict(title="Task 9", race_type='racetogoal',
                   checkpoints=checkpoints)
     return requests.post('/'.join((URL, 'contest', contest_id, 'race')),
                          data=params)
@@ -93,7 +96,7 @@ class ParsingTest(unittest.TestCase):
 
     def test_parsing(self):
         # create contest, person, register paragliders, create race:
-        cont_id = create_contest()
+        cont_id = create_contest("12TH FAI EUROPEAN PARAGLIDING CHAMPIONSHIP" + str(randint(1, 100)))
         print "contest created: ", cont_id
         register_paragliders_on_contest(cont_id)
         print "paragliders registered"
@@ -105,7 +108,7 @@ class ParsingTest(unittest.TestCase):
         r = requests.post('/'.join((URL, 'contest', cont_id, 'race',
                                     race_id, 'track_archive')),
                                   data={'url':
-                                      'http://localhost:8080/16items.zip'})
+                                      'http://airtribune.com:8087/1120-5321.zip'})
         print r.text
         print r.status_code
 
@@ -178,5 +181,63 @@ class TestTrackService(unittest.TestCase):
         ts.process_ParagliderFoundInArchive = mock.Mock()
         ts.process_ParagliderFoundInArchive.assert_called_with(1)
         print result
+
+
+def read_track(filename):
+    filename = os.path.abspath(filename)
+    reader = services.FileParserAdapter(track.DTYPE)
+    data = reader.read(filename)
+    return data
+
+def process_track(data, st, et):
+    reader = services.FileParserAdapter(track.DTYPE)
+    return reader.process(data, st, et)
+
+
+class TestArchiveTrackParsing(unittest.TestCase):
+    def test_reading(self):
+        data = read_track('nonetypeobjectisnotiterable.181.igc')
+        self.assertEqual(data.dtype, track.DTYPE)
+        self.assertTrue(len(data) > 0)
+
+    def test_track_processing(self):
+        data = read_track('nonetypeobjectisnotiterable.181.igc')
+        points, evs = process_track(data, 1371027600, 1371049200)
+        self.assertEqual(points.dtype, track.DTYPE)
+        self.assertEqual(len(points), 4160)
+        self.assertEqual(evs, [])
+
+
+def process_task(task_file, points, state, _id):
+    t = json.loads(open(task_file, 'r').read())
+    ttype = track.RaceToGoal(t)
+    ttype.calculate_path()
+    return ttype.process(points, state, _id)
+
+
+class TestTrackTaskProcessing(unittest.TestCase):
+    def test_task_processor(self):
+        points, evs = process_track(
+            read_track('nonetypeobjectisnotiterable.181.igc'),
+            # read_track('finished.67.igc'),
+            1371027600, 1371049200)
+        t = json.loads(open('cameli1.json', 'r').read())
+        ttype = track.RaceToGoal(t)
+        track_state = track.TrackState([])
+        track_id = track.TrackID()
+        res, evs = ttype.process(points, track_state, track_id)
+        for e in evs:
+            track_state.mutate(e)
+        #     print e.__class__.__name__, e.payload
+        self.assertLess(res[-1]['distance'], 1000)
+        self.assertIsInstance(res, np.ndarray)
+        self.assertIsInstance(evs, list)
+        self.assertEqual(track_state.last_checkpoint, 6)
+
+        # Test correct.
+        evlist = ttype.correct(track_state, track_id)
+        for e in evlist:
+            print e
+
 
 

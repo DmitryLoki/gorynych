@@ -117,7 +117,7 @@ class Checkpoint(ValueObject):
         @rtype: C{float}
         '''
         if isinstance(point, tuple):
-            lat, lon = point
+            lat, lon = float(point[0]), float(point[1])
         elif isinstance(point, Checkpoint):
             lat = point.__geo_interface__['geometry']['coordinates'][0]
             lon = point.__geo_interface__['geometry']['coordinates'][1]
@@ -125,7 +125,7 @@ class Checkpoint(ValueObject):
             raise TypeError("Unknown type %s" % type(point))
         _lat = self.__geo_interface__['geometry']['coordinates'][0]
         _lon = self.__geo_interface__['geometry']['coordinates'][1]
-        return point_dist_calculator(lat, lon, _lat, _lon)
+        return point_dist_calculator(lat, lon, _lat, _lon) - self.radius
 
     @property
     def __geo_interface__(self):

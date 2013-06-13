@@ -13,9 +13,5 @@ group:
   package: *info
   tree:
     *race_index:
-      leaf: RaceResource
-      package: *info
-      tree:
-        tracks:
-          leaf: TracksResource
-          package: *processor
+      leaf: TracksResource
+      package: *processor

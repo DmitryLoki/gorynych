@@ -9,10 +9,9 @@ from gorynych.info.domain import contest, person, race
 from gorynych.common.infrastructure import persistence
 from gorynych.common.domain.types import checkpoint_from_geojson
 from gorynych.common.domain.events import ContestRaceCreated
-from gorynych.common.application import EventPollingService
+from gorynych.common.application import EventPollingService, DBPoolService
 
-class ApplicationService(EventPollingService):
-    polling_interval = 2
+class ApplicationService(DBPoolService):
 
     ############## Contest Service part #############
     def create_new_contest(self, params):
@@ -152,7 +151,14 @@ class ApplicationService(EventPollingService):
     ############## Person Service part ##############
     def create_new_person(self, params):
         factory = person.PersonFactory()
-        year, month, day = params['reg_date'].split(',')
+        regdate = params.get('reg_date')
+        if regdate:
+            try:
+                year, month, day = regdate.split(',')
+            except ValueError:
+                raise ValueError("Wrong regdate has been passed on pilot creation: %s" % regdate)
+        else:
+            year, month, day = None, None, None
         pers = factory.create_person(params['name'], params['surname'],
                                      params['country'], params['email'], year,
                                      month, day)
@@ -207,11 +213,13 @@ class ApplicationService(EventPollingService):
         r = factory.create_race(params['title'], params['race_type'],
                                    cont.timezone, plist,
                                    params['checkpoints'],
-                                   bearing=params.get('bearing'))
+                                   bearing=params.get('bearing'),
+                                timelimits=(cont.start_time, cont.end_time))
         # TODO: do it transactionally.
-        yield persistence.event_store().persist(ContestRaceCreated(
-            cont.id, r.id))
-        yield persistence.get_repository(race.IRaceRepository).save(r)
+        d = persistence.get_repository(race.IRaceRepository).save(r)
+        d.addCallback(lambda _:persistence.event_store().persist(ContestRaceCreated(
+            cont.id, r.id)))
+        yield d
         defer.returnValue(r)
 
     def get_contest_races(self, params):
@@ -254,7 +262,15 @@ class ApplicationService(EventPollingService):
         def change(r):
             if params.has_key('checkpoints'):
                 # TODO: make in thinner
-                ch_list = json.loads(params['checkpoints'])['features']
+                if isinstance(params['checkpoints'], str):
+                    try:
+                        ch_list = json.loads(params['checkpoints'])['features']
+                    except Exception as e:
+                        raise ValueError("Problems with checkpoint reading: %r .Got %s, %r" % (e, type(params['checkpoints']), params['checkpoints']))
+                elif isinstance(params['checkpoints'], dict):
+                    ch_list = params['checkpoints']['features']
+                else:
+                    raise ValueError("Problems with checkpoint reading: got %s, %r" % (type(params['checkpoints']), params['checkpoints']))
                 checkpoints = []
                 for ch in ch_list:
                     checkpoints.append(checkpoint_from_geojson(ch))
@@ -317,14 +333,4 @@ class ApplicationService(EventPollingService):
         d.addCallback(persistence.get_repository(repo_interface).get_list,
                       offset)
         return d
-
-    ######################## cleaning room #####################
-    def apply_PersonGotTrack(self, ev):
-        return self.event_dispatched(ev.id)
-
-    def apply_ParagliderRegisteredOnContest(self, ev):
-        return self.event_dispatched(ev.id)
-
-    def apply_TrackCreated(self, ev):
-        return self.event_dispatched(ev.id)
 

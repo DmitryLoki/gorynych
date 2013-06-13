@@ -8,7 +8,8 @@ import zipfile
 import requests
 
 from gorynych.common.domain.model import ValueObject
-from gorynych import OPTS
+from gorynych import OPTS, __version__
+from twisted.python import log
 
 
 def get_contest_number(track):
@@ -78,7 +79,8 @@ class TrackArchive(ValueObject):
         @return: {contest_number:person_id}
         @rtype: C{dict}
         '''
-        url = '/'.join((OPTS['apiurl'], 'race', self.race_id,
+        # TODO: something wrong here...
+        url = '/'.join((OPTS['apiurl'],'v' + str(__version__), 'race', self.race_id,
                         'paragliders'))
         r = requests.get(url)
         res = r.json()
@@ -110,7 +112,10 @@ class TrackArchive(ValueObject):
         extra_tracks = []
         tracks = []
         for idx, item in enumerate(tracklist):
-            contest_number = get_contest_number(item)
+            try:
+                contest_number = get_contest_number(item)
+            except:
+                continue
             if paragliders.has_key(contest_number):
                 tracks.append(dict(person_id=paragliders[contest_number],
                                    trackfile=item,

@@ -126,12 +126,12 @@ class Track(AggregateRoot):
     dtype = DTYPE
 
     def __init__(self, id, events=None):
+        super(Track, self).__init__()
         self.id = id
         self._state = TrackState(events)
         self._task = None
         self._type = None
         self.changes = []
-        # Buffer for points.
         self.points = np.empty(0, dtype=self.dtype)
 
     def apply(self, ev):
@@ -211,6 +211,9 @@ class RaceToGoal(object):
         @return: (points, event list)
         @rtype: (np.array, list)
         '''
+        assert isinstance(points, np.ndarray), "Got %s instead of array" % \
+                                               type(points)
+        assert points.dtype == DTYPE
         eventlist = []
         self.calculate_path()
         lastchp = taskstate.last_checkpoint
@@ -222,7 +225,8 @@ class RaceToGoal(object):
                 p['distance'] = taskstate.pbuffer[-1]['distance']
             return points
         ended = taskstate.ended
-        for p in points:
+        for idx, p in np.ndenumerate(points):
+            # raise ValueError(p['lat'], p['lon'])
             dist = nextchp.distance_to((p['lat'], p['lon']))
             if dist <= self.wp_error and not ended:
                 eventlist.append(
@@ -240,7 +244,8 @@ class RaceToGoal(object):
                         occured_on=p['timestamp']))
                 if lastchp + 1 < len(self.checkpoints) - 1:
                     nextchp = self.checkpoints[lastchp + 2]
-            p['distance'] = int(dist + nextchp.distance)
+                    lastchp += 1
+            p['distance'] = max(int(dist + nextchp.distance), 0)
 
         return points, eventlist
 

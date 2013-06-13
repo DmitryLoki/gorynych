@@ -106,7 +106,7 @@ class FileParserAdapter(object):
         try:
             parsed_track = choose_offline_parser(data)(self.dtype).parse(data)
         except Exception as e:
-            raise Exception("Error while parsing file: %r " % e)
+            raise Exception("Error while parsing file: %r , %s" % (e, data))
         return parsed_track
 
     def process(self, data, stime, etime):

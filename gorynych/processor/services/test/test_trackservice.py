@@ -1,4 +1,4 @@
-import json
+import simplejson as json
 import os
 import time
 from random import randint
@@ -6,6 +6,7 @@ from random import randint
 from shapely.geometry import Point
 import mock
 import requests
+import numpy as np
 
 from twisted.internet import defer
 from twisted.trial import unittest
@@ -13,7 +14,7 @@ from twisted.trial import unittest
 from gorynych.test.test_info import create_geojson_checkpoints
 from gorynych.common.domain.types import Checkpoint
 from gorynych.processor.services.trackservice import ProcessorService, TrackService
-from gorynych.processor.domain import track
+from gorynych.processor.domain import track, services
 from gorynych.info.domain.ids import RaceID, PersonID
 from gorynych.common.domain import events
 
@@ -180,5 +181,63 @@ class TestTrackService(unittest.TestCase):
         ts.process_ParagliderFoundInArchive = mock.Mock()
         ts.process_ParagliderFoundInArchive.assert_called_with(1)
         print result
+
+
+def read_track(filename):
+    filename = os.path.abspath(filename)
+    reader = services.FileParserAdapter(track.DTYPE)
+    data = reader.read(filename)
+    return data
+
+def process_track(data, st, et):
+    reader = services.FileParserAdapter(track.DTYPE)
+    return reader.process(data, st, et)
+
+
+class TestArchiveTrackParsing(unittest.TestCase):
+    def test_reading(self):
+        data = read_track('nonetypeobjectisnotiterable.181.igc')
+        self.assertEqual(data.dtype, track.DTYPE)
+        self.assertTrue(len(data) > 0)
+
+    def test_track_processing(self):
+        data = read_track('nonetypeobjectisnotiterable.181.igc')
+        points, evs = process_track(data, 1371027600, 1371049200)
+        self.assertEqual(points.dtype, track.DTYPE)
+        self.assertEqual(len(points), 4160)
+        self.assertEqual(evs, [])
+
+
+def process_task(task_file, points, state, _id):
+    t = json.loads(open(task_file, 'r').read())
+    ttype = track.RaceToGoal(t)
+    ttype.calculate_path()
+    return ttype.process(points, state, _id)
+
+
+class TestTrackTaskProcessing(unittest.TestCase):
+    def test_task_processor(self):
+        points, evs = process_track(
+            read_track('nonetypeobjectisnotiterable.181.igc'),
+            # read_track('finished.67.igc'),
+            1371027600, 1371049200)
+        t = json.loads(open('cameli1.json', 'r').read())
+        ttype = track.RaceToGoal(t)
+        track_state = track.TrackState([])
+        track_id = track.TrackID()
+        res, evs = ttype.process(points, track_state, track_id)
+        for e in evs:
+            track_state.mutate(e)
+        #     print e.__class__.__name__, e.payload
+        self.assertLess(res[-1]['distance'], 1000)
+        self.assertIsInstance(res, np.ndarray)
+        self.assertIsInstance(evs, list)
+        self.assertEqual(track_state.last_checkpoint, 6)
+
+        # Test correct.
+        evlist = ttype.correct(track_state, track_id)
+        for e in evlist:
+            print e
+
 
 

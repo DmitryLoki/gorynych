@@ -55,6 +55,9 @@ def point_dist_calculator(start_lat, start_lon, end_lat, end_lon):
     """Return distance between two points in float
     TODO: analyze function and rewrite on Cython or C if needed
     """
+    # raise ValueError(repr(start_lat), repr(start_lon), repr(end_lat),
+    #     type(end_lon))
+    # raise ValueError(start_lat, start_lon, end_lat, end_lon)
     start_lat = float(math.radians(float(start_lat)))
     start_lon = float(math.radians(float(start_lon)))
     end_lat = float(math.radians(float(end_lat)))

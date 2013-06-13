@@ -35,7 +35,7 @@ class TestRaceToGoal(unittest.TestCase):
         for p in rt.checkpoints:
             print p.distance
 
-    def test_process(self):
+    def test_dist_to_goal(self):
         rt = track.RaceToGoal(test_race)
         ts = track.TrackState([])
         c = np.ones(1, dtype=[('lat', 'f4'), ('lon', 'f4'),

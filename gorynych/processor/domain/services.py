@@ -128,6 +128,7 @@ class FileParserAdapter(object):
         if not trackstate.finish_time:
             return [TrackEnded(_id, dict(state='landed'),
                 occured_on=trackstate.pbuffer[ -1]['timestamp'])]
+        return []
 
 
 class ParaglidingTrackCorrector(object):

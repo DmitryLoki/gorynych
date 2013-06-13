@@ -26,14 +26,14 @@ INSERT_SNAPSHOT = """
 def find_snapshots(data):
     result = []
     if data._state.finish_time:
-        result.append(dict(timestamp=data._state.finish_time,
+        result.append(dict(timestamp=int(data._state.finish_time),
             snapshot='finished'))
     elif data._state.end_time:
-        result.append(dict(timestamp=data._state.end_time,
+        result.append(dict(timestamp=int(data._state.end_time),
             snapshot='landed'))
 
     if data._state.start_time:
-        result.append(dict(timestamp=data._state.start_time,
+        result.append(dict(timestamp=int(data._state.start_time),
             snapshot='started'))
     return result
 

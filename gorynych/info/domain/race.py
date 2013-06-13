@@ -118,6 +118,8 @@ class Race(AggregateRoot):
         self.timelimits = ()
         self.paragliders = dict()
         self._timezone = pytz.utc
+        self.start_time = 0
+        self.end_time = 0
 
     @property
     def title(self):

@@ -111,7 +111,7 @@ class ContestRaceResource(APIResource):
         if cont and r:
             result = self.read_PUT(r)
             result['contest_title'] = cont.title
-            result['country'] = cont.country
+            result['country'] = pytz.country_names[cont.country]
             result['place'] = cont.place
             result['timeoffset'] = datetime.fromtimestamp(result[
                 'start_time'],

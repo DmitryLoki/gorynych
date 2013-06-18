@@ -33,8 +33,7 @@ class AuthenticationService(object):
         @raise: AuthenticationError if no chatroom can be found.
         '''
         time_offset = 3600*5
-        # t = int(time.time())
-        t = 1347717600 # test
+        t = int(time.time())
         c_id = yield self.pool.runQuery(pe.select('race_id_by_organizator',
             'race'),
             (token, t-time_offset, t+time_offset, t-time_offset, t+time_offset))

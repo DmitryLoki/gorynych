@@ -4,6 +4,8 @@ from zope.interface import implementer
 from twisted.web import resource, server
 from twisted.web.http import stringToDatetime
 
+from gorynych.common.exceptions import AuthenticationError
+
 
 @implementer(resource.IResource)
 class WebChat(resource.Resource):
@@ -20,6 +22,8 @@ class WebChat(resource.Resource):
             if len(request.postpath) > 0 and request.postpath[0]:
                 udid = request.postpath[0]
                 return AuthenticationResource(udid, self.service)
+        elif path == 'handshake':
+            return HandshakeResource(self.service)
         return self
 
 
@@ -118,3 +122,22 @@ class AuthenticationResource(resource.Resource):
         d.addCallback(self.write_request, request)
         return server.NOT_DONE_YET
 
+
+class HandshakeResource(resource.Resource):
+    isLeaf = True
+    def __init__(self, service):
+        resource.Resource.__init__(self)
+        self.service = service
+
+    def render_GET(self, request):
+        token = request.getHeader(b'x-app-token')
+        d = self.service.authenticate(token)
+        d.addErrback(self._trap_auth_error, request)
+        d.addCallback(request.write)
+        d.addCallback(lambda _:request.finish())
+        return server.NOT_DONE_YET
+
+    def _trap_auth_error(self, failure, request):
+        failure.trap(AuthenticationError)
+        request.setResponseCode(403)
+        return ''

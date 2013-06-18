@@ -40,6 +40,16 @@ class ChatApplication(Service):
     factory = MessageFactory()
 
     def __init__(self, repo, auth_service):
+        '''
+
+        @param repo:
+        @type repo:
+        @param auth_service:
+        @type auth_service: C{gorynych.chat.domain.services
+        .AuthenticationService}
+        @return:
+        @rtype:
+        '''
         self.repository = repo
         self.auth_service = auth_service
 
@@ -53,3 +63,6 @@ class ChatApplication(Service):
 
     def get_udid_token(self, udid):
         return self.auth_service.get_udid_token(udid)
+
+    def authenticate(self, token):
+        return self.auth_service.authenticate(token)

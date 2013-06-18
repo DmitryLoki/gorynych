@@ -21,6 +21,7 @@ components.registerAdapter(WebChat, IChatService, IResource)
 def makeService(config):
     from gorynych.chat.application import ChatApplication, IChatService
     from gorynych.chat.infrastructure import MessageRepository
+    from gorynych.chat.domain.services import AuthenticationService
     pool = adbapi.ConnectionPool('psycopg2', database=config['dbname'],
         user=config['dbuser'],
         password=config['dbpassword'],
@@ -28,7 +29,7 @@ def makeService(config):
 
     s = service.MultiService()
     r = MessageRepository(pool)
-    ca = ChatApplication(r)
+    ca = ChatApplication(r, AuthenticationService(pool))
     ca.setServiceParent(s)
 
     # website

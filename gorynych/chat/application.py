@@ -39,8 +39,9 @@ class IChatService(Interface):
 class ChatApplication(Service):
     factory = MessageFactory()
 
-    def __init__(self, repo):
+    def __init__(self, repo, auth_service):
         self.repository = repo
+        self.auth_service = auth_service
 
     def post_message(self, chatroom, msg):
         m = self.factory.create_message(msg)
@@ -49,3 +50,6 @@ class ChatApplication(Service):
     def get_messages(self, chatroom, from_time=None, to_time=None):
         return self.repository.get_messages(chatroom, from_time, to_time)
 
+
+    def get_udid_token(self, udid):
+        return self.auth_service.get_udid_token(udid)

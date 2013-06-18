@@ -1,9 +1,8 @@
 import simplejson as json
+from twisted.python import log
 from zope.interface import implementer
 from twisted.web import resource, server
-# from twisted.internet import defer
 from twisted.web.http import stringToDatetime
-
 
 
 @implementer(resource.IResource)
@@ -17,6 +16,10 @@ class WebChat(resource.Resource):
             if len(request.postpath) > 0 and request.postpath[0]:
                 chroom = request.postpath[0]
                 return ChatResource(self.service, chroom)
+        elif path == 'appinit':
+            if len(request.postpath) > 0 and request.postpath[0]:
+                udid = request.postpath[0]
+                return AuthenticationResource(udid, self.service)
         return self
 
 
@@ -57,7 +60,7 @@ class ChatResource(resource.Resource):
         request.setResponseCode(201)
         d = self.service.post_message(self.chatroom, msg)
         d.addCallback(request.write)
-        d.addCallback(lambda _:request.finish())
+        d.addCallback(lambda _: request.finish())
         return server.NOT_DONE_YET
 
     def render_GET(self, request):
@@ -68,25 +71,50 @@ class ChatResource(resource.Resource):
                 modified_since = stringToDatetime(first_part)
             except ValueError:
                 modified_since = None
+
         def set_header(msglist):
             if msglist:
                 ts = msglist[-1].timestamp
                 request.setLastModified(ts)
             return msglist
+
         def _format(msglist):
             result = []
             if msglist:
                 for msg in msglist:
-                    result.append({'from': msg.from_, 'to':msg.to,
+                    result.append({'from': msg.from_, 'to': msg.to,
                         'timestamp': msg.timestamp,
-                        'body':msg.body,
-                        'sender':msg.sender, 'id':msg.id})
+                        'body': msg.body,
+                        'sender': msg.sender, 'id': msg.id})
             return bytes(json.dumps(result))
+
         d = self.service.get_messages(self.chatroom, modified_since)
         d.addCallback(set_header)
         d.addCallback(_format)
         d.addCallback(request.write)
-        d.addCallback(lambda _:request.finish())
+        d.addCallback(lambda _: request.finish())
         return server.NOT_DONE_YET
 
+
+class AuthenticationResource(resource.Resource):
+    isLeaf = True
+
+    def __init__(self, key, service):
+        resource.Resource.__init__(self)
+        self.key = key
+        self.service = service
+
+    def write_request(self, body, request):
+        if body:
+            request.write(bytes(body))
+        else:
+            request.setResponseCode(404)
+        request.finish()
+        return
+
+    def render_GET(self, request):
+        d = self.service.get_udid_token(self.key)
+        d.addErrback(log.err)
+        d.addCallback(self.write_request, request)
+        return server.NOT_DONE_YET
 

@@ -120,7 +120,7 @@ def _operation(name, tagname, filename=None):
         filename = tagname
     with open(sqldir + filename + '.sql', 'r') as f:
         pattern = r'--\s+' + name + r'\s?' + tagname + \
-                  r'\n\s*([\w()\s.,%=\*]*);'
+                  r'\n\s*([\w()\s.,%="\*]*);'
         command = re.search(pattern, f.read(), re.IGNORECASE)
     return command.group(1)
 

@@ -240,4 +240,14 @@ class TestTrackTaskProcessing(unittest.TestCase):
             print e
 
 
+class IntegrationTestTrackProcessing(unittest.TestCase):
+    def test_test(self):
+        tid = track.TrackID()
+        tc = events.TrackCreated(tid)
+        tc.payload = dict(race_task=json.loads(open('cameli1.json',
+            'r').read()), track_type='competition_aftertask')
+
+        t = track.Track(tid, [tc])
+        t.process_data('nonetypeobjectisnotiterable.181.igc')
+        print t.changes
 

@@ -82,7 +82,7 @@ class Tracker(AggregateRoot):
 class TrackerFactory(object):
 
     def create_tracker(self, tracker_id=None, device_id=None,
-                       device_type=None, name=None):
+                       device_type=None, name=None, assignee=None):
         if not isinstance(tracker_id, TrackerID):
             tracker_id = TrackerID(device_type, device_id)
         if isinstance(device_id, str) and device_type in DEVICE_TYPES:
@@ -95,4 +95,5 @@ class TrackerFactory(object):
 
         if isinstance(name, str):
             tracker.name = name.strip()
+        tracker.assignee_id = assignee
         return tracker

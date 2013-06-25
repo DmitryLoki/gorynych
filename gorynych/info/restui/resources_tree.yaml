@@ -62,4 +62,6 @@ person:
       leaf: PersonResource
       package: *gorynych
 
-
+tracker:
+  leaf: TrackerCollection
+  package: *gorynych

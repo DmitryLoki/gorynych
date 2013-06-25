@@ -14,7 +14,7 @@ from gorynych.common.domain.types import checkpoint_collection_from_geojson, geo
 from gorynych.info.domain.person import IPersonRepository, PersonFactory
 from gorynych.common.exceptions import NoAggregate, DatabaseValueError
 from gorynych.common.infrastructure import persistence as pe
-from gorynych.info.domain.interfaces import ITrackerRepository
+from gorynych.info.domain import interfaces
 from gorynych.info.domain.tracker import TrackerFactory
 
 
@@ -23,15 +23,15 @@ def create_participants(paragliders_row):
     if paragliders_row:
         result = list()
         for tup in paragliders_row:
-            _id, pid, cn , co, gl, ti, n, sn = tup
+            _id, pid, cn, co, gl, ti, n, sn = tup
             result.append(Paraglider(pid, Name(n, sn), co,
-                                                   gl, cn, ti))
+                gl, cn, ti))
     return result
 
 # TODO: simplify repositories.
 
+@implementer(interfaces.IRepository)
 class BasePGSQLRepository(object):
-
     def __init__(self, pool):
         self.pool = pool
         self.name = self.__class__.__name__[5:-10].lower()
@@ -61,8 +61,21 @@ class BasePGSQLRepository(object):
         result.apply(event_list)
         defer.returnValue(result)
 
-    def _restore_aggregate(self, param):
-        raise NotImplementedError()
+    @defer.inlineCallbacks
+    def save(self, obj):
+        try:
+            if obj._id:
+                result = yield self._update(obj)
+            else:
+                _id = yield self._save_new(obj)
+                obj._id = _id[0][0]
+                result = obj
+        except psycopg2.IntegrityError as e:
+            if e.pgcode == '23505':
+                # unique constraints violation
+                result = yield self._get_existed(obj)
+                defer.returnValue(result)
+        defer.returnValue(result)
 
 
 class PGSQLPersonRepository(BasePGSQLRepository):
@@ -89,16 +102,16 @@ class PGSQLPersonRepository(BasePGSQLRepository):
     def save(self, pers):
         if pers._id:
             yield self.pool.runOperation(pe.update('person'),
-                                       self._extract_sql_fields(pers))
+                self._extract_sql_fields(pers))
             result = pers
         else:
             try:
                 data = yield self.pool.runQuery(pe.insert('person'),
-                                   self._extract_sql_fields(pers))
+                    self._extract_sql_fields(pers))
             except psycopg2.IntegrityError as e:
                 if e.pgcode == '23505':
                     pid = yield self.pool.runQuery(pe.select('by_email',
-                                            'person'), (str(pers.email),))
+                        'person'), (str(pers.email),))
                     result = yield self.get_by_id(pid[0][0])
                     defer.returnValue(result)
             result = yield self._process_insert_result(data, pers)
@@ -108,7 +121,7 @@ class PGSQLPersonRepository(BasePGSQLRepository):
         if pers is None:
             return ()
         return (pers.name.name, pers.name.surname, pers.regdate,
-                    pers.country, pers.email, str(pers.id))
+        pers.country, pers.email, str(pers.id))
 
     def _process_insert_result(self, data, pers):
         if data is not None and pers is not None:
@@ -141,7 +154,7 @@ class PGSQLRaceRepository(BasePGSQLRepository):
             b = None
         factory = RaceFactory()
         result = factory.create_race(t, rt, tz, ps, chs, race_id=rid,
-                                          bearing=b, timelimits=(slt, elt))
+            bearing=b, timelimits=(slt, elt))
         result._start_time = st
         result._end_time = et
         result._id = long(i)
@@ -151,6 +164,7 @@ class PGSQLRaceRepository(BasePGSQLRepository):
     def save(self, obj):
         result = []
         values = self._get_values_from_obj(obj)
+
         def insert_id(_id, _list):
             _list.insert(0, _id)
             return _list
@@ -159,7 +173,7 @@ class PGSQLRaceRepository(BasePGSQLRepository):
             cur.execute(pe.insert('race'), values['race'])
             x = cur.fetchone()
             pq = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s, %s)",
-                     (insert_id(x[0], p))) for p in values['paragliders'])
+                (insert_id(x[0], p))) for p in values['paragliders'])
             cur.execute("INSERT INTO paraglider VALUES " + pq)
             return x
 
@@ -179,14 +193,14 @@ class PGSQLRaceRepository(BasePGSQLRepository):
                             "AND person_id in %s", (obj._id, ids))
             if to_insert:
                 q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s, %s)",
-                                         (pitem)) for pitem in to_insert)
+                    (pitem)) for pitem in to_insert)
                 cur.execute("INSERT into paraglider values " + q)
             return obj
 
 
         if obj._id:
             pgs = yield self.pool.runQuery(pe.select('paragliders', 'race'),
-                                           (obj._id,))
+                (obj._id,))
             if not pgs:
                 raise DatabaseValueError(
                     "No paragliders has been found for race %s." % obj.id)
@@ -203,18 +217,19 @@ class PGSQLRaceRepository(BasePGSQLRepository):
         if obj.type == 'opendistance':
             if obj.task.bearing is None:
                 raise ValueError("Race don't have bearing.")
-            bearing = json.dumps(dict(bearing = int(obj.task.bearing)))
+            bearing = json.dumps(dict(bearing=int(obj.task.bearing)))
         result['race'] = (obj.title, obj.start_time, obj.end_time,
-                          obj.timezone, obj.type,
-                          geojson_feature_collection(obj.checkpoints),
-                          bearing, obj.timelimits[0], obj.timelimits[1],
-                          str(obj.id))
+        obj.timezone, obj.type,
+        geojson_feature_collection(obj.checkpoints),
+        bearing, obj.timelimits[0], obj.timelimits[1],
+        str(obj.id))
         result['paragliders'] = []
         for key in obj.paragliders:
             p = obj.paragliders[key]
-            result['paragliders'].append([str(p.person_id), str(p.contest_number),
-                                     p.country, p.glider, p.tracker_id,
-                                     p._name.name, p._name.surname])
+            result['paragliders'].append(
+                [str(p.person_id), str(p.contest_number),
+                    p.country, p.glider, p.tracker_id,
+                    p._name.name, p._name.surname])
         return result
 
 
@@ -224,7 +239,7 @@ class PGSQLContestRepository(BasePGSQLRepository):
     @defer.inlineCallbacks
     def _append_data_to_contest(self, cont):
         participants = yield self.pool.runQuery(
-                    pe.select('participants', 'contest'), (cont._id,))
+            pe.select('participants', 'contest'), (cont._id,))
         if participants:
             cont = self._add_participants_to_contest(cont, participants)
         defer.returnValue(cont)
@@ -273,6 +288,7 @@ class PGSQLContestRepository(BasePGSQLRepository):
     @defer.inlineCallbacks
     def save(self, obj):
         values = self._extract_values_from_contest(obj)
+
         def insert_id(_id, _list):
             _list.insert(0, _id)
             return _list
@@ -285,13 +301,12 @@ class PGSQLContestRepository(BasePGSQLRepository):
             i = cur.execute(pe.insert('contest'), values['contest'])
             x = cur.fetchone()
 
-
             if values['participants']:
                 # Callbacks wan't work in for loop, so i insert multiple values
                 # in one query.
                 # Oh yes, executemany also wan't work in asynchronous mode.
                 q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s)",
-                       (insert_id(x[0], p))) for p in values['participants'])
+                    (insert_id(x[0], p))) for p in values['participants'])
                 cur.execute("INSERT into participant values " + q)
 
             return x
@@ -309,10 +324,10 @@ class PGSQLContestRepository(BasePGSQLRepository):
                 if to_delete:
                     ids = tuple([x[1] for x in to_delete])
                     cur.execute("DELETE FROM participant WHERE id=%s "
-                            "AND participant_id in %s", (obj._id, ids))
+                                "AND participant_id in %s", (obj._id, ids))
                 if to_insert:
                     q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s)",
-                                    (pitem)) for pitem in to_insert)
+                        (pitem)) for pitem in to_insert)
                     cur.execute("INSERT into participant values " + q)
 
             return obj
@@ -320,7 +335,7 @@ class PGSQLContestRepository(BasePGSQLRepository):
         result = None
         if obj._id:
             prts = yield self.pool.runQuery(pe.select('participants',
-                                                      'contest'), (obj._id,))
+                'contest'), (obj._id,))
             result = yield self.pool.runInteraction(update, prts)
         else:
             c__id = yield self.pool.runInteraction(save_new)
@@ -331,22 +346,22 @@ class PGSQLContestRepository(BasePGSQLRepository):
     def _extract_values_from_contest(self, obj):
         result = dict()
         result['contest'] = (obj.title, obj.start_time, obj.end_time,
-                          obj.timezone,
-                obj.address.place, obj.address.country,
-                obj.address.lat, obj.address.lon, str(obj.id))
+        obj.timezone,
+        obj.address.place, obj.address.country,
+        obj.address.lat, obj.address.lon, str(obj.id))
 
         result['participants'] = []
         for key in obj._participants:
             p = obj._participants[key]
             row = [str(key), p['role'], p.get('glider', ''),
-                   p.get('contest_number', ''), p.get('description', ''),
-                   key.__class__.__name__.lower()[:-2]]
+                p.get('contest_number', ''), p.get('description', ''),
+                key.__class__.__name__.lower()[:-2]]
             result['participants'].append(row)
 
         return result
 
 
-@implementer(ITrackerRepository)
+@implementer(interfaces.ITrackerRepository)
 class PGSQLTrackerRepository(BasePGSQLRepository):
     def _restore_aggregate(self, row):
         factory = TrackerFactory()
@@ -355,3 +370,22 @@ class PGSQLTrackerRepository(BasePGSQLRepository):
             name=name, assignee=assignee)
         result._id = _id
         return result
+
+    def _save_new(self, obj):
+        return self.pool.runQuery(pe.insert('tracker'),
+                                                self._extract_sql_fields(obj))
+
+
+    def _extract_sql_fields(self, obj):
+        '''
+
+        @param obj:
+        @type obj: gorynych.info.domain.tracker.Tracker
+        @return:
+        @rtype:
+        '''
+        return (obj.device_id, obj.device_type, obj.name, str(obj.id),
+                obj.assignee)
+
+    def _get_existed(self, obj):
+        pass

@@ -314,5 +314,13 @@ class ContestRaceTest(unittest.TestCase):
                                       r.json()[0])
 
 
+class TrackerTest(unittest.TestCase):
+    url = URL + '/tracker'
+    def test_create(self):
+        params = dict(device_id=str(random.randint(1, 1000)),
+            device_type='tr203')
+        r = requests.post(self.url, data=params)
+        print r.text
+
 if __name__ == '__main__':
     unittest.main()

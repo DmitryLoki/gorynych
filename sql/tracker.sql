@@ -30,5 +30,7 @@ WHERE
 
 -- Insert Tracker
 INSERT INTO TRACKER(DEVICE_ID, DEVICE_TYPE, NAME, TRACKER_ID, ASSIGNEE)
-    VALUES (%s, %s, %s, %s, %s)
+    VALUES (%s,
+            (SELECT ID FROM DEVICE_TYPE WHERE NAME=%s),
+            %s, %s, %s)
 RETURNING ID;

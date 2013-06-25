@@ -33,43 +33,41 @@ class BasePGSQLRepository(object):
 
     def __init__(self, pool):
         self.pool = pool
+        self.name = self.__class__.__name__[5:-10].lower()
 
     @defer.inlineCallbacks
     def get_list(self, limit=20, offset=None):
-        table_name = self.__class__.__name__[5:-10]
-        idname = table_name + '_id'
+        idname = self.name + '_id'
         result = []
-        command = ' '.join(('select', idname, 'from', table_name))
+        command = ' '.join(('select', idname, 'from', self.name))
         if limit:
             command += ' limit ' + str(limit)
         if offset:
             command += ' offset ' + str(offset)
         ids = yield self.pool.runQuery(command)
         for idx, pid in enumerate(ids):
-            pers = yield self.get_by_id(pid[0])
-            result.append(pers)
+            item = yield self.get_by_id(pid[0])
+            result.append(item)
         defer.returnValue(result)
 
+    @defer.inlineCallbacks
     def get_by_id(self, id):
+        data = yield self.pool.runQuery(pe.select(self.name), (str(id),))
+        if not data:
+            raise NoAggregate("%s %s" % (self.name.title(), id))
+        result = yield defer.maybeDeferred(self._restore_aggregate, data[0])
+        event_list = yield pe.event_store().load_events(result.id)
+        result.apply(event_list)
+        defer.returnValue(result)
+
+    def _restore_aggregate(self, param):
         raise NotImplementedError()
 
 
 class PGSQLPersonRepository(BasePGSQLRepository):
     implements(IPersonRepository)
 
-    @defer.inlineCallbacks
-    def get_by_id(self, person_id):
-
-        data = yield self.pool.runQuery(pe.select('person'),
-                                        (str(person_id),))
-        if not data:
-            raise NoAggregate("Person %s" % person_id)
-        result = self._create_person(data[0])
-        event_list = yield pe.event_store().load_events(result.id)
-        result.apply(event_list)
-        defer.returnValue(result)
-
-    def _create_person(self, data_row):
+    def _restore_aggregate(self, data_row):
         if data_row:
             # regdate is datetime.datetime object
             regdate = data_row[4]
@@ -123,25 +121,16 @@ class PGSQLRaceRepository(BasePGSQLRepository):
     implements(IRaceRepository)
 
     @defer.inlineCallbacks
-    def get_by_id(self, race_id):
-        race_data = yield self.pool.runQuery(pe.select('race'), (str(race_id),))
-        if not race_data:
-            raise NoAggregate("Race")
-
-        pgs = yield self.pool.runQuery(pe.select('paragliders', 'race'),
-                                       (race_data[0][0],))
-        if not pgs:
-            raise DatabaseValueError("No paragliders has been found for race"
-                                     " %s." % race_data[0][1])
-        result = self._create_race(race_data[0], pgs)
-        event_list = yield pe.event_store().load_events(result.id)
-        result.apply(event_list)
-        defer.returnValue(result)
-
-    def _create_race(self, race_data, paragliders_row):
+    def _restore_aggregate(self, race_data):
         # TODO: repository knows too much about Race's internals. Think about it
         i, rid, t, st, et, tz, rt, _chs, _aux, slt, elt = race_data
-        ps = create_participants(paragliders_row)
+
+        pgs = yield self.pool.runQuery(pe.select('paragliders', 'race'),
+            (race_data[0],))
+        if not pgs:
+            raise DatabaseValueError("No paragliders has been found for race"
+                                     " %s." % race_data[1])
+        ps = create_participants(pgs)
         chs = checkpoint_collection_from_geojson(_chs)
 
         if _aux:
@@ -155,7 +144,7 @@ class PGSQLRaceRepository(BasePGSQLRepository):
         result._start_time = st
         result._end_time = et
         result._id = long(i)
-        return result
+        defer.returnValue(result)
 
     @defer.inlineCallbacks
     def save(self, obj):
@@ -232,18 +221,6 @@ class PGSQLContestRepository(BasePGSQLRepository):
     implements(IContestRepository)
 
     @defer.inlineCallbacks
-    def get_by_id(self, contest_id):
-        rows = yield self.pool.runQuery(pe.select('contest'),
-                                        (str(contest_id),))
-        if not rows:
-            raise NoAggregate("Contest")
-        cont = self._create_contest_from_data(rows[0])
-        cont = yield self._append_data_to_contest(cont)
-        event_list = yield pe.event_store().load_events(cont.id)
-        cont.apply(event_list)
-        defer.returnValue(cont)
-
-    @defer.inlineCallbacks
     def _append_data_to_contest(self, cont):
         participants = yield self.pool.runQuery(
                     pe.select('participants', 'contest'), (cont._id,))
@@ -251,7 +228,8 @@ class PGSQLContestRepository(BasePGSQLRepository):
             cont = self._add_participants_to_contest(cont, participants)
         defer.returnValue(cont)
 
-    def _create_contest_from_data(self, row):
+    @defer.inlineCallbacks
+    def _restore_aggregate(self, row):
         '''
 
         @param row: (id, contest_id, title, stime, etime, tz, place,
@@ -264,7 +242,8 @@ class PGSQLContestRepository(BasePGSQLRepository):
         sid, cid, ti, st, et, tz, pl, co, lat, lon = row
         cont = factory.create_contest(ti, st, et, pl, co, (lat, lon), tz, cid)
         cont._id = sid
-        return cont
+        cont = yield self._append_data_to_contest(cont)
+        defer.returnValue(cont)
 
     def _add_participants_to_contest(self, cont, rows):
         '''
@@ -364,3 +343,8 @@ class PGSQLContestRepository(BasePGSQLRepository):
             result['participants'].append(row)
 
         return result
+
+
+@implementer(ITrackerRepository)
+class PGSQLTrackerRepository(BasePGSQLRepository):
+    pass

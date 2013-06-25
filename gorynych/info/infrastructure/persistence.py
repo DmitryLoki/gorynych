@@ -15,6 +15,7 @@ from gorynych.info.domain.person import IPersonRepository, PersonFactory
 from gorynych.common.exceptions import NoAggregate, DatabaseValueError
 from gorynych.common.infrastructure import persistence as pe
 from gorynych.info.domain.interfaces import ITrackerRepository
+from gorynych.info.domain.tracker import TrackerFactory
 
 
 def create_participants(paragliders_row):
@@ -347,4 +348,10 @@ class PGSQLContestRepository(BasePGSQLRepository):
 
 @implementer(ITrackerRepository)
 class PGSQLTrackerRepository(BasePGSQLRepository):
-    pass
+    def _restore_aggregate(self, row):
+        factory = TrackerFactory()
+        did, dtype, name, tid, assignee, _id = row
+        result = factory.create_tracker(device_id=did, device_type=dtype,
+            name=name, assignee=assignee)
+        result._id = _id
+        return result

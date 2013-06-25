@@ -323,6 +323,28 @@ class RaceTracksResource(APIResource):
             return result
 
 
+class TrackerCollection(APIResource):
+    '''
+    /tracker
+    '''
+    name = 'tracker_collection'
+    service_command = dict(POST='create_new_tracker')
+
+    def read_POST(self, t, p=None):
+        '''
+        @type t: L{gorynych.info.domain.tracker.Tracker}
+        '''
+        if t:
+            result = dict()
+            result['device_id'] = t.device_id
+            result['name'] = t.name
+            result['device_type'] = t.device_type
+            result['id'] = t.id
+            return result
+
+
+
+
 # TODO: this resource should be in processor package.
 class TracksResource(APIResource):
     '''

@@ -11,10 +11,10 @@ from gorynych.info.domain.ids import TrackerID
 DEVICE_TYPES = ['tr203']
 
 class ITrackerRepository(Interface):
-    def get_by_id(tracker_id): # @NoSelf
+    def get_by_id(tracker_id):
         '''
         '''
-    def save(value): # @NoSelf
+    def save(value):
         '''
         '''
 
@@ -29,6 +29,7 @@ class TrackerDontHasOwner(Exception):
 class Tracker(AggregateRoot):
 
     def __init__(self, tracker_id, device_id, device_type):
+        super(Tracker, self).__init__()
         self.id = tracker_id
         self.device_id = device_id
         self.device_type = device_type
@@ -78,22 +79,20 @@ class Tracker(AggregateRoot):
             raise TypeError("Tracker name must be string.")
 
 
-
 class TrackerFactory(object):
-
-    def __init__(self, event_publisher):
-        self.event_publisher = event_publisher
 
     def create_tracker(self, tracker_id=None, device_id=None,
                        device_type=None, name=None):
         if not isinstance(tracker_id, TrackerID):
-            tracker_id = TrackerID(tracker_id)
+            tracker_id = TrackerID(device_type, device_id)
         if isinstance(device_id, str) and device_type in DEVICE_TYPES:
-            tracker = Tracker(tracker_id, device_id, device_type)
-            tracker.event_publisher = self.event_publisher
-            if isinstance(name, str):
-                tracker.name = name
-            return tracker
+            tracker = Tracker(TrackerID(device_type, device_id), device_id,
+                device_type)
         else:
-            raise ValueError("Wrong values has been passed for tracker "
-                             "creation.")
+            # We have device_id or device_type, and we have tracker_id.
+            tracker = Tracker(tracker_id, tracker_id.device_id,
+                tracker_id.device_type)
+
+        if isinstance(name, str):
+            tracker.name = name.strip()
+        return tracker

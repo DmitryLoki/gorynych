@@ -99,3 +99,12 @@ class TrackerID(DomainIdentifier):
             id._id = str(string)
             return id
 
+    @property
+    def device_type(self):
+        dtype, did = self._id.split('-', 1)
+        return dtype
+
+    @property
+    def device_id(self):
+        dtype, did = self._id.split('-', 1)
+        return did

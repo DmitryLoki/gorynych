@@ -74,7 +74,7 @@ class Tracker(AggregateRoot):
     @name.setter
     def name(self, value):
         if isinstance(value, str):
-            self._name = value
+            self._name = value.strip()
         else:
             raise TypeError("Tracker name must be string.")
 
@@ -97,3 +97,19 @@ class TrackerFactory(object):
             tracker.name = name.strip()
         tracker.assignee_id = assignee
         return tracker
+
+def change_tracker(trckr, params):
+    '''
+    Change some tracker properties.
+    @param trckr:
+    @type trckr: C{Tracker}
+    @param params:
+    @type params: C{dict}
+    @return: changed (or not) tracker
+    @rtype: C{Tracker}
+    '''
+    if params.has_key('name'):
+        trckr.name = params['name']
+    if params.has_key('assignee'):
+        trckr.assign_to(params['assignee'])
+    return trckr

@@ -65,7 +65,8 @@ class BasePGSQLRepository(object):
     def save(self, obj):
         try:
             if obj._id:
-                result = yield self._update(obj)
+                yield self._update(obj)
+                result = obj
             else:
                 _id = yield self._save_new(obj)
                 obj._id = _id[0][0]
@@ -371,9 +372,15 @@ class PGSQLTrackerRepository(BasePGSQLRepository):
         result._id = _id
         return result
 
+    # TODO: generalize this.
     def _save_new(self, obj):
         return self.pool.runQuery(pe.insert('tracker'),
                                                 self._extract_sql_fields(obj))
+
+    # TODO: generalize this.
+    def _update(self, obj):
+        return self.pool.runOperation(pe.update('tracker'),
+            self._extract_sql_fields(obj))
 
 
     def _extract_sql_fields(self, obj):
@@ -384,8 +391,8 @@ class PGSQLTrackerRepository(BasePGSQLRepository):
         @return:
         @rtype:
         '''
-        return (obj.device_id, obj.device_type, obj.name, str(obj.id),
-                obj.assignee)
+        return (obj.device_id, obj.device_type, obj.name,
+                obj.assignee, str(obj.id))
 
     def _get_existed(self, obj):
         pass

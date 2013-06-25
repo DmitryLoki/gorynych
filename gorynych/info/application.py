@@ -5,7 +5,7 @@ import simplejson as json
 
 from twisted.internet import defer
 
-from gorynych.info.domain import contest, person, race
+from gorynych.info.domain import contest, person, race, tracker
 from gorynych.common.infrastructure import persistence
 from gorynych.common.domain.types import checkpoint_from_geojson
 from gorynych.common.domain.events import ContestRaceCreated
@@ -208,6 +208,8 @@ class ApplicationService(BaseApplicationService):
         return self._get_aggregates_list(params, person.IPersonRepository)
 
     def change_person(self, params):
+        # TODO: create changing services instead of functions in application
+        #  layer.
         def change(pers, params):
             new_name = dict()
             if params.get('name'):
@@ -354,3 +356,10 @@ class ApplicationService(BaseApplicationService):
     def get_tracker(self, params):
         return self._get_aggregate(params['tracker_id'],
             interfaces.ITrackerRepository)
+
+    def change_tracker(self, params):
+        if params.has_key('tracker_id'):
+           params['id'] = params['tracker_id']
+           del params['tracker_id']
+        return self._change_aggregate(params, interfaces.ITrackerRepository,
+            tracker.change_tracker)

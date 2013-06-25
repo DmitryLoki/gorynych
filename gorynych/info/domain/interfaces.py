@@ -20,7 +20,7 @@ class IRepository(Interface):
         Save object to repository.
         @param obj:
         @type obj: subclass of AggregateRoot.
-        @return:
+        @return: obj
         @rtype:
         '''
 

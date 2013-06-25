@@ -338,6 +338,15 @@ class TrackerTest(unittest.TestCase):
         r = requests.get('/'.join((self.url, tid)))
         self.assertEqual(r.status_code, 200)
 
+        # Test PUT /tracker/{id}
+        params = json.dumps(dict(name='hello'))
+        r = requests.put('/'.join((self.url, tid)), data=params)
+        print r.text
+        self.assertEqual(r.status_code, 200)
+        r = r.json()
+        self.assertEqual(r['name'], 'hello')
+
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -361,6 +361,9 @@ class TrackerResource(APIResource):
         if t:
             return dict(tracker_id=t.id, device_id=t.device_id, name=t.name)
 
+    def read_PUT(self, t, p=None):
+        return self.read_GET(t)
+
 
 # TODO: this resource should be in processor package.
 class TracksResource(APIResource):

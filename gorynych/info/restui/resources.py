@@ -323,7 +323,7 @@ class RaceTracksResource(APIResource):
             return result
 
 
-class TrackerCollection(APIResource):
+class TrackerResourceCollection(APIResource):
     '''
     /tracker
     '''
@@ -348,6 +348,18 @@ class TrackerCollection(APIResource):
             for t in tracker_list:
                 result.append(self.read_POST(t))
             return result
+
+
+class TrackerResource(APIResource):
+    '''
+    /tracker/{id}
+    '''
+    service_command = dict(GET='get_tracker', PUT='change_tracker')
+    name = 'tracker'
+
+    def read_GET(self, t, p=None):
+        if t:
+            return dict(tracker_id=t.id, device_id=t.device_id, name=t.name)
 
 
 # TODO: this resource should be in processor package.

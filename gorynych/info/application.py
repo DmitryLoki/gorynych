@@ -350,3 +350,7 @@ class ApplicationService(BaseApplicationService):
 
     def get_trackers(self, params=None):
         return self._get_aggregates_list(params, interfaces.ITrackerRepository)
+
+    def get_tracker(self, params):
+        return self._get_aggregate(params['tracker_id'],
+            interfaces.ITrackerRepository)

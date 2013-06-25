@@ -273,7 +273,7 @@ class APIResource(resource.Resource):
         # {'contest_id': some_id}.
         maps = {'contest': 'contest_id', 'person': 'person_id',
                 'race': 'race_id', 'paraglider': 'person_id',
-            'group':'group_id'}
+            'group':'group_id', 'tracker': 'tracker_id'}
 
         result = dict()
         if req.method == "PUT":

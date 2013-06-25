@@ -317,10 +317,27 @@ class ContestRaceTest(unittest.TestCase):
 class TrackerTest(unittest.TestCase):
     url = URL + '/tracker'
     def test_create(self):
-        params = dict(device_id=str(random.randint(1, 1000)),
+        device_id = str(random.randint(1, 1000))
+        params = dict(device_id=device_id,
             device_type='tr203')
         r = requests.post(self.url, data=params)
-        print r.text
+        result = r.json()
+        self.assertEqual(r.status_code, 201)
+        self.assertTupleEqual((result['device_id'], result['device_type'],
+            result['name'], result['id']), (device_id, 'tr203', '',
+            'tr203-' + device_id))
+
+        # Test GET /tracker
+        r = requests.get(self.url)
+        self.assertEqual(r.status_code, 200)
+        r = r.json()
+        self.assertIsInstance(r, list)
+
+        # Test GET /tracker/{id}
+        tid = r[0]['id']
+        r = requests.get('/'.join((self.url, tid)))
+        self.assertEqual(r.status_code, 200)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -4,7 +4,7 @@ Realization of persistence logic.
 import simplejson as json
 
 from twisted.internet import defer
-from zope.interface import implements
+from zope.interface import implements, implementer
 import psycopg2
 
 from gorynych.info.domain.contest import Paraglider, IContestRepository, ContestFactory
@@ -14,6 +14,7 @@ from gorynych.common.domain.types import checkpoint_collection_from_geojson, geo
 from gorynych.info.domain.person import IPersonRepository, PersonFactory
 from gorynych.common.exceptions import NoAggregate, DatabaseValueError
 from gorynych.common.infrastructure import persistence as pe
+from gorynych.info.domain.interfaces import ITrackerRepository
 
 
 def create_participants(paragliders_row):
@@ -28,12 +29,33 @@ def create_participants(paragliders_row):
 
 # TODO: simplify repositories.
 
-class PGSQLPersonRepository(object):
-    implements(IPersonRepository)
+class BasePGSQLRepository(object):
 
     def __init__(self, pool):
         self.pool = pool
-        self.factory = PersonFactory()
+
+    @defer.inlineCallbacks
+    def get_list(self, limit=20, offset=None):
+        table_name = self.__class__.__name__[5:-10]
+        idname = table_name + '_id'
+        result = []
+        command = ' '.join(('select', idname, 'from', table_name))
+        if limit:
+            command += ' limit ' + str(limit)
+        if offset:
+            command += ' offset ' + str(offset)
+        ids = yield self.pool.runQuery(command)
+        for idx, pid in enumerate(ids):
+            pers = yield self.get_by_id(pid[0])
+            result.append(pers)
+        defer.returnValue(result)
+
+    def get_by_id(self, id):
+        raise NotImplementedError()
+
+
+class PGSQLPersonRepository(BasePGSQLRepository):
+    implements(IPersonRepository)
 
     @defer.inlineCallbacks
     def get_by_id(self, person_id):
@@ -47,25 +69,12 @@ class PGSQLPersonRepository(object):
         result.apply(event_list)
         defer.returnValue(result)
 
-    @defer.inlineCallbacks
-    def get_list(self, limit=20, offset=None):
-        result = []
-        command = "select person_id from person"
-        if limit:
-            command += ' limit ' + str(limit)
-        if offset:
-            command += ' offset ' + str(offset)
-        ids = yield self.pool.runQuery(command)
-        for idx, pid in enumerate(ids):
-            pers = yield self.get_by_id(pid[0])
-            result.append(pers)
-        defer.returnValue(result)
-
     def _create_person(self, data_row):
         if data_row:
             # regdate is datetime.datetime object
             regdate = data_row[4]
-            result = self.factory.create_person(
+            factory = PersonFactory()
+            result = factory.create_person(
                 data_row[0],
                 data_row[1],
                 data_row[2],
@@ -110,26 +119,8 @@ class PGSQLPersonRepository(object):
         return None
 
 
-class PGSQLRaceRepository(object):
+class PGSQLRaceRepository(BasePGSQLRepository):
     implements(IRaceRepository)
-
-    def __init__(self, pool):
-        self.pool = pool
-        self.factory = RaceFactory()
-
-    @defer.inlineCallbacks
-    def get_list(self, limit=20, offset=None):
-        result = []
-        command = "select race_id from race"
-        if limit:
-            command += ' limit ' + str(limit)
-        if offset:
-            command += ' offset ' + str(offset)
-        ids = yield self.pool.runQuery(command)
-        for idx, rid in enumerate(ids):
-            rc = yield self.get_by_id(rid[0])
-            result.append(rc)
-        defer.returnValue(result)
 
     @defer.inlineCallbacks
     def get_by_id(self, race_id):
@@ -158,7 +149,8 @@ class PGSQLRaceRepository(object):
             b = aux.get('bearing')
         else:
             b = None
-        result = self.factory.create_race(t, rt, tz, ps, chs, race_id=rid,
+        factory = RaceFactory()
+        result = factory.create_race(t, rt, tz, ps, chs, race_id=rid,
                                           bearing=b, timelimits=(slt, elt))
         result._start_time = st
         result._end_time = et
@@ -236,11 +228,8 @@ class PGSQLRaceRepository(object):
         return result
 
 
-class PGSQLContestRepository(object):
+class PGSQLContestRepository(BasePGSQLRepository):
     implements(IContestRepository)
-
-    def __init__(self, pool):
-        self.pool = pool
 
     @defer.inlineCallbacks
     def get_by_id(self, contest_id):
@@ -300,20 +289,6 @@ class PGSQLContestRepository(object):
                 participants[PersonID.fromstring(pid)] = dict(role=role)
         cont._participants = participants
         return cont
-
-    @defer.inlineCallbacks
-    def get_list(self, limit=20, offset=None):
-        result = []
-        command = "select contest_id from contest"
-        if limit:
-            command += ' limit ' + str(limit)
-        if offset:
-            command += ' offset ' + str(offset)
-        ids = yield self.pool.runQuery(command)
-        for idx, cid in enumerate(ids):
-            cont = yield self.get_by_id(cid[0])
-            result.append(cont)
-        defer.returnValue(result)
 
     @defer.inlineCallbacks
     def save(self, obj):

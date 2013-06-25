@@ -347,3 +347,6 @@ class ApplicationService(BaseApplicationService):
         d.addCallback(persistence.get_repository(
             interfaces.ITrackerRepository).save)
         return d
+
+    def get_trackers(self, params=None):
+        return self._get_aggregates_list(params, interfaces.ITrackerRepository)

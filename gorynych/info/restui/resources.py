@@ -328,7 +328,7 @@ class TrackerCollection(APIResource):
     /tracker
     '''
     name = 'tracker_collection'
-    service_command = dict(POST='create_new_tracker')
+    service_command = dict(POST='create_new_tracker', GET='get_trackers')
 
     def read_POST(self, t, p=None):
         '''
@@ -342,7 +342,12 @@ class TrackerCollection(APIResource):
             result['id'] = t.id
             return result
 
-
+    def read_GET(self, tracker_list, p=None):
+        if tracker_list:
+            result = []
+            for t in tracker_list:
+                result.append(self.read_POST(t))
+            return result
 
 
 # TODO: this resource should be in processor package.

@@ -80,15 +80,17 @@ class TrackerTest(unittest.TestCase):
 
 
 class TrackerIDTest(unittest.TestCase):
-    def setUp(self):
-        self.skipTest("Tracker is not number one priority.")
-    def test_int(self):
-        t_id = TrackerID(1)
-        self.assertEqual(1, t_id)
+    def test_good(self):
+        t_id = TrackerID('tr203', '00110234113423')
+        self.assertIsInstance(t_id, TrackerID)
+        t_id2 = TrackerID.fromstring('tr203-00110234113423')
+        self.assertEqual(t_id, t_id2)
 
-    def test_str(self):
-        t_str = TrackerID('hello')
-        self.assertEqual('hello', t_str)
+    def test_bad(self):
+        self.assertRaises(ValueError, TrackerID, 'tr20', '000')
+        self.assertRaises(ValueError, TrackerID, 'tr203', '')
+        self.assertRaises(ValueError, TrackerID.fromstring, 'tr203-')
+        self.assertRaises(ValueError, TrackerID.fromstring, 'tr23-s')
 
 
 if __name__ == '__main__':

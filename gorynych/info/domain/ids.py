@@ -73,12 +73,38 @@ class RaceID(DomainIdentifier):
 class TrackerID(DomainIdentifier):
     '''
     trckr-749e0d12574a4d4594e72488461574d0'
-    namespace-uuid4.hex
+    device_type-device_id
     '''
-    def __init__(self):
-        _uid = uuid.uuid4().hex
-        self._id = '-'.join(('trckr', _uid))
+    device_types = ['tr203']
+
+    def __init__(self, device_type, device_id):
+        super(TrackerID, self).__init__()
+        if not device_type in self.device_types:
+            raise ValueError("Device type %s not in allowed device types %s"
+                             % (device_type, self.device_types))
+        if not device_id:
+            raise ValueError("Empty device id passed.")
+        self._id = '-'.join((str(device_type), str(device_id)))
 
     def _string_is_valid_id(self, string):
-        return namespace_uuid_validator(string, 'trckr')
+        dtype, did = string.split('-', 1)
+        assert dtype in self.device_types, "Incorrect device type %s" % dtype
+        return True
 
+    @classmethod
+    def fromstring(cls, string):
+        dtype, did = string.split('-', 1)
+        id = cls(dtype, did)
+        if id._string_is_valid_id(str(string)):
+            id._id = str(string)
+            return id
+
+    @property
+    def device_type(self):
+        dtype, did = self._id.split('-', 1)
+        return dtype
+
+    @property
+    def device_id(self):
+        dtype, did = self._id.split('-', 1)
+        return did

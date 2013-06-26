@@ -210,7 +210,8 @@ class PersonResource(APIResource):
         if pers:
             return dict(person_name=pers.name.full(),
                         person_id=pers.id,
-                        person_country=pers.country)
+                        person_country=pers.country,
+                        trackers=list(pers.trackers))
 
     def read_GET(self, pers, request_params=None):
         return self.read_PUT(pers)
@@ -321,6 +322,48 @@ class RaceTracksResource(APIResource):
                 result.append(dict(type=row[0], track_id=row[1],
                     start_time=st, end_time=et))
             return result
+
+
+class TrackerResourceCollection(APIResource):
+    '''
+    /tracker
+    '''
+    name = 'tracker_collection'
+    service_command = dict(POST='create_new_tracker', GET='get_trackers')
+
+    def read_POST(self, t, p=None):
+        '''
+        @type t: L{gorynych.info.domain.tracker.Tracker}
+        '''
+        if t:
+            result = dict()
+            result['device_id'] = t.device_id
+            result['name'] = t.name
+            result['device_type'] = t.device_type
+            result['id'] = t.id
+            return result
+
+    def read_GET(self, tracker_list, p=None):
+        if tracker_list:
+            result = []
+            for t in tracker_list:
+                result.append(self.read_POST(t))
+            return result
+
+
+class TrackerResource(APIResource):
+    '''
+    /tracker/{id}
+    '''
+    service_command = dict(GET='get_tracker', PUT='change_tracker')
+    name = 'tracker'
+
+    def read_GET(self, t, p=None):
+        if t:
+            return dict(tracker_id=t.id, device_id=t.device_id, name=t.name)
+
+    def read_PUT(self, t, p=None):
+        return self.read_GET(t)
 
 
 # TODO: this resource should be in processor package.

@@ -174,17 +174,19 @@ class ContestRaceCreated(DomainEvent):
     serializer = serializers.DomainIdentifierSerializer('RaceID')
 
 
-############## undecided events
+############## Tracker events ##########################
 
 class TrackerAssigned(DomainEvent):
     '''
     This event is fired then tracker is assigned to someone.
 
     Event fields are:
-    @param id: id of aggregate to which tracker has been assigned (Person,
+    @param aggregate_id: id of aggregate to which tracker has been assigned (
+    Person,
     Transport).
-    @param tracker_id: tracker id.
+    @param payload: tracker_id.
     '''
+    serializer = serializers.DomainIdentifierSerializer('TrackerID')
 
 
 class TrackerUnAssigned(DomainEvent):
@@ -194,3 +196,4 @@ class TrackerUnAssigned(DomainEvent):
     unassigned (Person, Transport).
     @param payload: id of Tracker aggregate.
     '''
+    serializer = serializers.DomainIdentifierSerializer('TrackerID')

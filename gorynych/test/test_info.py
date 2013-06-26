@@ -314,5 +314,83 @@ class ContestRaceTest(unittest.TestCase):
                                       r.json()[0])
 
 
+class TrackerTest(unittest.TestCase):
+    url = URL + '/tracker'
+    def test_create(self):
+        device_id = str(random.randint(1, 1000))
+        params = dict(device_id=device_id,
+            device_type='tr203', name='a03')
+        r = requests.post(self.url, data=params)
+        result = r.json()
+        self.assertEqual(r.status_code, 201)
+        self.assertTupleEqual((result['device_id'], result['device_type'],
+            result['name'], result['id']), (device_id, 'tr203', 'a03',
+            'tr203-' + device_id))
+
+        # Test GET /tracker
+        r = requests.get(self.url)
+        self.assertEqual(r.status_code, 200)
+        r = r.json()
+        self.assertIsInstance(r, list)
+
+        # Test GET /tracker/{id}
+        tid = r[0]['id']
+        r = requests.get('/'.join((self.url, tid)))
+        self.assertEqual(r.status_code, 200)
+
+        # Test PUT /tracker/{id}
+        params = json.dumps(dict(name='hello'))
+        r = requests.put('/'.join((self.url, tid)), data=params)
+        print r.text
+        self.assertEqual(r.status_code, 200)
+        r = r.json()
+        self.assertEqual(r['name'], 'hello')
+
+    def test_assign_tracker_to_person(self):
+        try:
+            p, email = create_persons()
+            pid = p.json()['id']
+            device_id = str(random.randint(1, 1000))
+            params = dict(device_id=device_id,
+                device_type='tr203')
+            r = requests.post(self.url, data=params)
+            tid = r.json()['id']
+        except Exception as e:
+            print e
+            raise unittest.SkipTest("Need person and tracker for test.")
+        if not tid and not pid:
+            raise unittest.SkipTest("No ids for test.")
+
+        # assign
+        params = json.dumps(dict(assignee=str(pid)))
+        r = requests.put('/'.join((self.url, tid)), data=params)
+        self.assertEqual(r.status_code, 200)
+
+        p = requests.get('/'.join((URL, 'person', pid)))
+        self.assertEqual(p.status_code, 200)
+        self.assertEqual(p.json()['trackers'], [tid])
+
+        # unassign
+        params = json.dumps(dict(assignee=''))
+        r = requests.put('/'.join((self.url, tid)), data=params)
+        self.assertEqual(r.status_code, 200)
+
+        p = requests.get('/'.join((URL, 'person', pid)))
+        self.assertEqual(p.status_code, 200)
+        self.assertEqual(p.json()['trackers'], [])
+
+    def test_duplicate(self):
+        device_id = str(random.randint(1, 1000))
+        params = dict(device_id=device_id,
+            device_type='tr203')
+        r = requests.post(self.url, data=params)
+        tid = r.json()['id']
+
+        # duplicate
+        r1 = requests.post(self.url, data=params)
+        self.assertEqual(r1.status_code, 201)
+        self.assertEqual(r1.json()['id'], tid)
+
+
 if __name__ == '__main__':
     unittest.main()

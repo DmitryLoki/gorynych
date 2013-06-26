@@ -162,20 +162,6 @@ class ParagliderRegisteredOnContest(DomainEvent):
     serializer = serializers.DomainIdentifierSerializer('ContestID')
 
 
-######### Contest events #################################
-
-
-class ContestRaceCreated(DomainEvent):
-    '''
-    Fired then race created for contest.
-    @param aggregate_id: ContestID
-    @param payload: RaceID
-    '''
-    serializer = serializers.DomainIdentifierSerializer('RaceID')
-
-
-############## Tracker events ##########################
-
 class TrackerAssigned(DomainEvent):
     '''
     This event is fired then tracker is assigned to someone.
@@ -197,3 +183,15 @@ class TrackerUnAssigned(DomainEvent):
     @param payload: id of Tracker aggregate.
     '''
     serializer = serializers.DomainIdentifierSerializer('TrackerID')
+
+######### Contest events #################################
+
+
+class ContestRaceCreated(DomainEvent):
+    '''
+    Fired then race created for contest.
+    @param aggregate_id: ContestID
+    @param payload: RaceID
+    '''
+    serializer = serializers.DomainIdentifierSerializer('RaceID')
+

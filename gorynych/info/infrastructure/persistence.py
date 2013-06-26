@@ -229,7 +229,8 @@ class PGSQLRaceRepository(BasePGSQLRepository):
             p = obj.paragliders[key]
             result['paragliders'].append(
                 [str(p.person_id), str(p.contest_number),
-                    p.country, p.glider, p.tracker_id,
+                    p.country, p.glider,
+                    str(p.tracker_id) if p.tracker_id else '',
                     p._name.name, p._name.surname])
         return result
 

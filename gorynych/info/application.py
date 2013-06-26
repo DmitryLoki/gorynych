@@ -242,7 +242,8 @@ class ApplicationService(BaseApplicationService):
             pers = yield self._get_aggregate(key, person.IPersonRepository)
             plist.append(contest.Paraglider(key, pers.name, pers.country,
                          paragliders[key]['glider'],
-                         paragliders[key]['contest_number'], pers.tracker))
+                         paragliders[key]['contest_number'],
+                         pers.trackers.pop() if pers.trackers else None))
 
         factory = race.RaceFactory()
         r = factory.create_race(params['title'], params['race_type'],

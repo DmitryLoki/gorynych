@@ -1,29 +1,13 @@
 '''
 Tracker Aggregate.
 '''
-from zope.interface.interfaces import Interface
-
 from gorynych.common.domain.events import TrackerAssigned, TrackerUnAssigned
 from gorynych.common.domain.model import AggregateRoot
-from gorynych.info.domain.ids import TrackerID
+from gorynych.info.domain.ids import TrackerID, PersonID
+from gorynych.common.infrastructure import persistence as pe
 
 
 DEVICE_TYPES = ['tr203']
-
-class ITrackerRepository(Interface):
-    def get_by_id(tracker_id):
-        '''
-        '''
-    def save(value):
-        '''
-        '''
-
-
-class TrackerHasOwner(Exception):
-    pass
-
-class TrackerDontHasOwner(Exception):
-    pass
 
 
 class Tracker(AggregateRoot):
@@ -50,22 +34,22 @@ class Tracker(AggregateRoot):
 
     def assign_to(self, assignee_id):
         if self.is_free():
-            self.assignee_id = assignee_id
-            self.event_publisher.publish(TrackerAssigned(
-                aggregate_id= assignee_id,
-                tracker_id = self.id
-                ))
+            self.assignee_id = PersonID.fromstring(assignee_id)
+            return pe.event_store().persist(TrackerAssigned(
+                aggregate_id=self.assignee_id,
+                payload = self.id))
         else:
-            raise TrackerHasOwner("Tracker has owner: %s" % self.assignee_id)
+            raise RuntimeError("Tracker already has owner: %s" %
+                               self.assignee_id)
 
     def unassign(self):
         if self.is_free():
-            raise TrackerDontHasOwner("Tracker isn't assigned to anyone.")
+            raise RuntimeError("Tracker don't assigned to anyone.")
         else:
-            _ass_id = self.assignee_id
-            self.assignee_id = None
-            self.event_publisher.publish(TrackerUnAssigned(id=_ass_id,
-                tracker_id=self.id))
+            aid, self.assignee_id = self.assignee_id, None
+            aid = PersonID.fromstring(aid)
+            return pe.event_store().persist(TrackerUnAssigned(
+                aggregate_id=aid, payload=self.id))
 
     @property
     def name(self):
@@ -73,10 +57,7 @@ class Tracker(AggregateRoot):
 
     @name.setter
     def name(self, value):
-        if isinstance(value, str):
-            self._name = value.strip()
-        else:
-            raise TypeError("Tracker name must be string.")
+        self._name = value.strip()
 
 
 class TrackerFactory(object):
@@ -95,8 +76,11 @@ class TrackerFactory(object):
 
         if isinstance(name, str):
             tracker.name = name.strip()
+        if assignee and assignee == 'None':
+            assignee = None
         tracker.assignee_id = assignee
         return tracker
+
 
 def change_tracker(trckr, params):
     '''
@@ -111,5 +95,8 @@ def change_tracker(trckr, params):
     if params.has_key('name'):
         trckr.name = params['name']
     if params.has_key('assignee'):
-        trckr.assign_to(params['assignee'])
+        if params['assignee']:
+            trckr.assign_to(params['assignee'])
+        else:
+            trckr.unassign()
     return trckr

@@ -20,7 +20,7 @@ class DomainIdentifierSerializer(object):
         return bytes(value)
 
     def from_bytes(self, value):
-        return getattr(ids, self.klass_name).fromstring(value)
+        return getattr(ids, self.klass_name).fromstring(str(value))
 
 
 class StringSerializer(object):

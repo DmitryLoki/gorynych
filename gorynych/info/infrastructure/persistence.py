@@ -392,7 +392,7 @@ class PGSQLTrackerRepository(BasePGSQLRepository):
         @rtype:
         '''
         return (obj.device_id, obj.device_type, obj.name,
-                obj.assignee, str(obj.id))
+                str(obj.assignee), str(obj.id))
 
     def _get_existed(self, obj):
         pass

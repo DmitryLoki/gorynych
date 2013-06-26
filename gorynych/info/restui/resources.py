@@ -210,7 +210,8 @@ class PersonResource(APIResource):
         if pers:
             return dict(person_name=pers.name.full(),
                         person_id=pers.id,
-                        person_country=pers.country)
+                        person_country=pers.country,
+                        trackers=list(pers.trackers))
 
     def read_GET(self, pers, request_params=None):
         return self.read_PUT(pers)

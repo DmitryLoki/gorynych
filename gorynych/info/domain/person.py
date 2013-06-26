@@ -21,7 +21,7 @@ class Person(AggregateRoot):
         self._name = name
         self._country = country
         self.regdate = regdate
-        self.tracker = None
+        self.trackers = set()
         self._contests = dict()
 
     @property
@@ -42,15 +42,6 @@ class Person(AggregateRoot):
             TypeError("I'm waiting for a dictionary with name and surname.")
         self._name = Name(name=value.get('name', self._name.name),
                           surname=value.get('surname', self._name.surname))
-
-    def assign_tracker(self, tracker_id):
-        if isinstance(tracker_id, TrackerID):
-            self.tracker = tracker_id
-
-    def unassign_tracker(self, tracker_id):
-        if not self.tracker == tracker_id:
-            raise KeyError("No such tracker.")
-        self.tracker = None
 
     def participate_in_contest(self, contest_id, role):
         # TODO: does person really need to keep information about contests
@@ -78,6 +69,12 @@ class Person(AggregateRoot):
         return self.id == other.id and (
             self.name.full() == other.name.full()) and (
             self.email == other.email)
+
+    def apply_TrackerAssigned(self, ev):
+        self.trackers.add(ev.payload)
+
+    def apply_TrackerUnAssigned(self, ev):
+        self.trackers.remove(ev.payload)
 
 
 class PersonFactory(object):
@@ -109,6 +106,7 @@ class PersonFactory(object):
         return person
 
 
+# TODO: move interfaces into domain.interfaces.
 class IPersonRepository(Interface):
     def get_by_id(id):
         '''

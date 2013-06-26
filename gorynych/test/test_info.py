@@ -346,6 +346,39 @@ class TrackerTest(unittest.TestCase):
         r = r.json()
         self.assertEqual(r['name'], 'hello')
 
+    def test_assign_tracker_to_person(self):
+        try:
+            p, email = create_persons()
+            pid = p.json()['id']
+            device_id = str(random.randint(1, 1000))
+            params = dict(device_id=device_id,
+                device_type='tr203')
+            r = requests.post(self.url, data=params)
+            tid = r.json()['id']
+        except Exception as e:
+            print e
+            raise unittest.SkipTest("Need person and tracker for test.")
+        if not tid and not pid:
+            raise unittest.SkipTest("No ids for test.")
+
+        # assign
+        params = json.dumps(dict(assignee=str(pid)))
+        r = requests.put('/'.join((self.url, tid)), data=params)
+        self.assertEqual(r.status_code, 200)
+
+        p = requests.get('/'.join((URL, 'person', pid)))
+        self.assertEqual(p.status_code, 200)
+        self.assertEqual(p.json()['trackers'], [tid])
+
+        # unassign
+        params = json.dumps(dict(assignee=''))
+        r = requests.put('/'.join((self.url, tid)), data=params)
+        self.assertEqual(r.status_code, 200)
+
+        p = requests.get('/'.join((URL, 'person', pid)))
+        self.assertEqual(p.status_code, 200)
+        self.assertEqual(p.json()['trackers'], [])
+
 
 
 if __name__ == '__main__':

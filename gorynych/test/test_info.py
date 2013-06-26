@@ -379,6 +379,17 @@ class TrackerTest(unittest.TestCase):
         self.assertEqual(p.status_code, 200)
         self.assertEqual(p.json()['trackers'], [])
 
+    def test_duplicate(self):
+        device_id = str(random.randint(1, 1000))
+        params = dict(device_id=device_id,
+            device_type='tr203')
+        r = requests.post(self.url, data=params)
+        tid = r.json()['id']
+
+        # duplicate
+        r1 = requests.post(self.url, data=params)
+        self.assertEqual(r1.status_code, 201)
+        self.assertEqual(r1.json()['id'], tid)
 
 
 if __name__ == '__main__':

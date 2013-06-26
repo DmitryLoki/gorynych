@@ -74,7 +74,7 @@ class BasePGSQLRepository(object):
         except psycopg2.IntegrityError as e:
             if e.pgcode == '23505':
                 # unique constraints violation
-                result = yield self._get_existed(obj)
+                result = yield self._get_existed(obj, e)
                 defer.returnValue(result)
         defer.returnValue(result)
 
@@ -394,5 +394,5 @@ class PGSQLTrackerRepository(BasePGSQLRepository):
         return (obj.device_id, obj.device_type, obj.name,
                 str(obj.assignee), str(obj.id))
 
-    def _get_existed(self, obj):
-        pass
+    def _get_existed(self, obj, e):
+        return self.get_by_id(obj.id)

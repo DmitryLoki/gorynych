@@ -208,10 +208,13 @@ class PersonResource(APIResource):
 
     def read_PUT(self, pers, request_params=None):
         if pers:
+            trackers = []
+            for t in pers.trackers:
+                trackers.append(str(t))
             return dict(person_name=pers.name.full(),
                         person_id=pers.id,
                         person_country=pers.country,
-                        trackers=list(pers.trackers))
+                        trackers=json.dumps(trackers))
 
     def read_GET(self, pers, request_params=None):
         return self.read_PUT(pers)
@@ -233,7 +236,9 @@ class RaceParagliderResourceCollection(APIResource):
                                    glider=r.paragliders[key].glider,
                                    name=r.paragliders[key].name,
                                    person_id=r.paragliders[key].person_id,
-                                   country=r.paragliders[key].country))
+                                   country=r.paragliders[key].country,
+               tracker=r.paragliders[key].tracker_id if r.paragliders[key]
+               .tracker_id else ''))
             return result
 
 

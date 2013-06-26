@@ -319,12 +319,12 @@ class TrackerTest(unittest.TestCase):
     def test_create(self):
         device_id = str(random.randint(1, 1000))
         params = dict(device_id=device_id,
-            device_type='tr203')
+            device_type='tr203', name='a03')
         r = requests.post(self.url, data=params)
         result = r.json()
         self.assertEqual(r.status_code, 201)
         self.assertTupleEqual((result['device_id'], result['device_type'],
-            result['name'], result['id']), (device_id, 'tr203', '',
+            result['name'], result['id']), (device_id, 'tr203', 'a03',
             'tr203-' + device_id))
 
         # Test GET /tracker

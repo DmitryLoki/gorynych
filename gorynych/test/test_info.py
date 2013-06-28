@@ -224,7 +224,6 @@ class ContestRaceTest(unittest.TestCase):
     def test_create_read_race(self):
         chs = create_geojson_checkpoints()
         r = create_race(self.c_id, chs, race_type='opendistance', bearing=12)
-        print r.text
         result = r.json()
         self.assertEqual(r.status_code, 201)
         self.assertDictContainsSubset({'type':'opendistance',
@@ -232,7 +231,6 @@ class ContestRaceTest(unittest.TestCase):
                                        'start_time': '1347711300',
                                        'end_time': '1347732000'
                                        }, result)
-        print self.c_id
         r = requests.get('/'.join((URL, 'contest', self.c_id, 'race',
             result['id'])))
         self.assertEqual(r.status_code, 200)
@@ -270,7 +268,6 @@ class ContestRaceTest(unittest.TestCase):
         except Exception as error:
             raise unittest.SkipTest("Something went wrong and I need race "
                                     "for test: %r" % error)
-        print race_id
 
         # Test PUT /contest/{id}/race/{id}
         new_ch_list = create_checkpoints()
@@ -341,7 +338,6 @@ class TrackerTest(unittest.TestCase):
         # Test PUT /tracker/{id}
         params = json.dumps(dict(name='hello'))
         r = requests.put('/'.join((self.url, tid)), data=params)
-        print r.text
         self.assertEqual(r.status_code, 200)
         r = r.json()
         self.assertEqual(r['name'], 'hello')
@@ -356,22 +352,21 @@ class TrackerTest(unittest.TestCase):
             r = requests.post(self.url, data=params)
             tid = r.json()['id']
         except Exception as e:
-            print e
             raise unittest.SkipTest("Need person and tracker for test.")
         if not tid and not pid:
             raise unittest.SkipTest("No ids for test.")
 
         # assign
-        params = json.dumps(dict(assignee=str(pid)))
+        params = json.dumps(dict(assignee=str(pid), contest_id='cont'))
         r = requests.put('/'.join((self.url, tid)), data=params)
         self.assertEqual(r.status_code, 200)
 
         p = requests.get('/'.join((URL, 'person', pid)))
         self.assertEqual(p.status_code, 200)
-        self.assertEqual(p.json()['trackers'], [tid])
+        self.assertEqual(p.json()['trackers'], [[tid, 'cont']])
 
         # unassign
-        params = json.dumps(dict(assignee=''))
+        params = json.dumps(dict(assignee='', contest_id='cont'))
         r = requests.put('/'.join((self.url, tid)), data=params)
         self.assertEqual(r.status_code, 200)
 

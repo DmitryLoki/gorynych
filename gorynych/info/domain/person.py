@@ -21,7 +21,7 @@ class Person(AggregateRoot):
         self._name = name
         self._country = country
         self.regdate = regdate
-        self.trackers = set()
+        self.trackers = dict()
         self._contests = dict()
 
     @property
@@ -71,10 +71,12 @@ class Person(AggregateRoot):
             self.email == other.email)
 
     def apply_TrackerAssigned(self, ev):
-        self.trackers.add(ev.payload)
+        tr, cont = ev.payload
+        self.trackers[cont] = tr
 
     def apply_TrackerUnAssigned(self, ev):
-        self.trackers.remove(ev.payload)
+        tr, cont = ev.payload
+        del self.trackers[cont]
 
 
 class PersonFactory(object):

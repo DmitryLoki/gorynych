@@ -5,6 +5,7 @@ from gorynych.common.domain.events import TrackerAssigned, TrackerUnAssigned
 from gorynych.common.domain.model import AggregateRoot
 from gorynych.info.domain.ids import TrackerID, PersonID
 from gorynych.common.infrastructure import persistence as pe
+from gorynych.common.exceptions import DomainError
 
 
 DEVICE_TYPES = ['tr203']
@@ -17,39 +18,35 @@ class Tracker(AggregateRoot):
         self.id = tracker_id
         self.device_id = device_id
         self.device_type = device_type
-        self.assignee_id = None
+        self.assignee = dict() # {contest_id:assignee_id}
         self._name = ''
 
-    @property
-    def assignee(self):
-        return self.assignee_id
-
-    @assignee.setter
-    def assignee(self, value):
-        raise AttributeError("Assignee must be setted through assign_to"
-                             "(assignee_id) method. ")
-
     def is_free(self):
-        return self.assignee_id is None
+        return len(self.assignee) == 0
 
-    def assign_to(self, assignee_id):
-        if self.is_free():
-            self.assignee_id = PersonID.fromstring(assignee_id)
-            return pe.event_store().persist(TrackerAssigned(
-                aggregate_id=self.assignee_id,
-                payload = self.id))
-        else:
-            raise RuntimeError("Tracker already has owner: %s" %
-                               self.assignee_id)
+    def assign_to(self, assignee_id, contest_id):
+        assignee_id = PersonID.fromstring(assignee_id)
+        if assignee_id in self.assignee.values():
+            raise DomainError("Tracker already has owner %s for "
+                               "contest %s" %
+                               (self.assignee[assignee_id], contest_id))
+        self.assignee[contest_id] = assignee_id
+        return pe.event_store().persist(TrackerAssigned(
+            aggregate_id=assignee_id,
+            payload = (str(self.id), str(contest_id))))
 
-    def unassign(self):
+    def unassign(self, contest_id):
         if self.is_free():
-            raise RuntimeError("Tracker don't assigned to anyone.")
+            raise DomainError("Tracker don't assigned to anyone.")
+        elif not self.assignee.has_key(contest_id):
+            raise DomainError("Tracker hasn't been assigned to contest %s" %
+                              contest_id)
         else:
-            aid, self.assignee_id = self.assignee_id, None
+            aid = self.assignee[contest_id]
+            del self.assignee[contest_id]
             aid = PersonID.fromstring(aid)
             return pe.event_store().persist(TrackerUnAssigned(
-                aggregate_id=aid, payload=self.id))
+                aggregate_id=aid, payload=(str(self.id), str(contest_id))))
 
     @property
     def name(self):
@@ -76,9 +73,10 @@ class TrackerFactory(object):
 
         if isinstance(name, str):
             tracker.name = name.strip()
-        if assignee and assignee == 'None':
-            assignee = None
-        tracker.assignee_id = assignee
+        if assignee:
+            tracker.assignee = assignee
+        else:
+            tracker.assignee = dict()
         return tracker
 
 
@@ -94,9 +92,9 @@ def change_tracker(trckr, params):
     '''
     if params.has_key('name'):
         trckr.name = params['name']
-    if params.has_key('assignee'):
+    if params.has_key('assignee') and params.has_key('contest_id'):
         if params['assignee']:
-            trckr.assign_to(params['assignee'])
+            trckr.assign_to(params['assignee'], params['contest_id'])
         else:
-            trckr.unassign()
+            trckr.unassign(params['contest_id'])
     return trckr

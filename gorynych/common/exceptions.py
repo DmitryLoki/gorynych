@@ -39,3 +39,8 @@ class AuthenticationError(Exception):
     '''
     Raised when something is wrong with passed credentials.
     '''
+
+class DomainError(Exception):
+    '''
+    Error in domain logic.
+    '''

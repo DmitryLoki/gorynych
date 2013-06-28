@@ -365,23 +365,53 @@ class PGSQLContestRepository(BasePGSQLRepository):
 
 @implementer(interfaces.ITrackerRepository)
 class PGSQLTrackerRepository(BasePGSQLRepository):
+    @defer.inlineCallbacks
     def _restore_aggregate(self, row):
         factory = TrackerFactory()
-        did, dtype, name, tid, assignee, _id = row
+        did, dtype, tid, name, _id = row
+        assignee = yield self._get_assignee(_id)
         result = factory.create_tracker(device_id=did, device_type=dtype,
             name=name, assignee=assignee)
         result._id = _id
-        return result
+        defer.returnValue(result)
 
     # TODO: generalize this.
     def _save_new(self, obj):
         return self.pool.runQuery(pe.insert('tracker'),
                                                 self._extract_sql_fields(obj))
 
-    # TODO: generalize this.
+    @defer.inlineCallbacks
     def _update(self, obj):
-        return self.pool.runOperation(pe.update('tracker'),
-            self._extract_sql_fields(obj))
+        ass = yield self._get_assignee(obj._id)
+        if ass == obj.assignee:
+            yield self.pool.runOperation(pe.update('tracker'),
+                self._extract_sql_fields(obj))
+            defer.returnValue('')
+
+        # something has been changed in assignees
+        to_insert = set(obj.assignee.viewitems()).difference(set(ass))
+        to_delete = set(ass).difference(set(obj.assignee.viewitems()))
+
+        def update(cur):
+            cur.execute(pe.update('tracker'), self._extract_sql_fields(obj))
+            for ditem in to_delete:
+                cur.execute('delete from tracker_assignees where id=%s and '
+                            'assignee_id=%s and assigned_for=%s',
+                    (obj._id, ditem[1], ditem[0]))
+            for item in to_insert:
+                cur.execute('insert into tracker_assignees values(%s, %s, '
+                            '%s)', (obj._id, str(item[1]), str(item[0])))
+
+        yield self.pool.runInteraction(update)
+
+    @defer.inlineCallbacks
+    def _get_assignee(self, _id):
+        ass = yield self.pool.runQuery(pe.select('assignee', 'tracker'), (_id,
+        ))
+        assignee = dict()
+        for item in ass:
+            assignee[item[1]]=item[0]
+        defer.returnValue(assignee)
 
 
     def _extract_sql_fields(self, obj):
@@ -392,8 +422,7 @@ class PGSQLTrackerRepository(BasePGSQLRepository):
         @return:
         @rtype:
         '''
-        return (obj.device_id, obj.device_type, obj.name,
-                str(obj.assignee), str(obj.id))
+        return (obj.device_id, obj.device_type, obj.name, str(obj.id))
 
     def _get_existed(self, obj, e):
         return self.get_by_id(obj.id)

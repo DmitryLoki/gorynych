@@ -170,9 +170,9 @@ class TrackerAssigned(DomainEvent):
     @param aggregate_id: id of aggregate to which tracker has been assigned (
     Person,
     Transport).
-    @param payload: tracker_id.
+    @param payload: (tracker_id, contest_id).
     '''
-    serializer = serializers.DomainIdentifierSerializer('TrackerID')
+    serializer = serializers.TupleOf(serializers.StringSerializer())
 
 
 class TrackerUnAssigned(DomainEvent):
@@ -180,9 +180,9 @@ class TrackerUnAssigned(DomainEvent):
     This event is fired then tracker is unassigned from person or transport.
     @param aggregate_id: id of aggregate from which tracker has been
     unassigned (Person, Transport).
-    @param payload: id of Tracker aggregate.
+    @param payload: (tracker_id, contest_id)
     '''
-    serializer = serializers.DomainIdentifierSerializer('TrackerID')
+    serializer = serializers.TupleOf(serializers.StringSerializer())
 
 ######### Contest events #################################
 

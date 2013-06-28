@@ -210,7 +210,7 @@ class PersonResource(APIResource):
         if pers:
             trackers = []
             for t in pers.trackers:
-                trackers.append(str(t))
+                trackers.append([str(pers.trackers[t]), str(t)])
             return dict(person_name=pers.name.full(),
                         person_id=pers.id,
                         person_country=pers.country,

@@ -1,7 +1,11 @@
+# coding=utf-8
+from collections import defaultdict
 import time
+import cPickle
+import mock
 
 from twisted.python import log
-from twisted.internet import threads, defer
+from twisted.internet import threads, defer, task
 
 from gorynych.common.domain import events
 from gorynych.common.exceptions import NoGPSData
@@ -10,12 +14,18 @@ from gorynych.processor.domain import TrackArchive, track
 from gorynych.common.application import EventPollingService
 from gorynych.common.domain.services import APIAccessor
 
+from gorynych.receiver.receiver import RabbitMQService
 
 API = APIAccessor()
 
 ADD_TRACK_TO_GROUP = """
     INSERT INTO TRACKS_GROUP VALUES (%s,
         (SELECT ID FROM TRACK WHERE TRACK_ID=%s), %s);
+"""
+
+IMEI_LIST = """
+    SELECT t.device_id, ta.assignee_id FROM tracker t, tracker_assignees.t
+    WHERE t.id = ta.id;
 """
 
 class ProcessorService(EventPollingService):
@@ -206,12 +216,92 @@ class TrackService(EventPollingService):
         return d
 
 
-def pic(x, name, suf):
-    import cPickle
-    try:
-        f = open('.'.join((name, suf, 'pickle')), 'wb')
-        cPickle.dump(x, f)
-        f.close()
-    except Exception as e:
-        print "in pic", str(e)
+class OnlineTrashService(RabbitMQService):
+    '''
+    receive messages with track data from rabbitmq queue.
+    '''
+
+    def __init__(self, pool, repo, **kw):
+        RabbitMQService.__init__(self, **kw)
+        self.pool = pool
+        self.did_aid = {}
+        self.repo = repo
+        # {race_id:{track_id:Track}}
+        self.tracks = defaultdict(dict)
+
+    def when_started(self):
+        d = defer.Deferred()
+        d.addCallback(self.open)
+        d.addCallback(lambda x: task.LoopingCall(self.read, x))
+        d.addCallback(lambda lc: lc.start(0))
+        d.callback('rdp')
+        return d
+
+
+    def handle_payload(self, queue_name, channel, method_frame, header_frame,
+            body):
+        data = cPickle.loads(body)
+        if not data.has_key('ts'):
+            # ts key MUST be in a data.
+            return
+        if data['lat'] < 0.1 and data['lon'] < 0.1:
+            return
+        return self.handle_track_data(data)
+
+    def handle_track_data(self, data):
+        '''
+
+        @param data:
+        @type data:
+        @return:
+        @rtype:
+        '''
+        d = self.pool.runQuery(pe.select('current_race_by_tacker', 'race'),
+            (data['imei'], int(time.time())))
+        d.addCallback(self._get_track, data['imei'])
+        d.addCallback(lambda tr: tr.process(data))
+        # Now it's Track's work to process data.
+        return d
+
+    def _get_track(self, rid, device_id):
+        rid, cnumber = rid[0]
+        if self.tracks.has_key(rid) and self.tracks[rid].has_key(device_id):
+            # Race and track are in memory. Return Track for work.
+            return self.tracks[rid][device_id]
+        if self.tracks.has_key(rid):
+            # Has race but not track.
+            # Check if race has track.
+            d = self.pool.runQuery(pe.select('tracks_n_label', 'track'),
+                (rid, cnumber))
+            d.addCallback(self._find_track, rid, device_id)
+            return d
+        else:
+            # No tracks for race.
+            # Find something.
+            # TODO: Здесь должен быть код обрабатывающий ситуации:
+            # 1. Служба только что запустилась и ей надо восстановить треки.
+            # 2. Треков ещё нет и их надо создать.
+
+    @defer.inlineCallbacks
+    def _find_track(self, row, rid, device_id):
+        '''
+
+        @param row: (track_type.name, track_id, track.start_time,
+        track.end_time, contest_number)
+        @type row: C{tuple}
+        @return:
+        @rtype:
+        '''
+        tracks = self.tracks[rid]
+        t = int(time.time())
+        result = mock.Mock()
+        if row[3] and t > row[3]:
+            # Clean ended tracks.
+            del tracks[row[1]]
+            defer.returnValue(result)
+        tr = yield self.repo.get_by_id(row[1])
+        tracks[device_id] = tr
+        result = tr
+        defer.returnValue(result)
+
 

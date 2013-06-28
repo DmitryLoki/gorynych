@@ -141,6 +141,16 @@ class TrackEnded(DomainEvent):
     serializer = serializers.JSONSerializer()
 
 
+class TrackDataReceived(DomainEvent):
+    '''
+    Contain data for processing.
+    @param payload:{c(coords - lat, lon, alt string), s(device_id string),
+    t, gs(ground speed)}
+    '''
+    serializer = serializers.JSONSerializer()
+
+
+
 ########## Person events ##################################
 class PersonGotTrack(DomainEvent):
     '''

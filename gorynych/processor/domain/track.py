@@ -1,17 +1,22 @@
 '''
 Track aggregate.
 '''
+from twisted.internet import defer
+from gorynych.common.exceptions import NoAggregate
+from gorynych.common.infrastructure import persistence as pe
+
 __author__ = 'Boris Tsema'
 import uuid
 
 import numpy as np
-from zope.interface import Interface
 
 from gorynych.common.domain.model import AggregateRoot, ValueObject, DomainIdentifier
 from gorynych.info.domain.ids import namespace_uuid_validator
 from gorynych.common.domain import events
 from gorynych.common.domain.types import checkpoint_collection_from_geojson
 from gorynych.processor.domain import services
+
+from gorynych.info.infrastructure.persistence import BasePGSQLRepository
 
 DTYPE = [('id', 'i4'), ('timestamp', 'i4'), ('lat', 'f4'),
     ('lon', 'f4'), ('alt', 'i2'), ('g_speed', 'f4'), ('v_speed', 'f4'),
@@ -250,12 +255,14 @@ class RaceToGoal(object):
         return points, eventlist
 
 
-class ITrackRepository(Interface):
-    def save(track):
-        '''
-        Save track.
-        @param track:
-        @type track:
-        @return:
-        @rtype:
-        '''
+class TrackRepository(BasePGSQLRepository):
+   @defer.inlineCallbacks
+   def get_by_id(self, id):
+       data = yield self.pool.runQuery(pe.select(self.name), (str(id),))
+       if not data:
+           raise NoAggregate("%s %s" % (self.name.title(), id))
+       tid = TrackID.fromstring(data[0][0])
+       event_list = yield pe.event_store().load_events(tid)
+       result = Track(tid, event_list)
+       defer.returnValue(result)
+

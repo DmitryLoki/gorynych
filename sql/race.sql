@@ -87,3 +87,14 @@ WHERE
   o.id = r.id
   AND o.person_id=%s
   AND (r.end_time BETWEEN %s AND %s or r.start_time BETWEEN %s AND %s);
+
+-- Select current_race_by_tracker
+SELECT
+  r.race_id, p.contest_number
+FROM
+  race r,
+  paraglider p
+WHERE
+  r.id = p.id AND
+  p.tracker_id = %s
+  %s BETWEEN r.start_time AND r.end_time + 7*3600

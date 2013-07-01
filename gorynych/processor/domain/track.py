@@ -17,7 +17,6 @@ from gorynych.common.domain import events
 from gorynych.common.domain.types import checkpoint_collection_from_geojson
 from gorynych.processor.domain import services
 
-from gorynych.info.infrastructure.persistence import BasePGSQLRepository
 
 DTYPE = [('id', 'i4'), ('timestamp', 'i4'), ('lat', 'f4'),
     ('lon', 'f4'), ('alt', 'i2'), ('g_speed', 'f4'), ('v_speed', 'f4'),
@@ -72,8 +71,6 @@ class TrackState(ValueObject):
         self.start_time = None
         # Buffer for points.
         self._buffer = np.empty(0, dtype=DTYPE)
-        # points to save. Something wrong here.
-        self.pbuffer = np.empty(0, dtype=DTYPE)
         # Time at which track has been ended.
         self.end_time = None
         self.ended = False
@@ -109,9 +106,6 @@ class TrackState(ValueObject):
             self.statechanged_at = ev.occured_on
             self.started = True
 
-    def apply_PointsAddedToTrack(self, ev):
-        self.pbuffer = ev.payload
-
     def apply_TrackEnded(self, ev):
         if not self.state == 'finished':
             self.state = ev.payload['state']
@@ -143,7 +137,6 @@ class TrackState(ValueObject):
 
     def get_state(self):
         result = dict()
-        result['points'] = self.pbuffer
         result['state'] = self.state
         result['statechanged_at'] = self.statechanged_at
         return result
@@ -189,9 +182,10 @@ class Track(AggregateRoot):
         # Task process points and emit new events if occur.
         points, ev_list = self.task.process(points, self._state, self.id)
         self.apply(ev_list)
-        ev = events.PointsAddedToTrack(self.id, points)
-        ev.occured_on = points['timestamp'][0]
-        self.apply(ev)
+        self.points = np.hstack((self.points, points))
+        # ev = events.PointsAddedToTrack(self.id, points)
+        # ev.occured_on = points['timestamp'][0]
+        # self.apply(ev)
         # Look for state after processing and do all correctness.
         evlist = self.type.correct(self._state, self.id)
         self.apply(evlist)
@@ -261,11 +255,11 @@ class RaceToGoal(object):
             # Последняя точка взята, но данные продолжают поступать. Для
             # этого заменяем дистанцию во всех на последнюю посчитанную.
             for p in points:
-                p['distance'] = taskstate.pbuffer[-1]['distance']
+                p['distance'] = 0
             return points, []
         if taskstate.state == 'landed':
             for p in points:
-                p['distance'] = taskstate.pbuffer[-1]['distance']
+                p['distance'] = 0
             return points, []
         ended = taskstate.ended
         for idx, p in np.ndenumerate(points):

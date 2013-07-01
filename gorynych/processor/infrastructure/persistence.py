@@ -38,27 +38,3 @@ def find_snapshots(data):
     return result
 
 
-@implementer(track.ITrackRepository)
-class TrackRepository(object):
-    def __init__(self, pool):
-        self.pool = pool
-
-    def save(self, obj):
-        return self.pool.runInteraction(self._save_new, obj)
-
-    def _save_new(self, cur, obj):
-        cur.execute(NEW_TRACK, (obj._state.start_time, obj._state.end_time,
-                                obj.type.type, str(obj.id)))
-        dbid = cur.fetchone()[0]
-
-        points = obj.state['points']
-        points['id'] = np.ones(len(points)) * dbid
-        data = np_as_text(points)
-        cur.copy_expert("COPY track_data FROM STDIN ", data)
-        snaps = find_snapshots(obj)
-        for snap in snaps:
-            cur.execute(INSERT_SNAPSHOT, (snap['timestamp'], dbid,
-                snap['snapshot']))
-        obj._id = dbid
-        return obj
-

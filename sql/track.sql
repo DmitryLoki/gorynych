@@ -68,7 +68,7 @@ WHERE
   tracks_group.group_id = %s;
 
 
--- Select track_for_contest_number
+-- Select track_n_label
 SELECT
   track_type.name,
   track.track_id,

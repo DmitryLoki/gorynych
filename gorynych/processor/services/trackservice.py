@@ -259,7 +259,7 @@ class OnlineTrashService(RabbitMQService):
         d = self.pool.runQuery(pe.select('current_race_by_tacker', 'race'),
             (data['imei'], int(time.time())))
         d.addCallback(self._get_track, data['imei'])
-        d.addCallback(lambda tr: tr.process(data))
+        d.addCallback(lambda tr: tr.process_data(data))
         # Now it's Track's work to process data.
         return d
 
@@ -268,40 +268,53 @@ class OnlineTrashService(RabbitMQService):
         if self.tracks.has_key(rid) and self.tracks[rid].has_key(device_id):
             # Race and track are in memory. Return Track for work.
             return self.tracks[rid][device_id]
-        if self.tracks.has_key(rid):
-            # Has race but not track.
-            # Check if race has track.
+        else:
             d = self.pool.runQuery(pe.select('tracks_n_label', 'track'),
                 (rid, cnumber))
-            d.addCallback(self._find_track, rid, device_id)
+            # Результат запроса — существующий в гонке contest number для
+            # существующего трека. Трек может быть, может не быть,
+            # его надо создать или
+            # вернуть.
+            d.addCallback(self._restore_or_create_track, rid, device_id)
             return d
-        else:
-            # No tracks for race.
-            # Find something.
-            # TODO: Здесь должен быть код обрабатывающий ситуации:
-            # 1. Служба только что запустилась и ей надо восстановить треки.
-            # 2. Треков ещё нет и их надо создать.
 
     @defer.inlineCallbacks
-    def _find_track(self, row, rid, device_id):
+    def _restore_or_create_track(self, row, rid, device_id):
         '''
+        Отдаёт уже существующий трек, иначе создаёт его, сохраняет события о
+         его создании и добавлении в гонку, и отдаёт.
 
         @param row: (track_type.name, track_id, track.start_time,
-        track.end_time, contest_number)
+        track.end_time, contest_number), может быть пустым если трека ещё не
+         существует.
         @type row: C{tuple}
         @return:
-        @rtype:
+        @rtype: C{Track}
         '''
         tracks = self.tracks[rid]
-        t = int(time.time())
-        result = mock.Mock()
-        if row[3] and t > row[3]:
-            # Clean ended tracks.
-            del tracks[row[1]]
-            defer.returnValue(result)
-        tr = yield self.repo.get_by_id(row[1])
-        tracks[device_id] = tr
-        result = tr
+        current_time = int(time.time())
+        # result = mock.Mock()
+        if row:
+            result = yield self.repo.get_by_id(row[1])
+        else:
+            race_task = API.get_race_task(str(rid))
+            if not isinstance(race_task, dict):
+                log.msg("Race task wasn't received from API: %r" % race_task)
+                defer.returnValue('')
+            track_type = 'online'
+            track_id = track.TrackID()
+            tc = events.TrackCreated(track_id)
+            tc.payload = dict(race_task=race_task, track_type=track_type)
+            result = track.Track(track_id, [tc])
+            # Получить зарегистрированный contest_number для трекера.
+            cn = yield self.pool.runQuery(pe.select('cn_by_rid', 'race'),
+                (device_id,))
+            contest_number = cn[0][0]
+            rgt = events.RaceGotTrack(rid, aggregate_type='race')
+            rgt.payload = dict(contest_number=contest_number,
+                track_type=track_type, track_id=str(track_id))
+            yield pe.event_store().persist([tc, rgt])
+        tracks[device_id] = result
         defer.returnValue(result)
 
 

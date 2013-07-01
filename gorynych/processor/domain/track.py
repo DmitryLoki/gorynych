@@ -218,7 +218,7 @@ class RaceToGoal(object):
     Incapsulate race parameters calculation.
     '''
     type = 'racetogoal'
-    wp_error = 30
+    wp_error = 300
     def __init__(self, task):
         chlist = task['checkpoints']
         self.checkpoints = checkpoint_collection_from_geojson(chlist)
@@ -258,15 +258,19 @@ class RaceToGoal(object):
         if lastchp < len(self.checkpoints) - 1:
             nextchp = self.checkpoints[lastchp + 1]
         else:
-            # Impossible situation because track should be ended before.
+            # Последняя точка взята, но данные продолжают поступать. Для
+            # этого заменяем дистанцию во всех на последнюю посчитанную.
             for p in points:
                 p['distance'] = taskstate.pbuffer[-1]['distance']
-            return points
+            return points, []
+        if taskstate.state == 'landed':
+            for p in points:
+                p['distance'] = taskstate.pbuffer[-1]['distance']
+            return points, []
         ended = taskstate.ended
         for idx, p in np.ndenumerate(points):
-            # raise ValueError(p['lat'], p['lon'])
             dist = nextchp.distance_to((p['lat'], p['lon']))
-            if dist <= self.wp_error and not ended:
+            if dist - nextchp.radius <= self.wp_error and not ended:
                 eventlist.append(
                     events.TrackCheckpointTaken(_id, (lastchp+1, int(dist)),
                                                     occured_on=p['timestamp']))
@@ -283,7 +287,7 @@ class RaceToGoal(object):
                 if lastchp + 1 < len(self.checkpoints) - 1:
                     nextchp = self.checkpoints[lastchp + 2]
                     lastchp += 1
-            p['distance'] = max(int(dist + nextchp.distance), 0)
+            p['distance'] = int(dist + nextchp.distance)
 
         return points, eventlist
 

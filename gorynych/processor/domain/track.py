@@ -1,3 +1,4 @@
+# coding=utf-8
 '''
 Track aggregate.
 '''
@@ -25,7 +26,8 @@ DTYPE = [('id', 'i4'), ('timestamp', 'i4'), ('lat', 'f4'),
 EARTH_RADIUS = 6371000
 
 def track_types(ttype):
-    types = dict(competition_aftertask=services.FileParserAdapter(DTYPE))
+    types = dict(competition_aftertask=services.FileParserAdapter(DTYPE),
+        online=services.OnlineTrashAdapter(DTYPE))
     return types.get(ttype)
 
 
@@ -55,13 +57,18 @@ class TrackState(ValueObject):
     Hold track state. Memento.
     '''
     states = ['not started', 'started', 'finished', 'landed']
-    def __init__(self, events):
+    def __init__(self, id, events):
+        self.id = id
+        # Time when track speed become more then threshold.
+        self.become_fast = None
+        self.become_slow = None
         self.track_type = None
         self.race_task = None
         self.last_checkpoint = 0
         self.state = 'not started'
         self.statechanged_at = None
         self.started = False
+        self.in_air = False
         self.start_time = None
         self.pbuffer = np.empty(0, dtype=DTYPE)
         # Time at which track has been ended.
@@ -117,6 +124,20 @@ class TrackState(ValueObject):
     def apply_TrackFinishTimeReceived(self, ev):
         self.finish_time = ev.payload
 
+    def apply_TrackInAir(self, ev):
+        self.in_air = True
+
+    def apply_TrackSlowedDown(self, ev):
+        self.become_fast, self.become_slow = None, ev.occured_on
+
+    def apply_TrackSpeedExceeded(self, ev):
+        self.become_slow, self.become_fast = None, ev.occured_on
+
+    def apply_TrackLanded(self, ev):
+        self.in_air = False
+        self.state = 'landed'
+        self.statechanged_at = ev.occured_on
+
     def get_state(self):
         result = dict()
         result['points'] = self.pbuffer
@@ -127,41 +148,49 @@ class TrackState(ValueObject):
 
 class Track(AggregateRoot):
 
-    flush_time = 60
+    flush_time = 60 # unused?
     dtype = DTYPE
 
     def __init__(self, id, events=None):
         super(Track, self).__init__()
         self.id = id
-        self._state = TrackState(events)
+        self._id = None
+        self._state = TrackState(id, events)
         self._task = None
         self._type = None
         self.changes = []
         self.points = np.empty(0, dtype=self.dtype)
 
     def apply(self, ev):
-        self._state.mutate(ev)
-        self.changes.append(ev)
+        if isinstance(ev, list):
+            for e in ev:
+                self._state.mutate(e)
+                self.changes.append(e)
+        else:
+            self._state.mutate(ev)
+            self.changes.append(ev)
 
     def process_data(self, data):
         # Here TrackType read data and return it in good common format.
         data = self.type.read(data)
+        # Проверить летит или не летит.
+        evs = services.ParagliderSkyEarth(self._state.track_type)\
+            .state_work(data, self._state)
+        self.apply(evs)
+
         # Now TrackType correct points and calculate smth if needed.
         points, evs = self.type.process(data,
-            self.task.start_time, self.task.end_time)
-        for ev in evs:
-            self.apply(ev)
+            self.task.start_time, self.task.end_time, self._state)
+        self.apply(evs)
         # Task process points and emit new events if occur.
         points, ev_list = self.task.process(points, self._state, self.id)
-        for ev in ev_list:
-            self.apply(ev)
+        self.apply(ev_list)
         ev = events.PointsAddedToTrack(self.id, points)
         ev.occured_on = points['timestamp'][0]
         self.apply(ev)
         # Look for state after processing and do all correctness.
         evlist = self.type.correct(self._state, self.id)
-        for ev in evlist:
-            self.apply(ev)
+        self.apply(evlist)
 
     @property
     def state(self):
@@ -255,14 +284,4 @@ class RaceToGoal(object):
         return points, eventlist
 
 
-class TrackRepository(BasePGSQLRepository):
-   @defer.inlineCallbacks
-   def get_by_id(self, id):
-       data = yield self.pool.runQuery(pe.select(self.name), (str(id),))
-       if not data:
-           raise NoAggregate("%s %s" % (self.name.title(), id))
-       tid = TrackID.fromstring(data[0][0])
-       event_list = yield pe.event_store().load_events(tid)
-       result = Track(tid, event_list)
-       defer.returnValue(result)
 

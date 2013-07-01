@@ -1,3 +1,4 @@
+# coding=utf-8
 __author__ = 'Boris Tsema'
 
 from calendar import timegm
@@ -11,6 +12,7 @@ import numpy.ma as ma
 from gorynych.common.domain.services import point_dist_calculator
 from gorynych.common.domain.events import TrackEnded
 from gorynych.common.exceptions import NoGPSData
+from gorynych.common.domain import events
 
 def choose_offline_parser(trackname):
     if trackname.endswith('.igc'): return IGCTrackParser
@@ -109,7 +111,7 @@ class FileParserAdapter(object):
             raise Exception("Error while parsing file: %r , %s" % (e, data))
         return parsed_track
 
-    def process(self, data, stime, etime):
+    def process(self, data, stime, etime, taskstate):
         corrector = OfflineCorrectorService()
         try:
             track = corrector.correct_track(data, stime, etime)
@@ -390,4 +392,79 @@ def runs_of_ones_array(bits):
     run_starts, = np.where(difs > 0)
     run_ends, = np.where(difs < 0)
     return run_starts, run_ends
+
+
+class ParagliderSkyEarth(object):
+    # Threshold value for 'not started'-'flying' change in km/h.
+    sf_speed = 20
+    # Threshold value for 'flying'-'not started' or 'not started-flying'
+    # change in km/h.
+    t_speed = 10
+    # Time interval in which is allowed for pilot to be slow, seconds.
+    slow_interval = 60
+    alt_interval = 5
+
+    def __init__(self, tt):
+        self.track_type = tt
+
+    def state_work(self, data, trackstate):
+        ''' Calculate pilot's state.'''
+        if self.track_type == 'online':
+            return self.online_state_work(data, trackstate)
+
+    def online_state_work(self, data, trackstate):
+        result = []
+        _id = trackstate.id
+        if not trackstate.in_air:
+            # Ещё не в воздухе
+            if trackstate.become_fast:
+                # Пилот уже летит быстрее пороговой скорости.
+                bf = trackstate.become_fast
+                in_air_by_speed = data['g_speed'] > self.t_speed and (
+                    data['timestamp'] - bf > 60)
+                if in_air_by_speed:
+                    result.append(events.TrackInAir(_id,
+                        occured_on=data['timestamp']))
+                elif data['g_speed'] < self.t_speed:
+                    result.append(events.TrackSlowedDown(_id,
+                        occured_on=data['timestamp']))
+            else:
+                if data['g_speed'] > self.t_speed:
+                    # Был медленный, стал быстрый.
+                    result.append(events.TrackSpeedExceeded(_id,
+                        occured_on=data['timestamp']))
+        else:
+            if trackstate.become_fast:
+                if data['g_speed'] < self.t_speed:
+                    result.append(events.TrackSlowedDown(_id,
+                        occured_on=data['timestamp']))
+            else:
+                # Пилот уже медленный, но ещё в воздухе.
+                bs = trackstate.become_slow
+                if data['g_speed'] > self.t_speed:
+                    result.append(events.TrackSpeedExceeded(_id,
+                        occured_on=data['timestamp']))
+                elif data['timestamp'] - bs > 60 and trackstate\
+                    .alt_interval_for(60, data['alt']) < 5:
+                    # Landed
+                    result.append(events.TrackLanded(_id,
+                        occured_on=data['timestamp']))
+        return result
+
+
+class OnlineTrashAdapter(object):
+    def __init__(self, dtype):
+        self.dtype = dtype
+
+    def read(self, data):
+        result = np.empty(1, self.dtype)
+        result['timestamp'] = data['ts']
+        result['lat'] = data['lat']
+        result['lon'] = data['lon']
+        result['alt'] = data['alt']
+        result['g_speed'] = data['h_speed']
+        return result
+
+    def process(self, data, stime, etime, trackstate):
+        return data, []
 

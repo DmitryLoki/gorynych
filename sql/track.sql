@@ -50,7 +50,7 @@ CREATE TABLE TRACKS_GROUP(
 
 
 -- Select track
-SELECT track_id from track where track_id=%s;
+SELECT track_id, id from track where track_id=%s;
 
 
 -- Select tracks

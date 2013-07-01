@@ -21,6 +21,7 @@ class Person(AggregateRoot):
         self._name = name
         self._country = country
         self.regdate = regdate
+        # contid:tracker_id
         self.trackers = dict()
         self._contests = dict()
 

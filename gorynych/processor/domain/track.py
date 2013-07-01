@@ -70,6 +70,9 @@ class TrackState(ValueObject):
         self.started = False
         self.in_air = False
         self.start_time = None
+        # Buffer for points.
+        self._buffer = np.empty(0, dtype=DTYPE)
+        # points to save. Something wrong here.
         self.pbuffer = np.empty(0, dtype=DTYPE)
         # Time at which track has been ended.
         self.end_time = None
@@ -177,11 +180,12 @@ class Track(AggregateRoot):
         evs = services.ParagliderSkyEarth(self._state.track_type)\
             .state_work(data, self._state)
         self.apply(evs)
-
         # Now TrackType correct points and calculate smth if needed.
         points, evs = self.type.process(data,
             self.task.start_time, self.task.end_time, self._state)
         self.apply(evs)
+        if not points:
+            return
         # Task process points and emit new events if occur.
         points, ev_list = self.task.process(points, self._state, self.id)
         self.apply(ev_list)
@@ -220,6 +224,7 @@ class RaceToGoal(object):
         self.checkpoints = checkpoint_collection_from_geojson(chlist)
         self.start_time = int(task['start_time'])
         self.end_time = int(task['end_time'])
+        self.calculate_path()
 
     def calculate_path(self):
         '''
@@ -249,7 +254,6 @@ class RaceToGoal(object):
                                                type(points)
         assert points.dtype == DTYPE
         eventlist = []
-        self.calculate_path()
         lastchp = taskstate.last_checkpoint
         if lastchp < len(self.checkpoints) - 1:
             nextchp = self.checkpoints[lastchp + 1]

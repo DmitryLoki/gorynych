@@ -453,6 +453,7 @@ class ParagliderSkyEarth(object):
 
 
 class OnlineTrashAdapter(object):
+    store_second = 60
     def __init__(self, dtype):
         self.dtype = dtype
 
@@ -466,5 +467,33 @@ class OnlineTrashAdapter(object):
         return result
 
     def process(self, data, stime, etime, trackstate):
-        return data, []
+        '''
+        На выходе получили самые ранние пришедшие точки (те, которые раньше
+        чем за store_second.
+        @param data:
+        @type data: np.ndarray
+        @param stime:
+        @type stime:
+        @param etime:
+        @type etime:
+        @param trackstate:
+        @type trackstate: TrackState
+        @return: массив, единичной или больше длины.
+        @rtype: np.ndarray
+        '''
+        if data['timestamp'] < stime:
+            return None, []
+        if data['timestamp'] in trackstate._buffer['timestamp']:
+            return None, []
+        trackstate._buffer = np.hstack((trackstate._buffer, data))
+        # Select points for return.
+        buf = trackstate._buffer
+        now = int(time.time())
+        s = np.min(trackstate._buffer['timestamp'])
+        if now - s < self.store_second:
+            return None, []
+        idxs = np.where(buf['timestamp'] < now - self.store_second)
+        result = buf[idxs]
+        trackstate._buffer = np.delete(trackstate._buffer, idxs)
+        return result, []
 

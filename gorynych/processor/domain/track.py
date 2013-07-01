@@ -207,6 +207,10 @@ class Track(AggregateRoot):
             self._type = track_types(self._state.track_type)
         return self._type
 
+    def reset(self):
+        self.changes=[]
+        self.points = np.empty(0, dtype=self.dtype)
+
 
 class RaceToGoal(object):
     '''

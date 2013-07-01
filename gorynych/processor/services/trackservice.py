@@ -227,15 +227,16 @@ class OnlineTrashService(RabbitMQService):
         self.repo = repo
         # {race_id:{track_id:Track}}
         self.tracks = defaultdict(dict)
+        self.saver = task.LoopingCall(self.persist)
+        self.saver.start(5, False)
 
     def when_started(self):
         d = defer.Deferred()
         d.addCallback(self.open)
         d.addCallback(lambda x: task.LoopingCall(self.read, x))
-        d.addCallback(lambda lc: lc.start(0))
+        d.addCallback(lambda lc: lc.start(0.01))
         d.callback('rdp')
         return d
-
 
     def handle_payload(self, queue_name, channel, method_frame, header_frame,
             body):
@@ -293,7 +294,6 @@ class OnlineTrashService(RabbitMQService):
         '''
         tracks = self.tracks[rid]
         current_time = int(time.time())
-        # result = mock.Mock()
         if row:
             result = yield self.repo.get_by_id(row[1])
         else:
@@ -318,5 +318,12 @@ class OnlineTrashService(RabbitMQService):
         defer.returnValue(result)
 
 
-    def persist(self, obj):
-        return self.repo.save(obj)
+    def persist(self):
+        dlist = []
+        sem = defer.DeferredSemaphore(15)
+        for rid in self.tracks:
+            for key in self.tracks[rid]:
+                s = sem.run(self.repo.save, self.tracks[rid][key])
+                dlist.append(s)
+        d = defer.DeferredList(dlist)
+        return d

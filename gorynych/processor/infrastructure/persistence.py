@@ -68,7 +68,9 @@ class TrackRepository(object):
         defer.returnValue(result)
 
     def save(self, obj):
-        d = pe.event_store().persist(obj.changes)
+        d = defer.Deferred()
+        if obj.changes:
+            d.addCallback(lambda _: pe.event_store().persist(obj.changes))
         if len(obj._state._buffer) > 0:
             # Костыль
             ev = events.PointsAddedToTrack(obj.id, obj._state._buffer)
@@ -80,7 +82,8 @@ class TrackRepository(object):
         else:
             d.addCallback(lambda _: self.pool.runInteraction(self._update,
                 obj))
-        d.addCallback(self._clean_obj)
+        d.addCallback(lambda obj: obj.reset())
+        d.callback(obj)
         return d
 
     def _save_new(self, cur, obj):
@@ -88,10 +91,11 @@ class TrackRepository(object):
                                 obj.type.type, str(obj.id)))
         dbid = cur.fetchone()[0]
 
-        points = obj.points
-        points['id'] = np.ones(len(points)) * dbid
-        data = np_as_text(points)
-        cur.copy_expert("COPY track_data FROM STDIN ", data)
+        if len(obj.points) > 0:
+            points = obj.points
+            points['id'] = np.ones(len(points)) * dbid
+            data = np_as_text(points)
+            cur.copy_expert("COPY track_data FROM STDIN ", data)
         snaps = find_snapshots(obj)
         for snap in snaps:
             cur.execute(INSERT_SNAPSHOT, (snap['timestamp'], dbid,
@@ -100,6 +104,8 @@ class TrackRepository(object):
         return obj
 
     def _update(self, cur, obj):
+        if len(obj.points) == 0:
+            return obj
         points = obj.points
         points['id'] = np.ones(len(points)) * obj._id
         data = np_as_text(points)
@@ -116,6 +122,3 @@ class TrackRepository(object):
                     (t, obj.id))
         return obj
 
-    def _clean_obj(self, obj):
-        obj.changes = []
-        return obj

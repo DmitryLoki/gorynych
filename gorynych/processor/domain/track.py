@@ -189,6 +189,7 @@ class Track(AggregateRoot):
         # Look for state after processing and do all correctness.
         evlist = self.type.correct(self._state, self.id)
         self.apply(evlist)
+        return self
 
     @property
     def state(self):

@@ -211,8 +211,7 @@ class TrackService(EventPollingService):
 
     def persist(self, aggr):
         log.msg("Persist aggregate %s" % aggr.id)
-        d = self.event_store.persist(aggr.changes)
-        d.addCallback(lambda _:self.track_repository.save(aggr))
+        d = self.track_repository.save(aggr)
         return d
 
 
@@ -261,6 +260,7 @@ class OnlineTrashService(RabbitMQService):
         d.addCallback(self._get_track, data['imei'])
         d.addCallback(lambda tr: tr.process_data(data))
         # Now it's Track's work to process data.
+        d.addCallback(self.persist)
         return d
 
     def _get_track(self, rid, device_id):
@@ -318,3 +318,5 @@ class OnlineTrashService(RabbitMQService):
         defer.returnValue(result)
 
 
+    def persist(self, obj):
+        return self.repo.save(obj)

@@ -129,7 +129,7 @@ class FileParserAdapter(object):
     def correct(self, trackstate, _id):
         if not trackstate.finish_time:
             return [TrackEnded(_id, dict(state='landed'),
-                occured_on=trackstate.pbuffer[ -1]['timestamp'])]
+                occured_on=trackstate._buffer[ -1]['timestamp'])]
         return []
 
 

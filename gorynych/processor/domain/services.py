@@ -415,7 +415,7 @@ class ParagliderSkyEarth(object):
     def online_state_work(self, data, trackstate):
         result = []
         _id = trackstate.id
-        if not trackstate.in_air:
+        if not trackstate.in_air and not trackstate.state == 'landed':
             # Ещё не в воздухе
             if trackstate.become_fast:
                 # Пилот уже летит быстрее пороговой скорости.
@@ -444,8 +444,7 @@ class ParagliderSkyEarth(object):
                 if data['g_speed'] > self.t_speed:
                     result.append(events.TrackSpeedExceeded(_id,
                         occured_on=data['timestamp']))
-                elif data['timestamp'] - bs > 60 and trackstate\
-                    .alt_interval_for(60, data['alt']) < 5:
+                elif data['timestamp'] - bs > 60:
                     # Landed
                     result.append(events.TrackLanded(_id,
                         occured_on=data['timestamp']))

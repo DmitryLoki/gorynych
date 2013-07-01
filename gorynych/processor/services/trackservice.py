@@ -256,8 +256,9 @@ class OnlineTrashService(RabbitMQService):
         @return:
         @rtype:
         '''
+        now = int(time.time())
         d = self.pool.runQuery(pe.select('current_race_by_tacker', 'race'),
-            (data['imei'], int(time.time())))
+            (data['imei'], now))
         d.addCallback(self._get_track, data['imei'])
         d.addCallback(lambda tr: tr.process_data(data))
         # Now it's Track's work to process data.
@@ -265,6 +266,10 @@ class OnlineTrashService(RabbitMQService):
         return d
 
     def _get_track(self, rid, device_id):
+        if not rid:
+            # Null-object.
+            log.msg("No paraglider for device", device_id)
+            return mock.MagicMock()
         rid, cnumber = rid[0]
         if self.tracks.has_key(rid) and self.tracks[rid].has_key(device_id):
             # Race and track are in memory. Return Track for work.
@@ -293,7 +298,8 @@ class OnlineTrashService(RabbitMQService):
         @rtype: C{Track}
         '''
         tracks = self.tracks[rid]
-        current_time = int(time.time())
+        log.msg("Restore or create track for race %s and device %s" %
+                (rid, device_id))
         if row:
             result = yield self.repo.get_by_id(row[1])
         else:
@@ -316,7 +322,6 @@ class OnlineTrashService(RabbitMQService):
             yield pe.event_store().persist([tc, rgt])
         tracks[device_id] = result
         defer.returnValue(result)
-
 
     def persist(self):
         dlist = []

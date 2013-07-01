@@ -109,8 +109,13 @@ class TrackRepository(object):
         points = obj.points
         points['id'] = np.ones(len(points)) * obj._id
         data = np_as_text(points)
-        snaps = find_snapshots(obj)
         cur.copy_expert("COPY track_data FROM STDIN ", data)
+
+        snaps = find_snapshots(obj)
+        for snap in snaps:
+            cur.execute(INSERT_SNAPSHOT, (snap['timestamp'], obj._id,
+            snap['snapshot']))
+
         for idx, item in enumerate(obj.changes):
             if item.name == 'TrackStarted':
                 t = obj._state.start_time
@@ -119,6 +124,6 @@ class TrackRepository(object):
             if item.name == 'TrackEnded':
                 t = obj._state.end_time
                 cur.execute("UPDATE track SET end_time=%s WHERE ID=%s",
-                    (t, obj.id))
+                    (t, obj._id))
         return obj
 

@@ -132,8 +132,9 @@ class TrackState(ValueObject):
 
     def apply_TrackLanded(self, ev):
         self.in_air = False
-        self.state = 'landed'
-        self.statechanged_at = ev.occured_on
+        if not self.state == 'finished':
+            self.state = 'landed'
+            self.statechanged_at = ev.occured_on
 
     def get_state(self):
         result = dict()
@@ -183,9 +184,6 @@ class Track(AggregateRoot):
         points, ev_list = self.task.process(points, self._state, self.id)
         self.apply(ev_list)
         self.points = np.hstack((self.points, points))
-        # ev = events.PointsAddedToTrack(self.id, points)
-        # ev.occured_on = points['timestamp'][0]
-        # self.apply(ev)
         # Look for state after processing and do all correctness.
         evlist = self.type.correct(self._state, self.id)
         self.apply(evlist)

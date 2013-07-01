@@ -125,7 +125,7 @@ class Checkpoint(ValueObject):
             raise TypeError("Unknown type %s" % type(point))
         _lat = self.__geo_interface__['geometry']['coordinates'][0]
         _lon = self.__geo_interface__['geometry']['coordinates'][1]
-        return point_dist_calculator(lat, lon, _lat, _lon) - self.radius
+        return point_dist_calculator(lat, lon, _lat, _lon)
 
     @property
     def __geo_interface__(self):

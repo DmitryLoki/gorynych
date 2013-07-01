@@ -1,3 +1,4 @@
+# coding=utf-8
 from gorynych.common.domain.model import DomainEvent
 from gorynych.common.infrastructure import serializers
 
@@ -139,6 +140,43 @@ class TrackEnded(DomainEvent):
     @param payload: track state
     '''
     serializer = serializers.JSONSerializer()
+
+
+class TrackDataReceived(DomainEvent):
+    '''
+    Contain data for processing.
+    @param payload:{c(coords - lat, lon, alt string), s(device_id string),
+    t, gs(ground speed)}
+    '''
+    serializer = serializers.JSONSerializer()
+
+
+class TrackInAir(DomainEvent):
+    '''
+    Появляется когда пилот взлетел
+    @param payload: None
+    '''
+    serializer = serializers.NoneSerializer()
+
+
+class TrackSpeedExceeded(DomainEvent):
+    '''
+    Скорость трека стала больше пороговой.
+    '''
+    serializer = serializers.NoneSerializer()
+
+
+class TrackSlowedDown(DomainEvent):
+    '''
+    Скорость трека стала меньше пороговой.
+    '''
+    serializer = serializers.NoneSerializer()
+
+
+class TrackLanded(DomainEvent):
+    serializer = serializers.NoneSerializer()
+
+
 
 
 ########## Person events ##################################

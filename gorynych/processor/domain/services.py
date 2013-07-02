@@ -16,7 +16,6 @@ from gorynych.common.domain import events
 
 def choose_offline_parser(trackname):
     if trackname.endswith('.igc'): return IGCTrackParser
-    else: return KMLTrackParser
 
 
 class IGCTrackParser(object):

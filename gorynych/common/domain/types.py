@@ -137,7 +137,7 @@ class Checkpoint(ValueObject):
         result['properties'] = {}
         result['properties']['checkpoint_type'] = self.type
         result['properties']['name'] = self.name
-        if self.radius:
+        if hasattr(self, 'radius'):
             result['properties']['radius'] = self.radius
         result['properties']['open_time'] = self.open_time
         result['properties']['close_time'] = self.close_time

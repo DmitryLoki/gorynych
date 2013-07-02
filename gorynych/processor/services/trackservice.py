@@ -271,7 +271,6 @@ class OnlineTrashService(RabbitMQService):
     def _get_track(self, rid, device_id):
         if not rid:
             # Null-object.
-            log.msg("No paraglider for device", device_id)
             return A()
         rid, cnumber = rid[0]
         if not cnumber:

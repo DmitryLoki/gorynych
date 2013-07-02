@@ -12,11 +12,13 @@ from gorynych.common.exceptions import NoAggregate
 from gorynych.common.domain import events
 from gorynych.processor.domain import track
 
+
 class PickledTrackRepository(object):
     def save(self, data):
         f = open('track_repo', 'wb')
         cPickle.dump(data, f, -1)
         f.close()
+
 
 NEW_TRACK = """
     INSERT INTO track (start_time, end_time, track_type, track_id)
@@ -27,6 +29,7 @@ NEW_TRACK = """
 INSERT_SNAPSHOT = """
     INSERT INTO track_snapshot (timestamp, id, snapshot) VALUES(%s, %s, %s)
     """
+
 
 def find_snapshots(data):
     '''
@@ -77,7 +80,7 @@ class TrackRepository(object):
             ev.occured_on = obj._state._buffer['timestamp'][0]
             d.addCallback(lambda _: pe.event_store().persist([ev]))
         if not obj._id:
-            d.addCallback(lambda _:self.pool.runInteraction(self._save_new,
+            d.addCallback(lambda _: self.pool.runInteraction(self._save_new,
                 obj))
         else:
             d.addCallback(lambda _: self.pool.runInteraction(self._update,
@@ -88,7 +91,7 @@ class TrackRepository(object):
 
     def _save_new(self, cur, obj):
         cur.execute(NEW_TRACK, (obj._state.start_time, obj._state.end_time,
-                                obj.type.type, str(obj.id)))
+        obj.type.type, str(obj.id)))
         dbid = cur.fetchone()[0]
 
         if len(obj.points) > 0:
@@ -99,7 +102,7 @@ class TrackRepository(object):
         snaps = find_snapshots(obj)
         for snap in snaps:
             cur.execute(INSERT_SNAPSHOT, (snap['timestamp'], dbid,
-                snap['snapshot']))
+            snap['snapshot']))
         obj._id = dbid
         return obj
 
@@ -113,8 +116,11 @@ class TrackRepository(object):
 
         snaps = find_snapshots(obj)
         for snap in snaps:
-            cur.execute(INSERT_SNAPSHOT, (snap['timestamp'], obj._id,
-            snap['snapshot']))
+            try:
+                cur.execute(INSERT_SNAPSHOT, (snap['timestamp'], obj._id,
+                snap['snapshot']))
+            except:
+                pass
 
         for idx, item in enumerate(obj.changes):
             if item.name == 'TrackStarted':

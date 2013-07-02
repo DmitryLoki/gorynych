@@ -1,3 +1,4 @@
+# coding=utf-8
 from gorynych.common.domain.model import DomainEvent
 from gorynych.common.infrastructure import serializers
 
@@ -141,6 +142,43 @@ class TrackEnded(DomainEvent):
     serializer = serializers.JSONSerializer()
 
 
+class TrackDataReceived(DomainEvent):
+    '''
+    Contain data for processing.
+    @param payload:{c(coords - lat, lon, alt string), s(device_id string),
+    t, gs(ground speed)}
+    '''
+    serializer = serializers.JSONSerializer()
+
+
+class TrackInAir(DomainEvent):
+    '''
+    Появляется когда пилот взлетел
+    @param payload: None
+    '''
+    serializer = serializers.NoneSerializer()
+
+
+class TrackSpeedExceeded(DomainEvent):
+    '''
+    Скорость трека стала больше пороговой.
+    '''
+    serializer = serializers.NoneSerializer()
+
+
+class TrackSlowedDown(DomainEvent):
+    '''
+    Скорость трека стала меньше пороговой.
+    '''
+    serializer = serializers.NoneSerializer()
+
+
+class TrackLanded(DomainEvent):
+    serializer = serializers.NoneSerializer()
+
+
+
+
 ########## Person events ##################################
 class PersonGotTrack(DomainEvent):
     '''
@@ -162,6 +200,28 @@ class ParagliderRegisteredOnContest(DomainEvent):
     serializer = serializers.DomainIdentifierSerializer('ContestID')
 
 
+class TrackerAssigned(DomainEvent):
+    '''
+    This event is fired then tracker is assigned to someone.
+
+    Event fields are:
+    @param aggregate_id: id of aggregate to which tracker has been assigned (
+    Person,
+    Transport).
+    @param payload: (tracker_id, contest_id).
+    '''
+    serializer = serializers.TupleOf(serializers.StringSerializer())
+
+
+class TrackerUnAssigned(DomainEvent):
+    '''
+    This event is fired then tracker is unassigned from person or transport.
+    @param aggregate_id: id of aggregate from which tracker has been
+    unassigned (Person, Transport).
+    @param payload: (tracker_id, contest_id)
+    '''
+    serializer = serializers.TupleOf(serializers.StringSerializer())
+
 ######### Contest events #################################
 
 
@@ -173,24 +233,3 @@ class ContestRaceCreated(DomainEvent):
     '''
     serializer = serializers.DomainIdentifierSerializer('RaceID')
 
-
-############## undecided events
-
-class TrackerAssigned(DomainEvent):
-    '''
-    This event is fired then tracker is assigned to someone.
-
-    Event fields are:
-    @param id: id of aggregate to which tracker has been assigned (Person,
-    Transport).
-    @param tracker_id: tracker id.
-    '''
-
-
-class TrackerUnAssigned(DomainEvent):
-    '''
-    This event is fired then tracker is unassigned from person or transport.
-    @param aggregate_id: id of aggregate from which tracker has been
-    unassigned (Person, Transport).
-    @param payload: id of Tracker aggregate.
-    '''

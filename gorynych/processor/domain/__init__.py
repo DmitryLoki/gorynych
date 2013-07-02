@@ -70,7 +70,24 @@ class TrackArchive(ValueObject):
         namelist = []
         arc = zipfile.ZipFile(archive_file)
         for item in arc.infolist():
-            namelist.append(arc.extract(item, unpack_dir))
+            # Try to solve problem with national encodings.
+            # It's a mindless copy/paste from working code.
+            fn = item.filename
+            try:
+                fnd = unicode(fn, 'utf-8', 'replace')
+            except:
+                fnd = fn
+            fne = fnd.encode('ascii', 'replace')
+            if os.sep in fne:
+                path = os.path.join(unpack_dir, fne[:fne.rindex(os.sep)])
+                if not os.path.exists(path):
+                    os.makedirs(path)
+            if fne.endswith(os.sep): continue
+            f = open(os.path.join(unpack_dir, fne), 'wb')
+            f.write(arc.open(fn).read())
+            f.close()
+            namelist.append(fne)
+        print namelist
         return namelist
 
     def get_race_paragliders(self):

@@ -34,3 +34,13 @@ class NoGPSData(Exception):
     '''
     Raised when GPS data is needed but absent.
     '''
+
+class AuthenticationError(Exception):
+    '''
+    Raised when something is wrong with passed credentials.
+    '''
+
+class DomainError(Exception):
+    '''
+    Error in domain logic.
+    '''

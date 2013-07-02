@@ -161,6 +161,10 @@ class DomainEvent(object):
                 self.aggregate_id, self.aggregate_type, self.occured_on,
                 payload)
 
+    @property
+    def name(self):
+        return self.__class__.__name__
+
     def __str__(self):
         '''
         Represent event as string which can be jsonifyed in a dict with keys

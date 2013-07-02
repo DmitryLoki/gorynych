@@ -12,7 +12,7 @@ from twisted.web import resource, server
 from twisted.internet import defer
 from twisted.python import log
 
-from gorynych.common.exceptions import NoAggregate
+from gorynych.common.exceptions import NoAggregate, DomainError
 
 class BadParametersError(Exception):
     '''
@@ -141,7 +141,7 @@ class APIResource(resource.Resource):
         # get parameters from request
         try:
             request_params = self.parameters_from_request(request)
-            log.msg("request params: ", request_params)
+            # log.msg("request params: ", request_params)
         except Exception as error:
             self._handle_error(request, 400, "Bad input parameters or URI",
                 repr(error))
@@ -173,6 +173,10 @@ class APIResource(resource.Resource):
         except NoAggregate as error:
             self._handle_error(request, 404, "No such resource",
                 "Aggregate wasn't found in repository %s. " % error.message)
+            defer.returnValue('')
+        except DomainError as error:
+            self._handle_error(request, 409, "Domain Error occured",
+                                repr(error))
             defer.returnValue('')
         except Exception as error:
             self._handle_error(request, 500, "Error while executing service "
@@ -273,7 +277,7 @@ class APIResource(resource.Resource):
         # {'contest_id': some_id}.
         maps = {'contest': 'contest_id', 'person': 'person_id',
                 'race': 'race_id', 'paraglider': 'person_id',
-            'group':'group_id'}
+            'group':'group_id', 'tracker': 'tracker_id'}
 
         result = dict()
         if req.method == "PUT":

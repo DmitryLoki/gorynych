@@ -5,13 +5,46 @@ import simplejson as json
 
 from twisted.internet import defer
 
-from gorynych.info.domain import contest, person, race
+from gorynych.info.domain import contest, person, race, tracker
 from gorynych.common.infrastructure import persistence
 from gorynych.common.domain.types import checkpoint_from_geojson
 from gorynych.common.domain.events import ContestRaceCreated
 from gorynych.common.application import EventPollingService, DBPoolService
+from gorynych.info.domain import interfaces
 
-class ApplicationService(DBPoolService):
+
+class BaseApplicationService(DBPoolService):
+    def _get_aggregate(self, id, repository):
+        d = defer.succeed(id)
+        d.addCallback(persistence.get_repository(repository).get_by_id)
+        return d
+
+    def _change_aggregate(self, params, repo_interface, change_func):
+        id = params.get('id')
+        if not id:
+            raise ValueError("Aggregate's id hasn't been received.")
+        del params['id']
+
+        d = self._get_aggregate(id, repo_interface)
+        d.addCallback(change_func, params)
+        d.addCallback(persistence.get_repository(repo_interface).save)
+        return d
+
+    def _get_aggregates_list(self, limit_offset_params, repo_interface):
+        if limit_offset_params:
+            limit = limit_offset_params.get('limit', None)
+            offset = limit_offset_params.get('offset', 0)
+        else:
+            limit = None
+            offset = 0
+
+        d = defer.succeed(limit)
+        d.addCallback(persistence.get_repository(repo_interface).get_list,
+            offset)
+        return d
+
+
+class ApplicationService(BaseApplicationService):
 
     ############## Contest Service part #############
     def create_new_contest(self, params):
@@ -175,6 +208,8 @@ class ApplicationService(DBPoolService):
         return self._get_aggregates_list(params, person.IPersonRepository)
 
     def change_person(self, params):
+        # TODO: create changing services instead of functions in application
+        #  layer.
         def change(pers, params):
             new_name = dict()
             if params.get('name'):
@@ -207,7 +242,8 @@ class ApplicationService(DBPoolService):
             pers = yield self._get_aggregate(key, person.IPersonRepository)
             plist.append(contest.Paraglider(key, pers.name, pers.country,
                          paragliders[key]['glider'],
-                         paragliders[key]['contest_number'], pers.tracker))
+                         paragliders[key]['contest_number'],
+                         pers.trackers.get(params['contest_id'])))
 
         factory = race.RaceFactory()
         r = factory.create_race(params['title'], params['race_type'],
@@ -304,33 +340,27 @@ class ApplicationService(DBPoolService):
         d.addCallback(filtr)
         return d
 
-    ############## common methods ###################
-    def _get_aggregate(self, id, repository):
-        d = defer.succeed(id)
-        d.addCallback(persistence.get_repository(repository).get_by_id)
+    ############## Tracker aggregate part ###################
+    def create_new_tracker(self, params):
+        from gorynych.info.domain.tracker import TrackerFactory
+        factory = TrackerFactory()
+        trcker = factory.create_tracker(device_id=params['device_id'],
+            device_type=params['device_type'], name=params.get('name'))
+        d = defer.succeed(trcker)
+        d.addCallback(persistence.get_repository(
+            interfaces.ITrackerRepository).save)
         return d
 
-    def _change_aggregate(self, params, repo_interface, change_func):
-        id = params.get('id')
-        if not id:
-            raise ValueError("Aggregate's id hasn't been received.")
-        del params['id']
+    def get_trackers(self, params=None):
+        return self._get_aggregates_list(params, interfaces.ITrackerRepository)
 
-        d = self._get_aggregate(id, repo_interface)
-        d.addCallback(change_func, params)
-        d.addCallback(persistence.get_repository(repo_interface).save)
-        return d
+    def get_tracker(self, params):
+        return self._get_aggregate(params['tracker_id'],
+            interfaces.ITrackerRepository)
 
-    def _get_aggregates_list(self, limit_offset_params, repo_interface):
-        if limit_offset_params:
-            limit = limit_offset_params.get('limit', None)
-            offset = limit_offset_params.get('offset', 0)
-        else:
-            limit = None
-            offset = 0
-
-        d = defer.succeed(limit)
-        d.addCallback(persistence.get_repository(repo_interface).get_list,
-                      offset)
-        return d
-
+    def change_tracker(self, params):
+        if params.has_key('tracker_id'):
+           params['id'] = params['tracker_id']
+           del params['tracker_id']
+        return self._change_aggregate(params, interfaces.ITrackerRepository,
+            tracker.change_tracker)

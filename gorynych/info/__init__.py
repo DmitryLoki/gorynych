@@ -29,10 +29,11 @@ def makeService(config, services=None):
     from gorynych.info.domain.contest import IContestRepository
     from gorynych.info.domain.race import IRaceRepository
     from gorynych.info.domain.person import IPersonRepository
+    from gorynych.info.domain import interfaces
     from gorynych.common.infrastructure import persistence
     from gorynych.eventstore.eventstore import EventStore
     from gorynych.eventstore.store import PGSQLAppendOnlyStore
-    from gorynych.info.infrastructure.persistence import PGSQLContestRepository, PGSQLPersonRepository, PGSQLRaceRepository
+    from gorynych.info.infrastructure.persistence import PGSQLContestRepository, PGSQLPersonRepository, PGSQLRaceRepository, PGSQLTrackerRepository
 
     if not services:
         services = service.MultiService()
@@ -58,6 +59,8 @@ def makeService(config, services=None):
                                     PGSQLRaceRepository(pool))
     persistence.register_repository(IPersonRepository,
                                     PGSQLPersonRepository(pool))
+    persistence.register_repository(interfaces.ITrackerRepository,
+        PGSQLTrackerRepository(pool))
 
     # REST API init
     api_tree = base_resource.resource_tree()

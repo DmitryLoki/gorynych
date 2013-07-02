@@ -1,1 +1,1 @@
-{"id": "$person_id", "name": "$person_name", "country": "$person_country"}
+{"id": "$person_id", "name": "$person_name", "country": "$person_country","trackers":$trackers}

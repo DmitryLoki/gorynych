@@ -183,7 +183,7 @@ class RetreiveJSON(Resource):
 class MyElement(Element):
     a = os.path.join(os.path.dirname(__file__),'online_tester_template.xml')
 
-    loader = XMLFile(open(a))
+    #loader = XMLFile(open(a))
 
     def __init__(self, service):
         self.service = service

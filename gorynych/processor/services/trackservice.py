@@ -262,7 +262,6 @@ class OnlineTrashService(RabbitMQService):
         d.addCallback(self._get_track, data['imei'])
         d.addCallback(lambda tr: tr.process_data(data))
         # Now it's Track's work to process data.
-        d.addCallback(self.persist)
         return d
 
     def _get_track(self, rid, device_id):
@@ -303,8 +302,10 @@ class OnlineTrashService(RabbitMQService):
         log.msg("Restore or create track for race %s and device %s" %
                 (rid, device_id))
         if row:
+            log.msg("Restore track", row[1])
             result = yield self.repo.get_by_id(row[1])
         else:
+            log.msg("Create new track")
             race_task = API.get_race_task(str(rid))
             if not isinstance(race_task, dict):
                 log.msg("Race task wasn't received from API: %r" % race_task)
@@ -317,11 +318,13 @@ class OnlineTrashService(RabbitMQService):
             rgt = events.RaceGotTrack(rid, aggregate_type='race')
             rgt.payload = dict(contest_number=contest_number,
                 track_type=track_type, track_id=str(track_id))
-            yield pe.event_store().persist([tc, rgt])
+            result.changes.append(rgt)
+            yield pe.event_store().persist([tc])
         tracks[device_id] = result
         defer.returnValue(result)
 
     def persist(self):
+        log.msg("Start persist")
         dlist = []
         sem = defer.DeferredSemaphore(15)
         for rid in self.tracks:

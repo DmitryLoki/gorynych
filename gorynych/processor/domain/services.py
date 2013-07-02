@@ -445,6 +445,7 @@ class ParagliderSkyEarth(object):
 
 
 class OnlineTrashAdapter(object):
+    type = 'online'
     store_second = 60
     def __init__(self, dtype):
         self.dtype = dtype

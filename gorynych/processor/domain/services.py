@@ -14,7 +14,6 @@ from gorynych.common.exceptions import NoGPSData
 
 def choose_offline_parser(trackname):
     if trackname.endswith('.igc'): return IGCTrackParser
-    else: return KMLTrackParser
 
 
 class IGCTrackParser(object):

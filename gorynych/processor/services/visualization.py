@@ -211,6 +211,8 @@ def parse_result(data):
         result = float(num)
         if math.isnan(result):
             result = 0
+        if math.isinf(result):
+            result = 1
         return result
 
     formats = dict(lat=_float, lon=_float, alt=int, gspd=_float, vspd=_float,

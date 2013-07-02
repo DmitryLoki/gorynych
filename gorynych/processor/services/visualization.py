@@ -2,6 +2,7 @@
 This application service return tracks data to visualisation.
 '''
 import time
+import math
 
 from twisted.internet import defer
 from twisted.python import log
@@ -206,8 +207,13 @@ def parse_result(data):
     res = dict()
     res['lat'], res['lon'], res['alt'], res['vspd'], res['gspd'], \
     res['dist'] = data
+    def _float(num):
+        result = float(num)
+        if math.isnan(result):
+            result = 0
+        return result
 
-    formats = dict(lat=float, lon=float, alt=int, gspd=float, vspd=float,
+    formats = dict(lat=_float, lon=_float, alt=int, gspd=_float, vspd=_float,
                    dist=int)
     for key in res:
         res[key] = formats[key](res[key])

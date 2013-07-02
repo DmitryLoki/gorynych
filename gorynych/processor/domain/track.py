@@ -185,7 +185,7 @@ class Track(AggregateRoot):
         self.apply(ev_list)
         self.points = np.hstack((self.points, points))
         # Look for state after processing and do all correctness.
-        evlist = self.type.correct(self._state, self.id)
+        evlist = self.type.correct(self)
         self.apply(evlist)
 
     @property

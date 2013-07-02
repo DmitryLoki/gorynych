@@ -125,10 +125,10 @@ class FileParserAdapter(object):
             track['timestamp'])
         return track, []
 
-    def correct(self, trackstate, _id):
-        if not trackstate.finish_time:
-            return [TrackEnded(_id, dict(state='landed'),
-                occured_on=trackstate._buffer[ -1]['timestamp'])]
+    def correct(self, obj):
+        if not obj._state.finish_time:
+            return [TrackEnded(obj.id, dict(state='landed'),
+                occured_on=obj.points[ -1]['timestamp'])]
         return []
 
 

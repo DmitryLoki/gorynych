@@ -490,3 +490,6 @@ class OnlineTrashAdapter(object):
         trackstate._buffer = np.delete(trackstate._buffer, idxs)
         return result, []
 
+    def correct(self, a, b):
+        return []
+

@@ -314,10 +314,6 @@ class OnlineTrashService(RabbitMQService):
             tc = events.TrackCreated(track_id)
             tc.payload = dict(race_task=race_task, track_type=track_type)
             result = track.Track(track_id, [tc])
-            # Получить зарегистрированный contest_number для трекера.
-            cn = yield self.pool.runQuery(pe.select('cn_by_rid', 'race'),
-                (device_id,))
-            contest_number = cn[0][0]
             rgt = events.RaceGotTrack(rid, aggregate_type='race')
             rgt.payload = dict(contest_number=contest_number,
                 track_type=track_type, track_id=str(track_id))

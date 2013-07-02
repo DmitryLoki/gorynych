@@ -100,11 +100,3 @@ WHERE
   %s BETWEEN r.start_time AND r.end_time + 7*3600;
 
 
--- Select cn_by_rid
-SELECT p.contest_number
-FROM
-  paraglider p,
-  race r
-WHERE
-  p.id = r.id AND
-  p.tracker_id=%s;

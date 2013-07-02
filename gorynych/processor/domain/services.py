@@ -394,20 +394,14 @@ def runs_of_ones_array(bits):
 
 
 class ParagliderSkyEarth(object):
-    # Threshold value for 'not started'-'flying' change in km/h.
-    sf_speed = 20
     # Threshold value for 'flying'-'not started' or 'not started-flying'
     # change in km/h.
     t_speed = 10
-    # Time interval in which is allowed for pilot to be slow, seconds.
-    slow_interval = 60
-    alt_interval = 5
 
     def __init__(self, tt):
         self.track_type = tt
 
     def state_work(self, data, trackstate):
-        ''' Calculate pilot's state.'''
         if self.track_type == 'online':
             return self.online_state_work(data, trackstate)
 

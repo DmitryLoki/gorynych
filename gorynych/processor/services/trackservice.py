@@ -307,7 +307,7 @@ class OnlineTrashService(RabbitMQService):
                 (rid, device_id))
         if row:
             log.msg("Restore track", row[1])
-            result = yield self.repo.get_by_id(row[1])
+            result = yield self.repo.get_by_id(row[1][1])
         else:
             log.msg("Create new track")
             race_task = API.get_race_task(str(rid))

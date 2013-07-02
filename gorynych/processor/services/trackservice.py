@@ -329,7 +329,7 @@ class OnlineTrashService(RabbitMQService):
         defer.returnValue(result)
 
     def persist(self):
-        log.msg("Start persist")
+        #log.msg("Start persist")
         dlist = []
         sem = defer.DeferredSemaphore(15)
         for rid in self.tracks:

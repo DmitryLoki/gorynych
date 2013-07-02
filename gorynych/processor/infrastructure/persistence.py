@@ -98,11 +98,17 @@ class TrackRepository(object):
             points = obj.points
             points['id'] = np.ones(len(points)) * dbid
             data = np_as_text(points)
-            cur.copy_expert("COPY track_data FROM STDIN ", data)
+            try:
+                cur.copy_expert("COPY track_data FROM STDIN ", data)
+            except:
+                pass
         snaps = find_snapshots(obj)
         for snap in snaps:
-            cur.execute(INSERT_SNAPSHOT, (snap['timestamp'], dbid,
-            snap['snapshot']))
+            try:
+                cur.execute(INSERT_SNAPSHOT, (snap['timestamp'], dbid,
+                snap['snapshot']))
+            except:
+                pass
         obj._id = dbid
         return obj
 
@@ -112,7 +118,10 @@ class TrackRepository(object):
         points = obj.points
         points['id'] = np.ones(len(points)) * obj._id
         data = np_as_text(points)
-        cur.copy_expert("COPY track_data FROM STDIN ", data)
+        try:
+            cur.copy_expert("COPY track_data FROM STDIN ", data)
+        except:
+            pass
 
         snaps = find_snapshots(obj)
         for snap in snaps:

@@ -16,6 +16,7 @@ from gorynych.info.domain.ids import namespace_uuid_validator
 from gorynych.common.domain import events
 from gorynych.common.domain.types import checkpoint_collection_from_geojson
 from gorynych.processor.domain import services
+from twisted.python import log
 
 
 DTYPE = [('id', 'i4'), ('timestamp', 'i4'), ('lat', 'f4'),
@@ -170,7 +171,6 @@ class Track(AggregateRoot):
     def process_data(self, data):
         # Here TrackType read data and return it in good common format.
         data = self.type.read(data)
-        # Проверить летит или не летит.
         evs = services.ParagliderSkyEarth(self._state.track_type)\
             .state_work(data, self._state)
         self.apply(evs)
@@ -178,16 +178,18 @@ class Track(AggregateRoot):
         points, evs = self.type.process(data,
             self.task.start_time, self.task.end_time, self._state)
         self.apply(evs)
-        if not points:
+        log.msg('processed in type')
+        if points is None:
             return
         # Task process points and emit new events if occur.
         points, ev_list = self.task.process(points, self._state, self.id)
         self.apply(ev_list)
+        log.msg('processed in task')
         self.points = np.hstack((self.points, points))
         # Look for state after processing and do all correctness.
         evlist = self.type.correct(self._state, self.id)
         self.apply(evlist)
-        return self
+        log.msg('return track')
 
     @property
     def state(self):

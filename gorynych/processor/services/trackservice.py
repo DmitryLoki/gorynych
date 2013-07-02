@@ -18,6 +18,10 @@ from gorynych.receiver.receiver import RabbitMQService
 
 API = APIAccessor()
 
+class A:
+    def process_data(self, data):
+        pass
+
 ADD_TRACK_TO_GROUP = """
     INSERT INTO TRACKS_GROUP VALUES (%s,
         (SELECT ID FROM TRACK WHERE TRACK_ID=%s), %s);
@@ -234,7 +238,7 @@ class OnlineTrashService(RabbitMQService):
         d = defer.Deferred()
         d.addCallback(self.open)
         d.addCallback(lambda x: task.LoopingCall(self.read, x))
-        d.addCallback(lambda lc: lc.start(0.01))
+        d.addCallback(lambda lc: lc.start(0.00))
         d.callback('rdp')
         return d
 
@@ -262,16 +266,16 @@ class OnlineTrashService(RabbitMQService):
         d.addCallback(self._get_track, data['imei'])
         d.addCallback(lambda tr: tr.process_data(data))
         # Now it's Track's work to process data.
-        return d
+        #return d
 
     def _get_track(self, rid, device_id):
         if not rid:
             # Null-object.
             log.msg("No paraglider for device", device_id)
-            return mock.MagicMock()
+            return A()
         rid, cnumber = rid[0]
         if not cnumber:
-            return mock.MagicMock()
+            return A()
         if self.tracks.has_key(rid) and self.tracks[rid].has_key(device_id):
             # Race and track are in memory. Return Track for work.
             return self.tracks[rid][device_id]
@@ -319,8 +323,10 @@ class OnlineTrashService(RabbitMQService):
             rgt.payload = dict(contest_number=contest_number,
                 track_type=track_type, track_id=str(track_id))
             result.changes.append(rgt)
+            log.msg("Track created, emit events")
             yield pe.event_store().persist([tc])
         tracks[device_id] = result
+        log.msg("Restored track for device", device_id)
         defer.returnValue(result)
 
     def persist(self):

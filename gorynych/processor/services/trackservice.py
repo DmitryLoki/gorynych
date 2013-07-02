@@ -257,7 +257,7 @@ class OnlineTrashService(RabbitMQService):
         @rtype:
         '''
         now = int(time.time())
-        d = self.pool.runQuery(pe.select('current_race_by_tacker', 'race'),
+        d = self.pool.runQuery(pe.select('current_race_by_tracker', 'race'),
             (data['imei'], now))
         d.addCallback(self._get_track, data['imei'])
         d.addCallback(lambda tr: tr.process_data(data))
@@ -271,21 +271,23 @@ class OnlineTrashService(RabbitMQService):
             log.msg("No paraglider for device", device_id)
             return mock.MagicMock()
         rid, cnumber = rid[0]
+        if not cnumber:
+            return mock.MagicMock()
         if self.tracks.has_key(rid) and self.tracks[rid].has_key(device_id):
             # Race and track are in memory. Return Track for work.
             return self.tracks[rid][device_id]
         else:
-            d = self.pool.runQuery(pe.select('tracks_n_label', 'track'),
+            d = self.pool.runQuery(pe.select('track_n_label', 'track'),
                 (rid, cnumber))
             # Результат запроса — существующий в гонке contest number для
             # существующего трека. Трек может быть, может не быть,
             # его надо создать или
             # вернуть.
-            d.addCallback(self._restore_or_create_track, rid, device_id)
+            d.addCallback(self._restore_or_create_track, rid, device_id, cnumber)
             return d
 
     @defer.inlineCallbacks
-    def _restore_or_create_track(self, row, rid, device_id):
+    def _restore_or_create_track(self, row, rid, device_id, contest_number):
         '''
         Отдаёт уже существующий трек, иначе создаёт его, сохраняет события о
          его создании и добавлении в гонку, и отдаёт.

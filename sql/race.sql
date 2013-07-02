@@ -96,7 +96,7 @@ FROM
   paraglider p
 WHERE
   r.id = p.id AND
-  p.tracker_id = %s AND
+  p.tracker_id = (select tracker_id from tracker where device_id=%s) AND
   %s BETWEEN r.start_time AND r.end_time + 7*3600;
 
 

@@ -85,7 +85,7 @@ class TrackRepository(object):
         else:
             d.addCallback(lambda _: self.pool.runInteraction(self._update,
                 obj))
-        d.addCallback(lambda obj: obj.reset())
+        d.addBoth(lambda obj: obj.reset())
         d.callback(obj)
         return d
 
@@ -98,17 +98,11 @@ class TrackRepository(object):
             points = obj.points
             points['id'] = np.ones(len(points)) * dbid
             data = np_as_text(points)
-            try:
-                cur.copy_expert("COPY track_data FROM STDIN ", data)
-            except:
-                pass
+            cur.copy_expert("COPY track_data FROM STDIN ", data)
         snaps = find_snapshots(obj)
         for snap in snaps:
-            try:
-                cur.execute(INSERT_SNAPSHOT, (snap['timestamp'], dbid,
+            cur.execute(INSERT_SNAPSHOT, (snap['timestamp'], dbid,
                 snap['snapshot']))
-            except:
-                pass
         obj._id = dbid
         return obj
 
@@ -118,16 +112,13 @@ class TrackRepository(object):
         points = obj.points
         points['id'] = np.ones(len(points)) * obj._id
         data = np_as_text(points)
-        try:
-            cur.copy_expert("COPY track_data FROM STDIN ", data)
-        except:
-            pass
+        cur.copy_expert("COPY track_data FROM STDIN ", data)
 
         snaps = find_snapshots(obj)
         for snap in snaps:
             try:
                 cur.execute(INSERT_SNAPSHOT, (snap['timestamp'], obj._id,
-                snap['snapshot']))
+                    snap['snapshot']))
             except:
                 pass
 

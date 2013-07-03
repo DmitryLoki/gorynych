@@ -82,10 +82,6 @@ class TrackState(ValueObject):
     def mutate(self, ev):
         '''
         Mutate state according to event. Analog of apply method in AggregateRoot.
-        @param ev:
-        @type ev:
-        @return:
-        @rtype:
         '''
         evname = ev.__class__.__name__
         if hasattr(self, 'apply_' + evname):

@@ -488,7 +488,7 @@ class OnlineTrashAdapter(object):
         idxs = np.where(buf['timestamp'] < now - self.store_second)
         result = buf[idxs]
         trackstate._buffer = np.delete(trackstate._buffer, idxs)
-        return result, []
+        return np.sort(result, order='timestamp'), []
 
     def correct(self, a, b):
         return []

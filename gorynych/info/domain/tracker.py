@@ -29,7 +29,7 @@ class Tracker(AggregateRoot):
         if assignee_id in self.assignee.values():
             raise DomainError("Tracker already has owner %s for "
                                "contest %s" %
-                               (self.assignee[assignee_id], contest_id))
+                               (self.assignee[contest_id], contest_id))
         self.assignee[contest_id] = assignee_id
         return pe.event_store().persist(TrackerAssigned(
             aggregate_id=assignee_id,

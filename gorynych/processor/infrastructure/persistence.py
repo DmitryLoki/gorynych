@@ -1,5 +1,6 @@
 # coding=utf-8
 from twisted.internet import defer
+from twisted.python import log
 
 __author__ = 'Boris Tsema'
 import cPickle
@@ -71,6 +72,7 @@ class TrackRepository(object):
         defer.returnValue(result)
 
     def save(self, obj):
+        log.msg("%s points will be saved for track %s" % (len(obj.points), obj.id))
         d = defer.Deferred()
         if obj.changes:
             d.addCallback(lambda _: pe.event_store().persist(obj.changes))

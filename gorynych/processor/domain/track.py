@@ -64,7 +64,7 @@ class TrackState(ValueObject):
         self.become_slow = None
         self.track_type = None
         self.race_task = None
-        self.last_checkpoint = 0
+        self.last_checkpoint = 1
         self.state = 'not started'
         self.statechanged_at = None
         self.started = False

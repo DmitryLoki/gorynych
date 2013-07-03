@@ -73,6 +73,9 @@ class TrackRepository(object):
 
     def save(self, obj):
         log.msg("%s points will be saved for track %s" % (len(obj.points), obj.id))
+        def handle_Failure(failure):
+            log.err(failure)
+            return obj.reset()
         d = defer.Deferred()
         if obj.changes:
             d.addCallback(lambda _: pe.event_store().persist(obj.changes))
@@ -87,7 +90,8 @@ class TrackRepository(object):
         else:
             d.addCallback(lambda _: self.pool.runInteraction(self._update,
                 obj))
-        d.addBoth(lambda obj: obj.reset())
+        d.addCallback(lambda obj: obj.reset())
+        d.addErrback(handle_Failure)
         d.callback(obj)
         return d
 

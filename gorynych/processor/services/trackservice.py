@@ -321,3 +321,4 @@ class OnlineTrashService(RabbitMQService):
         for rid in self.tracks.keys():
             for key in self.tracks[rid].keys():
                 yield self.repo.save(self.tracks[rid][key])
+        return

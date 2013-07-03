@@ -112,10 +112,6 @@ class TrackService(EventPollingService):
         '''
         After this message TrackService start to listen events for this
          track.
-        @param ev:
-        @type ev:
-        @return:
-        @rtype:
         '''
         trackfile = ev.payload['trackfile']
         person_id = ev.payload['person_id']
@@ -192,18 +188,6 @@ class TrackService(EventPollingService):
         '''
         When track is ready to be shown send messages for Race and Person to
          append this track to them.
-        @param race_id:
-        @type race_id:
-        @param track_id:
-        @type track_id:
-        @param track_type:
-        @type track_type:
-        @param contest_number:
-        @type contest_number:
-        @param person_id:
-        @type person_id:
-        @return:
-        @rtype:
         '''
         rgt = events.RaceGotTrack(race_id, aggregate_type='race')
         rgt.payload = dict(contest_number=contest_number,

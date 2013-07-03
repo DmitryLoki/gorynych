@@ -20,7 +20,7 @@ class TrackArchiveUnpacked(DomainEvent):
     '''
     Fired in L{gorynych.processor.services.trackservise.ProcessorService}
     @param id: Race ID
-    @payload:
+    @param payload:
         ([{person_id, trackfile, contest_number}, ...], - list of dicts
         [extra trackfile,], - list of str
          [person_id without tracks,]) - list of str
@@ -64,7 +64,7 @@ class RaceCheckpointsChanged(DomainEvent):
     @todo: think about more explicit name for this event.
     Event fields:
     @param id: Race id
-    @param payload: list with new checkpoints. List of L{Checkpoints}.
+    @param payload: list with new checkpoints. List of Checkpoint.
     '''
     from gorynych.common.domain.types import checkpoint_from_geojson
     serializer = serializers.GeoObjectsListSerializer(checkpoint_from_geojson)

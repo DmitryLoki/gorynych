@@ -51,7 +51,7 @@ class EventStore(object):
         @param stored_event:
         @type stored_event: C{tuple}
         @return:
-        @rtype: instance of L{DomainEvent} subclass
+        @rtype: instance of DomainEvent subclass
         '''
         id, name, aggrid, aggrtype, payload, ts = stored_event
         event_class = getattr(events, name)
@@ -76,7 +76,7 @@ class EventStore(object):
         '''
 
         @param event:
-        @type event: L{DomainEvent} subclass instance.
+        @type event: DomainEvent subclass instance.
         @return:
         @rtype: C{dict}
         '''

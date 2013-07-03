@@ -70,25 +70,6 @@ class DummyChannel:
 class DummyRequest(object):
     """
     Represents a dummy or fake request.
-
-    @ivar _finishedDeferreds: C{None} or a C{list} of L{Deferreds} which will
-        be called back with C{None} when C{finish} is called or which will be
-        errbacked if C{processingFailed} is called.
-
-    @type headers: C{dict}
-    @ivar headers: A mapping of header name to header value for all request
-        headers.
-
-    @type outgoingHeaders: C{dict}
-    @ivar outgoingHeaders: A mapping of header name to header value for all
-        response headers.
-
-    @type responseCode: C{int}
-    @ivar responseCode: The response code which was passed to
-        C{setResponseCode}.
-
-    @type written: C{list} of C{bytes}
-    @ivar written: The bytes which have been written to the request.
     """
     uri = b'http://dummy/'
     method = b'GET'

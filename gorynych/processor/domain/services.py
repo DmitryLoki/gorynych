@@ -437,7 +437,8 @@ class ParagliderSkyEarth(object):
                 if data['g_speed'] > self.t_speed:
                     result.append(events.TrackSpeedExceeded(_id,
                         occured_on=data['timestamp']))
-                elif data['timestamp'] - bs > 60:
+                elif data['timestamp'] - bs > 60 and not trackstate.state ==\
+                        'landed':
                     # Landed
                     result.append(events.TrackLanded(_id,
                         occured_on=data['timestamp']))

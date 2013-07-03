@@ -489,9 +489,9 @@ class OnlineTrashAdapter(object):
         result = buf[idxs]
         trackstate._buffer = np.delete(trackstate._buffer, idxs)
         result = np.sort(result, order='timestamp')
-        result['v_speed'] = vspeed_calculator(result['alt'], result['times'])
+        result['v_speed'] = vspeed_calculator(result['alt'], result['timestamp'])
         return result, []
 
-    def correct(self, a, b):
+    def correct(self, b):
         return []
 

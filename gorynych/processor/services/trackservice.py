@@ -305,6 +305,6 @@ class OnlineTrashService(RabbitMQService):
     @defer.inlineCallbacks
     def persist(self):
         #log.msg("Start persist")
-        for rid in self.tracks:
-            for key in self.tracks[rid]:
+        for rid in self.tracks.keys():
+            for key in self.tracks[rid].keys():
                 yield self.repo.save(self.tracks[rid][key])

@@ -1,6 +1,8 @@
 import unittest
+import mock
 
 import numpy as np
+import time
 
 from gorynych.processor.domain import services
 
@@ -66,3 +68,27 @@ class TestParaglidingTrackCorrector(unittest.TestCase):
         co = services.ParaglidingTrackCorrector()
         res = co.correct_data(ar)
         self.assertEqual(res.shape[0], self.shape)
+
+
+class TestOnlineTrashAdapter(unittest.TestCase):
+    def setUp(self):
+        self.ta = services.OnlineTrashAdapter(1)
+        self.dtype = [('timestamp', 'i4'), ('lat', 'f4')]
+        self.ts = mock.Mock()
+        _buffer = np.ones(10, self.dtype)
+        self.ts._buffer = _buffer
+
+    def tearDown(self):
+        del self.ts
+        del self.ta
+
+    def test_delete(self):
+        now = int(time.time())
+        data = np.ones(1, self.dtype)
+        data['timestamp'] = now
+        self.ts._buffer['timestamp'] = np.ones(10) * now - np.arange(60, 70)
+        points, evs = self.ta.process(data, 1, 2, self.ts)
+        self.assertEqual(len(points), 9)
+        self.assertEqual(len(self.ts._buffer), 2)
+
+

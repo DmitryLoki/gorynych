@@ -463,7 +463,7 @@ class OnlineTrashAdapter(object):
         '''
         На выходе получили самые ранние пришедшие точки (те, которые раньше
         чем за store_second.
-        @param data:
+        @param data: 1-length array
         @type data: np.ndarray
         @param stime:
         @type stime:
@@ -482,7 +482,7 @@ class OnlineTrashAdapter(object):
         # Select points for return.
         buf = trackstate._buffer
         now = int(time.time())
-        s = np.min(trackstate._buffer['timestamp'])
+        s = np.min(buf['timestamp'])
         if now - s < self.store_second:
             return None, []
         idxs = np.where(buf['timestamp'] < now - self.store_second)

@@ -346,6 +346,7 @@ class TrackerResourceCollection(APIResource):
             result['name'] = t.name
             result['device_type'] = t.device_type
             result['id'] = t.id
+            result['last_point'] = json.dumps(t.last_point)
             return result
 
     def read_GET(self, tracker_list, p=None):
@@ -365,7 +366,8 @@ class TrackerResource(APIResource):
 
     def read_GET(self, t, p=None):
         if t:
-            return dict(tracker_id=t.id, device_id=t.device_id, name=t.name)
+            return dict(tracker_id=t.id, device_id=t.device_id, name=t.name,
+                last_point=json.dumps(t.last_point))
 
     def read_PUT(self, t, p=None):
         return self.read_GET(t)

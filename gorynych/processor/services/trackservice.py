@@ -217,6 +217,8 @@ class OnlineTrashService(RabbitMQService):
         self.tracks = defaultdict(dict)
         self.saver = task.LoopingCall(self.persist)
         self.saver.start(5, False)
+        # device_id:(race_id, contest_number, time)
+        self.devices = dict()
 
     def when_started(self):
         d = defer.Deferred()
@@ -236,10 +238,21 @@ class OnlineTrashService(RabbitMQService):
             return
         return self.handle_track_data(data)
 
+    @defer.inlineCallbacks
+    def _get_race_by_tracker(self, device_id, time):
+        result = self.devices.get(device_id)
+        if result and time - result[2] < 300:
+            defer.returnValue((result[0], result[1]))
+        row = yield self.pool.runQuery(pe.select('current_race_by_tracker',
+            'race'),(device_id, time))
+        if not row:
+            defer.returnValue(None)
+        self.devices[device_id] = (row[0][0], row[0][1], int(time.time()))
+        defer.returnValue(row[0])
+
     def handle_track_data(self, data):
         now = int(time.time())
-        d = self.pool.runQuery(pe.select('current_race_by_tracker', 'race'),
-            (data['imei'], now))
+        d = self._get_race_by_tracker(data['imei'], now)
         d.addCallback(self._get_track, data['imei'])
         d.addCallback(lambda tr: tr.process_data(data))
 
@@ -247,7 +260,7 @@ class OnlineTrashService(RabbitMQService):
         if not rid:
             # Null-object.
             return A()
-        rid, cnumber = rid[0]
+        rid, cnumber = rid
         if not cnumber:
             return A()
         if self.tracks.has_key(rid) and self.tracks[rid].has_key(device_id):

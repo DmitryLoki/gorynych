@@ -54,7 +54,7 @@ def makeService(config, services=None):
 
     # LastPoint application service init
     last_point = LastPointApplication(pool, host='localhost', port=5672,
-        exchange='receiver', queues_no_ack=True)
+        exchange='receiver', queues_no_ack=True, exchange_type='fanout')
     last_point.setServiceParent(services)
 
     # Test repositories init

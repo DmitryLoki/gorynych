@@ -34,9 +34,6 @@ INSERT_SNAPSHOT = """
 
 def find_snapshots(data):
     '''
-    Создаёт снапшоты — снимки состояний трека и одновременно его read-модель.
-    Здесь, как будто, что-то неправильно, следует исправить когда будет время.
-
     @param data:
     @type data: L{gorynych.processor.domain.track.Track}
     @return:

@@ -250,8 +250,7 @@ class RaceToGoal(object):
         if lastchp < len(self.checkpoints) - 1:
             nextchp = self.checkpoints[lastchp + 1]
         else:
-            # Последняя точка взята, но данные продолжают поступать. Для
-            # этого заменяем дистанцию во всех на последнюю посчитанную.
+            # Last point taken but we still have data.
             for p in points:
                 p['distance'] = 0
             return points, []

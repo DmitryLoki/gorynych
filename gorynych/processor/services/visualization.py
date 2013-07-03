@@ -123,8 +123,8 @@ class TrackVisualizationService(Service):
         start_positions = params.get('start_positions')
         tracks = yield self.pool.runQuery(SELECT_DATA, (race_id, from_time,
                                                   to_time))
-        snaps = yield self.pool.runQuery(SELECT_DATA_SNAPSHOTS, (race_id, from_time,
-                                                  to_time))
+        snaps = yield self.pool.runQuery(SELECT_DATA_SNAPSHOTS,
+                                    (race_id, from_time, to_time))
         t2 = time.time()
         result['timeline'] = self.prepare_result(tracks, snaps)
         t3 = time.time()
@@ -157,9 +157,8 @@ class TrackVisualizationService(Service):
         result = defaultdict(dict)
         # Add last coords and speeds to result.
         for row in hdata:
-            result[str(row[0])] = parse_result(row[1].split(','))
-            #result[str(row[0])]['ts'] = str(row[2])
-
+            cont_number, data, timestamp = row
+            result[cont_number] = parse_result(data.split(','))
 
         t2 = time.time()
         # Add last state to result.
@@ -172,7 +171,6 @@ class TrackVisualizationService(Service):
             if not result[pilot].has_key('state'):
                 result[pilot]['state'] = 'not started'
         log.msg("start data prepared in: %s" % (t3-t1))
-
         return result
 
     def prepare_result(self, tracks, snaps):
@@ -192,7 +190,8 @@ class TrackVisualizationService(Service):
                                     ] = parse_result(data.split(',')[1:])
 
         for row in snaps:
-            result[int(row[0])][row[2]]['state'] = row[1]
+            timestamp, snapshot, contest_number = row
+            result[timestamp][contest_number]['state'] = snapshot
 
         return result
 

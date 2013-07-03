@@ -210,8 +210,10 @@ def parse_result(data):
     def _float(num):
         result = float(num)
         if math.isnan(result):
+            log.msg("Nan found in vspeed.")
             result = 0
         if math.isinf(result):
+            log.msg("Infinity found in vspeed.")
             result = 1
         return result
 

@@ -66,7 +66,8 @@ class EventStore(object):
         if isinstance(event, list):
             to_store = list()
             for ev in event:
-                to_store.append(self._serialize(ev))
+                if ev:
+                    to_store.append(self._serialize(ev))
         else:
             to_store = [self._serialize(event)]
         return self.store.append(to_store)

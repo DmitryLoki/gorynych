@@ -369,9 +369,13 @@ class PGSQLTrackerRepository(BasePGSQLRepository):
     def _restore_aggregate(self, row):
         factory = TrackerFactory()
         did, dtype, tid, name, _id = row
+        last_point = yield self.pool.runQuery(pe.select('last_point',
+            'tracker'), (_id,))
+        if last_point:
+            last_point=last_point[0]
         assignee = yield self._get_assignee(_id)
         result = factory.create_tracker(device_id=did, device_type=dtype,
-            name=name, assignee=assignee)
+            name=name, assignee=assignee, last_point=last_point)
         result._id = _id
         defer.returnValue(result)
 

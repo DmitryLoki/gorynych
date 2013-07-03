@@ -173,12 +173,6 @@ class TrackVisualizationService(Service):
                 result[pilot]['state'] = 'not started'
         log.msg("start data prepared in: %s" % (t3-t1))
 
-        #final_result = defaultdict(dict)
-        #for key in result:
-            #ts = result[key]['ts']
-            #del result[key]['ts']
-            #final_result[ts][key] = result[key]
-
         return result
 
     def prepare_result(self, tracks, snaps):

@@ -10,7 +10,8 @@ from gorynych.receiver.online_tester import RetreiveJSON
 from twisted.web.server import Site
 
 audit_log = AuditFileLog('audit_log')
-sender = ReceiverRabbitService(host='localhost', port=5672, exchange='receiver')
+sender = ReceiverRabbitService(host='localhost', port=5672,
+    exchange='receiver', exchange_type='fanout')
 receiver_service = ReceiverService(sender, audit_log)
 
 application = service.Application("ReceiverServer")

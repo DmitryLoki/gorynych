@@ -99,7 +99,7 @@ GET_HEADERS_SNAPSHOTS = """
 
 class TrackVisualizationService(Service):
     # don't show pilots earlier then time - track_gap. In seconds
-    track_gap = 10800
+    track_gap = 15000
 
     def __init__(self, pool):
         self.pool = pool

@@ -40,7 +40,6 @@ class BasePGSQLRepository(object):
 
     @defer.inlineCallbacks
     def get_list(self, limit=20, offset=None):
-        idname = self.name + '_id'
         name = 'all_' + self.name
         rows = yield self.pool.runQuery(pe.select(name, self.name))
         a_ids = [row[0] for row in rows]
@@ -49,18 +48,6 @@ class BasePGSQLRepository(object):
         for key in result:
             if event_dict.get(key):
                 result[key].apply(event_dict[key])
-
-
-
-        # command = ' '.join(('select', idname, 'from', self.name))
-        # if limit:
-        #     command += ' limit ' + str(limit)
-        # if offset:
-        #     command += ' offset ' + str(offset)
-        # ids = yield self.pool.runQuery(command)
-        # for idx, pid in enumerate(ids):
-        #     item = yield self.get_by_id(pid[0])
-        #     result.append(item)
         defer.returnValue(result.values())
 
     @defer.inlineCallbacks

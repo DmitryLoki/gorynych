@@ -70,8 +70,6 @@ class TrackRepository(object):
         defer.returnValue(result)
 
     def save(self, obj):
-        # log.msg(
-        #     "%s points will be saved for track %s" % (len(obj.points), obj.id))
 
         def handle_Failure(failure):
             log.err(failure)

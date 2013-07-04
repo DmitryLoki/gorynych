@@ -2,8 +2,10 @@
 Realization of persistence logic.
 '''
 import simplejson as json
+import time
 
 from twisted.internet import defer
+from twisted.python import log
 from zope.interface import implements, implementer
 import psycopg2
 
@@ -39,16 +41,33 @@ class BasePGSQLRepository(object):
     @defer.inlineCallbacks
     def get_list(self, limit=20, offset=None):
         idname = self.name + '_id'
-        result = []
-        command = ' '.join(('select', idname, 'from', self.name))
-        if limit:
-            command += ' limit ' + str(limit)
-        if offset:
-            command += ' offset ' + str(offset)
-        ids = yield self.pool.runQuery(command)
-        for idx, pid in enumerate(ids):
-            item = yield self.get_by_id(pid[0])
-            result.append(item)
+        name = 'all_' + self.name
+        rows = yield self.pool.runQuery(pe.select(name, self.name))
+        a_ids = [row[0] for row in rows]
+        event_dict = yield pe.event_store().load_events_for_aggregates(a_ids)
+        result = yield self._restore_aggregates(rows)
+        for key in result:
+            if event_dict.get(key):
+                result[key].apply(event_dict[key])
+
+
+
+        # command = ' '.join(('select', idname, 'from', self.name))
+        # if limit:
+        #     command += ' limit ' + str(limit)
+        # if offset:
+        #     command += ' offset ' + str(offset)
+        # ids = yield self.pool.runQuery(command)
+        # for idx, pid in enumerate(ids):
+        #     item = yield self.get_by_id(pid[0])
+        #     result.append(item)
+        defer.returnValue(result.values())
+
+    @defer.inlineCallbacks
+    def _restore_aggregates(self, rows):
+        result = dict()
+        for row in rows:
+            result[row[0]] = yield self._restore_aggregate(row[1:])
         defer.returnValue(result)
 
     @defer.inlineCallbacks

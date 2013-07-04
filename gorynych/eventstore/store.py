@@ -1,4 +1,5 @@
 # coding=utf-8
+from collections import defaultdict
 from zope.interface import implementer
 from twisted.python import log
 
@@ -72,6 +73,13 @@ GET_UNDISPATCHED_EVENTS = """
         LIMIT 5
         FOR UPDATE;
     """
+
+GET_EVENTS_FOR_AGGREGATES = """
+    SELECT * FROM {events_table}
+    WHERE AGGREGATE_ID in %s
+
+    """
+
 
 EVENTS_TABLE = 'events'
 FUNC_NAME = 'add_to_dispatch'
@@ -166,4 +174,18 @@ class PGSQLAppendOnlyStore(object):
                             "WHERE event_id=%s" % (id,))
             return rows
         return self.pool.runInteraction(get_events)
+
+    def load_events_for_aggregates(self, ags):
+        assert isinstance(ags, list)
+        def process_list(rows):
+            result = defaultdict(list)
+            for row in rows:
+                _id, _n, _aid, _atype, _payload, _ts = row
+                result[_aid].append(row)
+            return result
+
+        d = self.pool.runQuery(GET_EVENTS_FOR_AGGREGATES.format(
+            events_table=EVENTS_TABLE), [tuple(ags)])
+        d.addCallback(process_list)
+        return d
 

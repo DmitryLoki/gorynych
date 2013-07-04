@@ -13,6 +13,13 @@ from gorynych.common.domain import events
 @implementer(IEventStore)
 class EventStore(object):
     def __init__(self, store):
+        '''
+
+        @param store:
+        @type store: gorynych.eventstore.store.PGSQLAppendOnlyStore
+        @return:
+        @rtype:
+        '''
         self.store = store
 
     def load_events(self, id):
@@ -33,8 +40,8 @@ class EventStore(object):
     def _construct_event_list(self, stored_events):
         '''
         Create EventStream instance from a list of stored events.
-        @param stored_events:
-        @type stored_events:
+        @param stored_events: list of tuples from db
+        @type stored_events: C{list}
         @return:
         @rtype:
         '''
@@ -87,4 +94,21 @@ class EventStore(object):
         result['aggregate_id'] = str(event.aggregate_id)
         result['event_name'] = str(event.__class__.__name__)
         return result
+
+    def load_events_for_aggregates(self, elist):
+        '''
+
+        @param elist: {aggr_id:row}
+        @type elist: C{dict}
+        @return: {aggr_id:event_list}
+        @rtype: dict
+        '''
+        def process(e_list):
+            result = dict()
+            for aggr_id in e_list:
+                result[aggr_id] = self._construct_event_list(e_list[aggr_id])
+            return result
+        d = self.store.load_events_for_aggregates(elist)
+        d.addCallback(process)
+        return d
 

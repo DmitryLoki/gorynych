@@ -151,24 +151,20 @@ class TrackVisualizationService(Service):
         'state':'finished', 'statechanged_at': 2134} - that's not true
         @rtype:
         '''
-        t1 = time.time()
         result = defaultdict(dict)
         # Add last coords and speeds to result.
         for row in hdata:
             cont_number, data, timestamp = row
             result[cont_number] = parse_result(data.split(','))
 
-        t2 = time.time()
         # Add last state to result.
         for row in hsnaps:
             result[str(row[0])]['state'] = str(row[1])
             result[str(row[0])]['statechanged_at'] = int(row[2])
 
-        t3 = time.time()
         for pilot in result:
             if not result[pilot].has_key('state'):
                 result[pilot]['state'] = 'not started'
-        log.msg("start data prepared in: %s" % (t3-t1))
         return result
 
     def prepare_result(self, tracks, snaps):

@@ -39,16 +39,18 @@ def find_snapshots(data):
     @rtype: C{list}
     '''
     result = []
-    if data._state.finish_time:
-        result.append(dict(timestamp=int(data._state.finish_time),
-            snapshot='finished'))
+    state = data._state
+    if state.started:
+        result.append(dict(timestamp=state.start_time, snapshot='started'))
+    elif state.ended:
+        result.append(dict(timestamp=state.end_time, snapshot=state.state))
+    elif state.finish_time:
+        result.append(dict(timestamp=state.finish_time, snapshot='finished'))
     elif data._state.end_time:
         result.append(dict(timestamp=int(data._state.end_time),
             snapshot='landed'))
-
-    if data._state.start_time:
-        result.append(dict(timestamp=int(data._state.start_time),
-            snapshot='started'))
+    elif state.start_time:
+        result.append(dict(timestamp=state.start_time, snapshot='started'))
     return result
 
 
@@ -68,10 +70,13 @@ class TrackRepository(object):
         defer.returnValue(result)
 
     def save(self, obj):
-        log.msg("%s points will be saved for track %s" % (len(obj.points), obj.id))
+        # log.msg(
+        #     "%s points will be saved for track %s" % (len(obj.points), obj.id))
+
         def handle_Failure(failure):
             log.err(failure)
             return obj.reset()
+
         d = defer.Deferred()
         if obj.changes:
             d.addCallback(lambda _: pe.event_store().persist(obj.changes))
@@ -98,8 +103,11 @@ class TrackRepository(object):
             cur.copy_expert("COPY track_data FROM STDIN ", data)
         snaps = find_snapshots(obj)
         for snap in snaps:
-            cur.execute(INSERT_SNAPSHOT, (snap['timestamp'], dbid,
-                snap['snapshot']))
+            try:
+                cur.execute(INSERT_SNAPSHOT, (snap['timestamp'], dbid,
+                    snap['snapshot']))
+            except:
+                pass
         obj._id = dbid
         return obj
 
@@ -115,7 +123,7 @@ class TrackRepository(object):
         for snap in snaps:
             try:
                 cur.execute(INSERT_SNAPSHOT, (snap['timestamp'], obj._id,
-                    snap['snapshot']))
+                snap['snapshot']))
             except:
                 pass
 

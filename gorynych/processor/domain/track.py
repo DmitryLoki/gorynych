@@ -57,7 +57,7 @@ class TrackState(ValueObject):
     Hold track state. Memento.
     '''
     states = ['not started', 'started', 'finished', 'landed']
-    def __init__(self, id, events):
+    def __init__(self, id, event_list):
         self.id = id
         # Time when track speed become more then threshold.
         self.become_fast = None
@@ -76,7 +76,8 @@ class TrackState(ValueObject):
         self.end_time = None
         self.ended = False
         self.finish_time = None
-        for ev in events:
+        self.last_distance = 0
+        for ev in event_list:
             self.mutate(ev)
 
     def mutate(self, ev):
@@ -109,6 +110,7 @@ class TrackState(ValueObject):
             self.statechanged_at = ev.occured_on
         self.ended = True
         self.end_time = ev.occured_on
+        self.last_distance = ev.payload.get('distance')
 
     def apply_TrackFinished(self, ev):
         if not self.state == 'finished':
@@ -131,6 +133,7 @@ class TrackState(ValueObject):
         self.in_air = False
         if not self.state == 'finished':
             self.state = 'landed'
+            self.last_distance = int(ev.payload)
             self.statechanged_at = ev.occured_on
 
     def get_state(self):
@@ -167,12 +170,11 @@ class Track(AggregateRoot):
     def process_data(self, data):
         # Here TrackType read data and return it in good common format.
         data = self.type.read(data)
-        evs = services.ParagliderSkyEarth(self._state.track_type)\
-            .state_work(data, self._state)
-        self.apply(evs)
         # Now TrackType correct points and calculate smth if needed.
         points, evs = self.type.process(data,
             self.task.start_time, self.task.end_time, self._state)
+        self.apply(evs)
+        evs = services.ParagliderSkyEarth(self._state).state_work(points)
         self.apply(evs)
         if points is None:
             return
@@ -256,7 +258,7 @@ class RaceToGoal(object):
             return points, []
         if taskstate.state == 'landed':
             for p in points:
-                p['distance'] = 0
+                p['distance'] = taskstate.last_distance
             return points, []
         ended = taskstate.ended
         for idx, p in np.ndenumerate(points):

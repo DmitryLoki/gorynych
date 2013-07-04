@@ -127,8 +127,9 @@ class FileParserAdapter(object):
 
     def correct(self, obj):
         if not obj._state.finish_time:
-            return [TrackEnded(obj.id, dict(state='landed'),
-                occured_on=obj.points[ -1]['timestamp'])]
+            return [TrackEnded(obj.id, dict(state='landed',
+                                            distance=obj.points[-1]),
+                occured_on=obj.points[-1]['timestamp'])]
         return []
 
 
@@ -398,51 +399,81 @@ class ParagliderSkyEarth(object):
     # change in km/h.
     t_speed = 10
 
-    def __init__(self, tt):
-        self.track_type = tt
+    def __init__(self, trackstate):
+        self._bs = trackstate.become_slow
+        self._bf = trackstate.become_fast
+        self._in_air = trackstate.in_air
+        self._state = trackstate.state
+        self._id = trackstate.id
+        self.trackstate = trackstate
 
-    def state_work(self, data, trackstate):
-        if self.track_type == 'online':
-            return self.online_state_work(data, trackstate)
+    def state_work(self, data):
+        '''
 
-    def online_state_work(self, data, trackstate):
+        @param data:
+        @type data: numpy.ndarray
+        @param trackstate:
+        @type trackstate: gorynych.processor.domain.track.TrackState
+        @return:
+        @rtype:
+        '''
         result = []
-        _id = trackstate.id
-        if not trackstate.in_air and not trackstate.state == 'landed':
+        for point in data:
+            result.append(self._state_work(point))
+        return [item for sublist in result for item in sublist]
+
+    def _state_work(self, data):
+        result = []
+
+        if not self._in_air and not self._state == 'landed':
             # Ещё не в воздухе
-            if trackstate.become_fast:
+            if self._bf:
                 # Пилот уже летит быстрее пороговой скорости.
-                bf = trackstate.become_fast
                 in_air_by_speed = data['g_speed'] > self.t_speed and (
-                    data['timestamp'] - bf > 60)
+                    data['timestamp'] - self._bf > 60)
                 if in_air_by_speed:
-                    result.append(events.TrackInAir(_id,
-                        occured_on=data['timestamp']))
+                    result.append(self._track_in_air(data))
                 elif data['g_speed'] < self.t_speed:
-                    result.append(events.TrackSlowedDown(_id,
-                        occured_on=data['timestamp']))
+                    result.append(self._slowed_down(data))
             else:
                 if data['g_speed'] > self.t_speed:
                     # Был медленный, стал быстрый.
-                    result.append(events.TrackSpeedExceeded(_id,
-                        occured_on=data['timestamp']))
+                    result.append(self._speed_exceed(data))
         else:
-            if trackstate.become_fast:
+            if self._bf:
                 if data['g_speed'] < self.t_speed:
-                    result.append(events.TrackSlowedDown(_id,
-                        occured_on=data['timestamp']))
+                    result.append(self._slowed_down(data))
             else:
                 # Пилот уже медленный, но ещё в воздухе.
-                bs = trackstate.become_slow
                 if data['g_speed'] > self.t_speed:
-                    result.append(events.TrackSpeedExceeded(_id,
-                        occured_on=data['timestamp']))
-                elif data['timestamp'] - bs > 60 and not trackstate.state ==\
-                        'landed':
+                    result.append(self._speed_exceed(data))
+
+                elif data['timestamp'] - self._bs > 60 and (
+                    not self._state =='landed'):
                     # Landed
-                    result.append(events.TrackLanded(_id,
-                        occured_on=data['timestamp']))
+                    result.append(self._track_landed(data))
         return result
+
+    def _speed_exceed(self, data):
+        self._bf = data['timestamp']
+        self._bs = None
+        return events.TrackSpeedExceeded(self._id, occured_on=data[
+            'timestamp'])
+
+    def _slowed_down(self, data):
+        self._bf = None
+        self._bs = data['timestamp']
+        return events.TrackSlowedDown(self._id, occured_on=data['timestamp'])
+
+    def _track_in_air(self, data):
+        self._in_air = True
+        return events.TrackInAir(self._id, occured_on=data['timestamp'])
+
+    def _track_landed(self, data):
+        self._state = 'landed'
+        self._in_air = False
+        return events.TrackLanded(self._id, payload=data['distance'],
+            occured_on=data['timestamp'])
 
 
 class OnlineTrashAdapter(object):

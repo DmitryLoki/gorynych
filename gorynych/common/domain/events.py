@@ -137,7 +137,7 @@ class TrackEnded(DomainEvent):
     '''
     Track ended. Pilot landed or finished or time is gone.
     @param aggregate_id: Track ID
-    @param payload: track state
+    @param payload: {state, distance}
     '''
     serializer = serializers.JSONSerializer()
 
@@ -174,9 +174,12 @@ class TrackSlowedDown(DomainEvent):
 
 
 class TrackLanded(DomainEvent):
-    serializer = serializers.NoneSerializer()
-
-
+    '''
+    System decided that track landed.
+    @param payload: distance when track has been landed (distance to goal or
+     passed distance - depends on race).
+    '''
+    serializer = serializers.IntSerializer()
 
 
 ########## Person events ##################################

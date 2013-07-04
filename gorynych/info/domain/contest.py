@@ -180,6 +180,11 @@ class Contest(AggregateRoot):
 
     @property
     def hq_coords(self):
+        '''
+
+        @return:(float, float)
+        @rtype: C{tuple}
+        '''
         return self.address.coordinates
 
     @hq_coords.setter

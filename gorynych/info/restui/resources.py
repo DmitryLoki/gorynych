@@ -48,12 +48,17 @@ class ContestResource(APIResource):
     name = 'contest'
 
     def read_GET(self, cont, request_params=None):
+        '''
+        @type cont: gorynych.info.domain.contest.Contest
+        '''
         if cont:
             return dict(contest_title=cont.title,
                         contest_id=cont.id,
                         contest_country_code=cont.country,
                         contest_start_date=cont.start_time,
-                        contest_end_date=cont.end_time)
+                        contest_end_date=cont.end_time,
+                        contest_coords=json.dumps(cont.hq_coords))
+
 
     def read_PUT(self, cont, request_params=None):
         if cont:

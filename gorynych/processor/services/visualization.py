@@ -115,31 +115,29 @@ class TrackVisualizationService(Service):
 
     @defer.inlineCallbacks
     def get_track_data(self, params):
-        t1 = time.time()
         result = dict()
         race_id = params['group_id']
         from_time = int(params['from_time'])
         to_time = int(params['to_time'])
         start_positions = params.get('start_positions')
+        t1 = time.time()
         tracks = yield self.pool.runQuery(SELECT_DATA, (race_id, from_time,
                                                   to_time))
         snaps = yield self.pool.runQuery(SELECT_DATA_SNAPSHOTS,
                                     (race_id, from_time, to_time))
         t2 = time.time()
         result['timeline'] = self.prepare_result(tracks, snaps)
-        t3 = time.time()
-        log.msg("result requested in %s:" % (t2-t1))
-        log.msg("result ready in: %s, preparation time is: %s" % (t3-t1, t3-t2))
+        log.msg("data requested in %0.3f" % (t2-t1))
         if start_positions:
             ts1 = time.time()
             hdata = yield self.pool.runQuery(GET_HEADERS_DATA, (race_id,
                                 from_time - self.track_gap, from_time))
             hsnaps = yield self.pool.runQuery(GET_HEADERS_SNAPSHOTS,
                                               (race_id, from_time))
-            start_data = self.prepare_start_data(hdata, hsnaps)
             ts2 = time.time()
+            start_data = self.prepare_start_data(hdata, hsnaps)
             result['start'] = start_data
-            log.msg("start positions ready in: %s" % (ts2-ts1))
+            log.msg("start positions requested in %0.3f" % (ts2-ts1))
         defer.returnValue(result)
 
     def prepare_start_data(self, hdata, hsnaps):

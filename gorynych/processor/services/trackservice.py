@@ -87,6 +87,8 @@ class ProcessorService(EventPollingService):
         except Exception as e:
             log.msg("Track %s hasn't been added to group %s because of %r" %
                     (track_id, race_id, e))
+        if ev.payload['track_type'] == 'online':
+            defer.returnValue('')
         res = yield defer.maybeDeferred(API.get_track_archive, str(race_id))
         if res:
             processed = len(res['progress']['parsed_tracks']) + len(

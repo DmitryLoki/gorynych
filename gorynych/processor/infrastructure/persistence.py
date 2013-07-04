@@ -10,7 +10,6 @@ import numpy as np
 from gorynych.common.infrastructure.persistence import np_as_text
 from gorynych.common.infrastructure import persistence as pe
 from gorynych.common.exceptions import NoAggregate
-from gorynych.common.domain import events
 from gorynych.processor.domain import track
 
 
@@ -76,11 +75,6 @@ class TrackRepository(object):
         d = defer.Deferred()
         if obj.changes:
             d.addCallback(lambda _: pe.event_store().persist(obj.changes))
-        if len(obj._state._buffer) > 0:
-            # Костыль
-            ev = events.PointsAddedToTrack(obj.id, obj._state._buffer)
-            ev.occured_on = obj._state._buffer['timestamp'][0]
-            d.addCallback(lambda _: pe.event_store().persist([ev]))
         if not obj._id:
             d.addCallback(lambda _: self.pool.runInteraction(self._save_new,
                 obj))

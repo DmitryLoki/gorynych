@@ -388,7 +388,6 @@ class LastPointApplication(RabbitMQService):
         if not data.has_key('ts'):
             # ts key MUST be in a data.
             return
-        log.msg(data)
         return self.pool.runOperation(persistence.update('last_point',
             'tracker'), (data['lat'], data['lon'], data['alt'], data['ts'],
         data['imei']))

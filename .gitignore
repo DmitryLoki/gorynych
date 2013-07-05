@@ -4,3 +4,7 @@
 .DS_Store
 devdocs/DDDgorynych.asta.bak
 _trial_temp/
+ts.*
+info.*
+viz.*
+log/*

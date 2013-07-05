@@ -8,11 +8,12 @@ import scipy as sc
 from scipy import signal, interpolate
 import numpy as np
 import numpy.ma as ma
+from zope.interface import implementer
 
 from gorynych.common.domain.services import point_dist_calculator
-from gorynych.common.domain.events import TrackEnded
 from gorynych.common.exceptions import NoGPSData
 from gorynych.common.domain import events
+from gorynych.processor import interfaces
 
 def choose_offline_parser(trackname):
     if trackname.endswith('.igc'): return IGCTrackParser
@@ -98,6 +99,7 @@ class KMLTrackParser(object):
     pass
 
 
+@implementer(interfaces.ITrackType)
 class FileParserAdapter(object):
     type = 'competition_aftertask'
     def __init__(self, dtype):
@@ -476,6 +478,7 @@ class ParagliderSkyEarth(object):
             occured_on=data['timestamp'])
 
 
+@implementer(interfaces.ITrackType)
 class OnlineTrashAdapter(object):
     type = 'online'
     store_second = 60

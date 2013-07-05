@@ -118,6 +118,11 @@ class ApplicationService(BaseApplicationService):
                 del params['start_time']
                 del params['end_time']
 
+            if params.get('coords'):
+                lat, lon = params['coords'].split(',')
+                cont.hq_coords = (lat, lon)
+                del params['coords']
+
             for param in params.keys():
                 setattr(cont, param, params[param])
             return cont

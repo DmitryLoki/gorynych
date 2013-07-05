@@ -116,11 +116,12 @@ class ContestRESTAPITest(unittest.TestCase):
         title = '  besT Contest changed' + str(random.randint(1, 1000)) + '  '
         params = json.dumps(dict(title=title,
             start_time=11, end_time=15, place='Paris', country='mc',
-            coords='42.3,11.3', timezone='Europe/Paris'))
+            coords='42.6,11.3', timezone='Europe/Paris'))
         r2 = requests.put('/'.join((URL, 'contest', cont_id)), data=params)
         result = r2.json()
         self.assertEqual(result['title'], title.strip())
         self.assertEqual(result['country'], 'MC')
+        self.assertEqual(result['coords'], [42.6, 11.3])
 
 
 class PersonAPITest(unittest.TestCase):

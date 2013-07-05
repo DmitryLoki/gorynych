@@ -66,7 +66,8 @@ class ContestResource(APIResource):
                         contest_id=cont.id,
                         contest_country_code=cont.country,
                         contest_start_date=cont.start_time,
-                        contest_end_date=cont.end_time)
+                        contest_end_date=cont.end_time,
+                        contest_coords=json.dumps(cont.hq_coords))
 
 
 class ContestRaceResourceCollection(APIResource):

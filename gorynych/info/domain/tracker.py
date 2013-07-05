@@ -26,16 +26,17 @@ class Tracker(AggregateRoot):
     def last_point(self):
         return [self._last_point.get('lat'), self._last_point.get('lon'),
                     self._last_point.get('alt'), self._last_point.get('ts'),
-            self._last_point.get('bat')]
+            self._last_point.get('bat'), self._last_point.get('speed')]
 
     @last_point.setter
     def last_point(self, value):
-        lat, lon, alt, ts, bat = value
+        lat, lon, alt, ts, bat, speed = value
         self._last_point['lat'] = lat
         self._last_point['lon'] = lon
         self._last_point['alt'] = alt
         self._last_point['ts'] = ts
         self._last_point['bat'] = bat
+        self._last_point['speed'] = speed
 
     def is_free(self):
         return len(self.assignee) == 0
@@ -95,7 +96,7 @@ class TrackerFactory(object):
         else:
             tracker.assignee = dict()
 
-        if isinstance(last_point, tuple) and len(last_point) == 5:
+        if isinstance(last_point, tuple) and len(last_point) == 6:
             tracker.last_point = last_point
         return tracker
 

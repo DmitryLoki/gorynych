@@ -3,6 +3,7 @@ Application Services for info context.
 '''
 import cPickle
 import simplejson as json
+import time
 
 from twisted.internet import defer, task
 from twisted.python import log
@@ -393,7 +394,8 @@ class LastPointApplication(RabbitMQService):
         if not data.has_key('ts'):
             # ts key MUST be in a data.
             return
+        now = int(time.time())
         return self.pool.runOperation(persistence.update('last_point',
-            'tracker'), (data['lat'], data['lon'], data['alt'], data['ts'],
+            'tracker'), (data['lat'], data['lon'], data['alt'], now,
         data['battery'], data['h_speed'], data['imei']))
 

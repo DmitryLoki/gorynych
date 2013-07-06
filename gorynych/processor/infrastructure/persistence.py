@@ -81,6 +81,7 @@ class TrackRepository(object):
         if not obj._id:
             d.addCallback(lambda _: self.pool.runInteraction(self._save_new,
                 obj))
+            d.addCallback(self._save_snapshots)
         else:
             d.addCallback(lambda _: self.pool.runInteraction(self._update,
                 obj))
@@ -93,21 +94,25 @@ class TrackRepository(object):
         cur.execute(NEW_TRACK, (obj._state.start_time, obj._state.end_time,
         obj.type.type, str(obj.id)))
         dbid = cur.fetchone()[0]
+        log.msg("New track inserted %s and its id %s" % (obj.id, dbid))
 
         if len(obj.points) > 0:
             points = obj.points
             points['id'] = np.ones(len(points)) * dbid
             data = np_as_text(points)
             cur.copy_expert("COPY track_data FROM STDIN ", data)
+        obj._id = dbid
+        return obj
+
+    @defer.inlineCallbacks
+    def _save_snapshots(self, obj):
         snaps = find_snapshots(obj)
         for snap in snaps:
             try:
-                cur.execute(INSERT_SNAPSHOT, (snap['timestamp'], dbid,
+                yield self.pool.runOperation(INSERT_SNAPSHOT, (snap['timestamp'], dbid,
                     snap['snapshot']))
             except:
                 pass
-        obj._id = dbid
-        return obj
 
     def _update(self, cur, obj):
         if len(obj.points) == 0:
@@ -115,7 +120,10 @@ class TrackRepository(object):
         points = obj.points
         points['id'] = np.ones(len(points)) * obj._id
         data = np_as_text(points)
-        cur.copy_expert("COPY track_data FROM STDIN ", data)
+        try:
+            cur.copy_expert("COPY track_data FROM STDIN ", data)
+        except:
+            pass
 
         snaps = find_snapshots(obj)
         for snap in snaps:

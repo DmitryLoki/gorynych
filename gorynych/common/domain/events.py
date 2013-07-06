@@ -20,7 +20,7 @@ class TrackArchiveUnpacked(DomainEvent):
     '''
     Fired in L{gorynych.processor.services.trackservise.ProcessorService}
     @param id: Race ID
-    @payload:
+    @param payload:
         ([{person_id, trackfile, contest_number}, ...], - list of dicts
         [extra trackfile,], - list of str
          [person_id without tracks,]) - list of str
@@ -64,7 +64,7 @@ class RaceCheckpointsChanged(DomainEvent):
     @todo: think about more explicit name for this event.
     Event fields:
     @param id: Race id
-    @param payload: list with new checkpoints. List of L{Checkpoints}.
+    @param payload: list with new checkpoints. List of Checkpoint.
     '''
     from gorynych.common.domain.types import checkpoint_from_geojson
     serializer = serializers.GeoObjectsListSerializer(checkpoint_from_geojson)
@@ -137,7 +137,7 @@ class TrackEnded(DomainEvent):
     '''
     Track ended. Pilot landed or finished or time is gone.
     @param aggregate_id: Track ID
-    @param payload: track state
+    @param payload: {state, distance}
     '''
     serializer = serializers.JSONSerializer()
 
@@ -174,9 +174,12 @@ class TrackSlowedDown(DomainEvent):
 
 
 class TrackLanded(DomainEvent):
-    serializer = serializers.NoneSerializer()
-
-
+    '''
+    System decided that track landed.
+    @param payload: distance when track has been landed (distance to goal or
+     passed distance - depends on race).
+    '''
+    serializer = serializers.IntSerializer()
 
 
 ########## Person events ##################################

@@ -1,9 +1,12 @@
 '''
 Application Services for info context.
 '''
+import cPickle
 import simplejson as json
+import time
 
-from twisted.internet import defer
+from twisted.internet import defer, task
+from twisted.python import log
 
 from gorynych.info.domain import contest, person, race, tracker
 from gorynych.common.infrastructure import persistence
@@ -11,6 +14,7 @@ from gorynych.common.domain.types import checkpoint_from_geojson
 from gorynych.common.domain.events import ContestRaceCreated
 from gorynych.common.application import EventPollingService, DBPoolService
 from gorynych.info.domain import interfaces
+from gorynych.receiver.receiver import RabbitMQService
 
 
 class BaseApplicationService(DBPoolService):
@@ -114,6 +118,11 @@ class ApplicationService(BaseApplicationService):
                 cont.change_times(params['start_time'], params['end_time'])
                 del params['start_time']
                 del params['end_time']
+
+            if params.get('coords'):
+                lat, lon = params['coords'].split(',')
+                cont.hq_coords = (lat, lon)
+                del params['coords']
 
             for param in params.keys():
                 setattr(cont, param, params[param])
@@ -364,3 +373,29 @@ class ApplicationService(BaseApplicationService):
            del params['tracker_id']
         return self._change_aggregate(params, interfaces.ITrackerRepository,
             tracker.change_tracker)
+
+
+class LastPointApplication(RabbitMQService):
+    def __init__(self, pool, **kw):
+        RabbitMQService.__init__(self, **kw)
+        self.pool = pool
+
+    def when_started(self):
+        d = defer.Deferred()
+        d.addCallback(self.open)
+        d.addCallback(lambda x: task.LoopingCall(self.read, x))
+        d.addCallback(lambda lc: lc.start(0.00))
+        d.callback('last_point')
+        return d
+
+    def handle_payload(self, queue_name, channel, method_frame, header_frame,
+            body):
+        data = cPickle.loads(body)
+        if not data.has_key('ts'):
+            # ts key MUST be in a data.
+            return
+        now = int(time.time())
+        return self.pool.runOperation(persistence.update('last_point',
+            'tracker'), (data['lat'], data['lon'], data['alt'], now,
+        data['battery'], data['h_speed'], data['imei']))
+

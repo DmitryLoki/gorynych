@@ -23,7 +23,7 @@ def makeService(config, services=None):
     @return:
     @rtype:
     '''
-    from gorynych.info.application import ApplicationService
+    from gorynych.info.application import ApplicationService, LastPointApplication
     from gorynych.info.restui import base_resource
     # import persistence staff
     from gorynych.info.domain.contest import IContestRepository
@@ -51,6 +51,11 @@ def makeService(config, services=None):
     # Application Service init
     app_service = ApplicationService(pool, event_store)
     app_service.setServiceParent(services)
+
+    # LastPoint application service init
+    last_point = LastPointApplication(pool, host='localhost', port=5672,
+        exchange='receiver', queues_no_ack=True, exchange_type='fanout')
+    last_point.setServiceParent(services)
 
     # Test repositories init
     persistence.register_repository(IContestRepository,

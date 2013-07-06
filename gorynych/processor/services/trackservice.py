@@ -18,6 +18,10 @@ from gorynych.receiver.receiver import RabbitMQService
 
 API = APIAccessor()
 
+class A:
+    def process_data(self, data):
+        pass
+
 ADD_TRACK_TO_GROUP = """
     INSERT INTO TRACKS_GROUP VALUES (%s,
         (SELECT ID FROM TRACK WHERE TRACK_ID=%s), %s);
@@ -83,6 +87,8 @@ class ProcessorService(EventPollingService):
         except Exception as e:
             log.msg("Track %s hasn't been added to group %s because of %r" %
                     (track_id, race_id, e))
+        if ev.payload['track_type'] == 'online':
+            defer.returnValue('')
         res = yield defer.maybeDeferred(API.get_track_archive, str(race_id))
         if res:
             processed = len(res['progress']['parsed_tracks']) + len(
@@ -108,10 +114,6 @@ class TrackService(EventPollingService):
         '''
         After this message TrackService start to listen events for this
          track.
-        @param ev:
-        @type ev:
-        @return:
-        @rtype:
         '''
         trackfile = ev.payload['trackfile']
         person_id = ev.payload['person_id']
@@ -188,18 +190,6 @@ class TrackService(EventPollingService):
         '''
         When track is ready to be shown send messages for Race and Person to
          append this track to them.
-        @param race_id:
-        @type race_id:
-        @param track_id:
-        @type track_id:
-        @param track_type:
-        @type track_type:
-        @param contest_number:
-        @type contest_number:
-        @param person_id:
-        @type person_id:
-        @return:
-        @rtype:
         '''
         rgt = events.RaceGotTrack(race_id, aggregate_type='race')
         rgt.payload = dict(contest_number=contest_number,
@@ -229,12 +219,14 @@ class OnlineTrashService(RabbitMQService):
         self.tracks = defaultdict(dict)
         self.saver = task.LoopingCall(self.persist)
         self.saver.start(5, False)
+        # device_id:(race_id, contest_number, time)
+        self.devices = dict()
 
     def when_started(self):
         d = defer.Deferred()
         d.addCallback(self.open)
         d.addCallback(lambda x: task.LoopingCall(self.read, x))
-        d.addCallback(lambda lc: lc.start(0.01))
+        d.addCallback(lambda lc: lc.start(0.00))
         d.callback('rdp')
         return d
 
@@ -248,44 +240,46 @@ class OnlineTrashService(RabbitMQService):
             return
         return self.handle_track_data(data)
 
-    def handle_track_data(self, data):
-        '''
+    @defer.inlineCallbacks
+    def _get_race_by_tracker(self, device_id, t):
+        result = self.devices.get(device_id)
+        if result and t - result[2] < 300:
+            defer.returnValue((result[0], result[1]))
+        row = yield self.pool.runQuery(pe.select('current_race_by_tracker',
+            'race'),(device_id, t))
+        if not row:
+            defer.returnValue(None)
+        self.devices[device_id] = (row[0][0], row[0][1], int(time.time()))
+        defer.returnValue(row[0])
 
-        @param data:
-        @type data:
-        @return:
-        @rtype:
-        '''
+    def handle_track_data(self, data):
         now = int(time.time())
-        d = self.pool.runQuery(pe.select('current_race_by_tacker', 'race'),
-            (data['imei'], now))
+        d = self._get_race_by_tracker(data['imei'], now)
         d.addCallback(self._get_track, data['imei'])
         d.addCallback(lambda tr: tr.process_data(data))
-        # Now it's Track's work to process data.
-        d.addCallback(self.persist)
-        return d
 
     def _get_track(self, rid, device_id):
         if not rid:
             # Null-object.
-            log.msg("No paraglider for device", device_id)
-            return mock.MagicMock()
-        rid, cnumber = rid[0]
+            return A()
+        rid, cnumber = rid
+        if not cnumber:
+            return A()
         if self.tracks.has_key(rid) and self.tracks[rid].has_key(device_id):
             # Race and track are in memory. Return Track for work.
             return self.tracks[rid][device_id]
         else:
-            d = self.pool.runQuery(pe.select('tracks_n_label', 'track'),
+            d = self.pool.runQuery(pe.select('track_n_label', 'track'),
                 (rid, cnumber))
             # Результат запроса — существующий в гонке contest number для
             # существующего трека. Трек может быть, может не быть,
             # его надо создать или
             # вернуть.
-            d.addCallback(self._restore_or_create_track, rid, device_id)
+            d.addCallback(self._restore_or_create_track, rid, device_id, cnumber)
             return d
 
     @defer.inlineCallbacks
-    def _restore_or_create_track(self, row, rid, device_id):
+    def _restore_or_create_track(self, row, rid, device_id, contest_number):
         '''
         Отдаёт уже существующий трек, иначе создаёт его, сохраняет события о
          его создании и добавлении в гонку, и отдаёт.
@@ -301,8 +295,10 @@ class OnlineTrashService(RabbitMQService):
         log.msg("Restore or create track for race %s and device %s" %
                 (rid, device_id))
         if row:
-            result = yield self.repo.get_by_id(row[1])
+            log.msg("Restore track", row[1])
+            result = yield self.repo.get_by_id(row[1][1])
         else:
+            log.msg("Create new track")
             race_task = API.get_race_task(str(rid))
             if not isinstance(race_task, dict):
                 log.msg("Race task wasn't received from API: %r" % race_task)
@@ -312,23 +308,19 @@ class OnlineTrashService(RabbitMQService):
             tc = events.TrackCreated(track_id)
             tc.payload = dict(race_task=race_task, track_type=track_type)
             result = track.Track(track_id, [tc])
-            # Получить зарегистрированный contest_number для трекера.
-            cn = yield self.pool.runQuery(pe.select('cn_by_rid', 'race'),
-                (device_id,))
-            contest_number = cn[0][0]
             rgt = events.RaceGotTrack(rid, aggregate_type='race')
             rgt.payload = dict(contest_number=contest_number,
                 track_type=track_type, track_id=str(track_id))
-            yield pe.event_store().persist([tc, rgt])
+            result.changes.append(rgt)
+            yield pe.event_store().persist([tc])
         tracks[device_id] = result
+        log.msg("Restored or created track for device", device_id)
         defer.returnValue(result)
 
+    @defer.inlineCallbacks
     def persist(self):
-        dlist = []
-        sem = defer.DeferredSemaphore(15)
-        for rid in self.tracks:
-            for key in self.tracks[rid]:
-                s = sem.run(self.repo.save, self.tracks[rid][key])
-                dlist.append(s)
-        d = defer.DeferredList(dlist)
-        return d
+        #log.msg("Start persist")
+        for rid in self.tracks.keys():
+            for key in self.tracks[rid].keys():
+                yield self.repo.save(self.tracks[rid][key])
+        return

@@ -71,6 +71,13 @@ UPDATE RACE SET (TITLE, START_TIME, END_TIME, TIMEZONE, RACE_TYPE,
       SELECT ID FROM RACE_TYPE WHERE TYPE=%s), %s, %s, %s, %s)
 WHERE RACE_ID=%s;
 
+
+-- Select all_race
+SELECT
+  RACE_ID, ID, RACE_ID, TITLE, START_TIME, END_TIME, TIMEZONE, (SELECT TYPE FROM RACE_TYPE WHERE ID=RACE.RACE_TYPE), CHECKPOINTS, AUX_FIELDS, START_LIMIT_TIME, END_LIMIT_TIME
+FROM RACE;
+
+
 -- Select paragliders
 SELECT * FROM PARAGLIDER WHERE ID=%s;
 
@@ -96,15 +103,7 @@ FROM
   paraglider p
 WHERE
   r.id = p.id AND
-  p.tracker_id = %s AND
+  p.tracker_id = (select tracker_id from tracker where device_id=%s) AND
   %s BETWEEN r.start_time AND r.end_time + 7*3600;
 
 
--- Select cn_by_rid
-SELECT p.contest_number
-FROM
-  paraglider p,
-  race r
-WHERE
-  p.id = r.id AND
-  p.tracker_id=%s;

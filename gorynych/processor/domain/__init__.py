@@ -86,7 +86,7 @@ class TrackArchive(ValueObject):
             f = open(os.path.join(unpack_dir, fne), 'wb')
             f.write(arc.open(fn).read())
             f.close()
-            namelist.append(fne)
+            namelist.append('/'.join((unpack_dir, fne)))
         print namelist
         return namelist
 

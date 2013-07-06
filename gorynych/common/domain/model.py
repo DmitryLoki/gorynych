@@ -169,8 +169,6 @@ class DomainEvent(object):
         '''
         Represent event as string which can be jsonifyed in a dict with keys
          equal to column names in EventStore PostgreSQL realization.
-        @return: a string which can be dumped by json.
-        @rtype: C{str}
         '''
         result = dict(event_name=self.__class__.__name__,
                       aggregate_id=self.aggregate_id,

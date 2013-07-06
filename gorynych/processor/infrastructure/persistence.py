@@ -1,5 +1,6 @@
 # coding=utf-8
 from twisted.internet import defer
+from twisted.python import log
 
 __author__ = 'Boris Tsema'
 import cPickle
@@ -9,14 +10,15 @@ import numpy as np
 from gorynych.common.infrastructure.persistence import np_as_text
 from gorynych.common.infrastructure import persistence as pe
 from gorynych.common.exceptions import NoAggregate
-from gorynych.common.domain import events
 from gorynych.processor.domain import track
+
 
 class PickledTrackRepository(object):
     def save(self, data):
         f = open('track_repo', 'wb')
         cPickle.dump(data, f, -1)
         f.close()
+
 
 NEW_TRACK = """
     INSERT INTO track (start_time, end_time, track_type, track_id)
@@ -28,27 +30,27 @@ INSERT_SNAPSHOT = """
     INSERT INTO track_snapshot (timestamp, id, snapshot) VALUES(%s, %s, %s)
     """
 
+
 def find_snapshots(data):
     '''
-    Создаёт снапшоты — снимки состояний трека и одновременно его read-модель.
-    Здесь, как будто, что-то неправильно, следует исправить когда будет время.
-
     @param data:
     @type data: L{gorynych.processor.domain.track.Track}
     @return:
     @rtype: C{list}
     '''
     result = []
-    if data._state.finish_time:
-        result.append(dict(timestamp=int(data._state.finish_time),
-            snapshot='finished'))
-    elif data._state.end_time:
+    state = data._state
+    if state.started:
+        result.append(dict(timestamp=state.start_time, snapshot='started'))
+    if state.ended:
+        result.append(dict(timestamp=state.end_time, snapshot=state.state))
+    if state.finish_time:
+        result.append(dict(timestamp=state.finish_time, snapshot='finished'))
+    if data._state.end_time:
         result.append(dict(timestamp=int(data._state.end_time),
             snapshot='landed'))
-
-    if data._state.start_time:
-        result.append(dict(timestamp=int(data._state.start_time),
-            snapshot='started'))
+    if state.start_time:
+        result.append(dict(timestamp=state.start_time, snapshot='started'))
     return result
 
 
@@ -68,40 +70,49 @@ class TrackRepository(object):
         defer.returnValue(result)
 
     def save(self, obj):
+
+        def handle_Failure(failure):
+            log.err(failure)
+            return obj.reset()
+
         d = defer.Deferred()
         if obj.changes:
             d.addCallback(lambda _: pe.event_store().persist(obj.changes))
-        if len(obj._state._buffer) > 0:
-            # Костыль
-            ev = events.PointsAddedToTrack(obj.id, obj._state._buffer)
-            ev.occured_on = obj._state._buffer['timestamp'][0]
-            d.addCallback(lambda _: pe.event_store().persist([ev]))
         if not obj._id:
-            d.addCallback(lambda _:self.pool.runInteraction(self._save_new,
+            d.addCallback(lambda _: self.pool.runInteraction(self._save_new,
                 obj))
+            d.addCallback(self._save_snapshots)
         else:
             d.addCallback(lambda _: self.pool.runInteraction(self._update,
                 obj))
         d.addCallback(lambda obj: obj.reset())
+        d.addErrback(handle_Failure)
         d.callback(obj)
         return d
 
     def _save_new(self, cur, obj):
         cur.execute(NEW_TRACK, (obj._state.start_time, obj._state.end_time,
-                                obj.type.type, str(obj.id)))
+        obj.type.type, str(obj.id)))
         dbid = cur.fetchone()[0]
+        log.msg("New track inserted %s and its id %s" % (obj.id, dbid))
 
         if len(obj.points) > 0:
             points = obj.points
             points['id'] = np.ones(len(points)) * dbid
             data = np_as_text(points)
             cur.copy_expert("COPY track_data FROM STDIN ", data)
-        snaps = find_snapshots(obj)
-        for snap in snaps:
-            cur.execute(INSERT_SNAPSHOT, (snap['timestamp'], dbid,
-                snap['snapshot']))
         obj._id = dbid
         return obj
+
+    @defer.inlineCallbacks
+    def _save_snapshots(self, obj):
+        snaps = find_snapshots(obj)
+        for snap in snaps:
+            try:
+                yield self.pool.runOperation(INSERT_SNAPSHOT, (snap['timestamp'], dbid,
+                    snap['snapshot']))
+            except:
+                pass
 
     def _update(self, cur, obj):
         if len(obj.points) == 0:
@@ -109,12 +120,18 @@ class TrackRepository(object):
         points = obj.points
         points['id'] = np.ones(len(points)) * obj._id
         data = np_as_text(points)
-        cur.copy_expert("COPY track_data FROM STDIN ", data)
+        try:
+            cur.copy_expert("COPY track_data FROM STDIN ", data)
+        except:
+            pass
 
         snaps = find_snapshots(obj)
         for snap in snaps:
-            cur.execute(INSERT_SNAPSHOT, (snap['timestamp'], obj._id,
-            snap['snapshot']))
+            try:
+                cur.execute(INSERT_SNAPSHOT, (snap['timestamp'], obj._id,
+                snap['snapshot']))
+            except:
+                pass
 
         for idx, item in enumerate(obj.changes):
             if item.name == 'TrackStarted':

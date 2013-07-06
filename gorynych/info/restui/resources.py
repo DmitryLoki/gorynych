@@ -48,12 +48,17 @@ class ContestResource(APIResource):
     name = 'contest'
 
     def read_GET(self, cont, request_params=None):
+        '''
+        @type cont: gorynych.info.domain.contest.Contest
+        '''
         if cont:
             return dict(contest_title=cont.title,
                         contest_id=cont.id,
                         contest_country_code=cont.country,
                         contest_start_date=cont.start_time,
-                        contest_end_date=cont.end_time)
+                        contest_end_date=cont.end_time,
+                        contest_coords=json.dumps(cont.hq_coords))
+
 
     def read_PUT(self, cont, request_params=None):
         if cont:
@@ -61,7 +66,8 @@ class ContestResource(APIResource):
                         contest_id=cont.id,
                         contest_country_code=cont.country,
                         contest_start_date=cont.start_time,
-                        contest_end_date=cont.end_time)
+                        contest_end_date=cont.end_time,
+                        contest_coords=json.dumps(cont.hq_coords))
 
 
 class ContestRaceResourceCollection(APIResource):
@@ -346,6 +352,7 @@ class TrackerResourceCollection(APIResource):
             result['name'] = t.name
             result['device_type'] = t.device_type
             result['id'] = t.id
+            result['last_point'] = json.dumps(t.last_point)
             return result
 
     def read_GET(self, tracker_list, p=None):
@@ -365,7 +372,8 @@ class TrackerResource(APIResource):
 
     def read_GET(self, t, p=None):
         if t:
-            return dict(tracker_id=t.id, device_id=t.device_id, name=t.name)
+            return dict(tracker_id=t.id, device_id=t.device_id, name=t.name,
+                last_point=json.dumps(t.last_point))
 
     def read_PUT(self, t, p=None):
         return self.read_GET(t)

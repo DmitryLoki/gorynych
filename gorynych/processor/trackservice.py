@@ -31,7 +31,7 @@ def makeService(config, services=None):
     # Online
     online_service = OnlineTrashService(pool, track_repository,
         host='localhost',
-        port=5672, exchange='receiver', queues_no_ack=True)
+        port=5672, exchange='receiver', queues_no_ack=True, exchange_type='fanout')
 
 
     track_service = TrackService(pool, event_store, track_repository)

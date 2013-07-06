@@ -113,6 +113,7 @@ class TrackRepository(object):
                     snap['snapshot']))
             except:
                 pass
+        return obj
 
     def _update(self, cur, obj):
         if len(obj.points) == 0:

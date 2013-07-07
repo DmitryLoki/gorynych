@@ -426,8 +426,10 @@ class ParagliderSkyEarth(object):
 
     def _state_work(self, data):
         result = []
+        if self._state == 'landed' or self._state == 'finished':
+            return []
 
-        if not self._in_air and not self._state == 'landed':
+        if not self._in_air:
             # Ещё не в воздухе
             if self._bf:
                 # Пилот уже летит быстрее пороговой скорости.
@@ -451,10 +453,11 @@ class ParagliderSkyEarth(object):
                     result.append(self._speed_exceed(data))
 
                 elif data['timestamp'] - self._bs > 60 and (
-                    not self._state =='landed'):
+                    self._alt_diff(data, 5)):
                     # Landed
                     result.append(self._track_landed(data))
         return result
+
 
     def _speed_exceed(self, data):
         self._bf = data['timestamp']
@@ -476,6 +479,14 @@ class ParagliderSkyEarth(object):
         self._in_air = False
         return events.TrackLanded(self._id, payload=data['distance'],
             occured_on=data['timestamp'])
+
+    def _alt_diff(self, data, dif):
+        ts = data['timestamp']
+        idxs = np.where(self.trackstate._buffer['timestamp'] < ts - 50)
+        if len(idxs) == 0:
+            return False
+        a1 = self.trackstate._buffer['alt'][idxs[-1]]
+        return abs(a1 - data['alt']) < dif
 
 
 @implementer(interfaces.ITrackType)

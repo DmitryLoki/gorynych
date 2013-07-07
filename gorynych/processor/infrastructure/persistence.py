@@ -109,10 +109,11 @@ class TrackRepository(object):
         snaps = find_snapshots(obj)
         for snap in snaps:
             try:
-                yield self.pool.runOperation(INSERT_SNAPSHOT, (snap['timestamp'], dbid,
-                    snap['snapshot']))
+                yield self.pool.runOperation(INSERT_SNAPSHOT,
+                            (snap['timestamp'], obj._id, snap['snapshot']))
             except:
                 pass
+        defer.returnValue(obj)
 
     def _update(self, cur, obj):
         if len(obj.points) == 0:

@@ -24,6 +24,8 @@ class WebChat(resource.Resource):
                 return AuthenticationResource(udid, self.service)
         elif path == 'handshake':
             return HandshakeResource(self.service)
+        elif path == 'chatapi':
+            return ChatAPI(self.service)
         return self
 
 
@@ -62,12 +64,16 @@ class ChatResource(resource.Resource):
             request.finish()
             return server.NOT_DONE_YET
         request.setResponseCode(201)
+        request.setHeader('Access-Control-Allow-Origin', '*')
+        request.setHeader('Access-Control-Allow-Credentials', 'true')
+        request.setHeader('Content-Type', 'application/json')
         d = self.service.post_message(self.chatroom, msg)
         d.addCallback(request.write)
         d.addCallback(lambda _: request.finish())
         return server.NOT_DONE_YET
 
     def render_GET(self, request):
+        args = request.args
         modified_since = request.getHeader(b'if-modified-since')
         if modified_since:
             first_part = modified_since.split(b';', 1)[0]
@@ -77,9 +83,11 @@ class ChatResource(resource.Resource):
                 modified_since = None
 
         def set_header(msglist):
-            if msglist:
+
+            if msglist and not args.has_key('from_time'):
                 ts = msglist[-1].timestamp
                 request.setLastModified(ts)
+                request.setHeader('Content-Type', 'application/json')
             return msglist
 
         def _format(msglist):
@@ -92,6 +100,8 @@ class ChatResource(resource.Resource):
                         'sender': msg.sender, 'id': msg.id})
             return bytes(json.dumps(result))
 
+        if args.has_key('from_time'):
+            modified_since = args['from_time'][0]
         d = self.service.get_messages(self.chatroom, modified_since)
         d.addCallback(set_header)
         d.addCallback(_format)
@@ -141,3 +151,25 @@ class HandshakeResource(resource.Resource):
         failure.trap(AuthenticationError)
         request.setResponseCode(403)
         return ''
+
+
+class ChatAPI(resource.Resource):
+    isLeaf = True
+
+    def __init__(self, service):
+        resource.Resource.__init__(self)
+        self.service = service
+        self.operations = dict(person=self.service.get_phone_for_person,
+            phone=self.service.get_person_by_phone)
+
+    def render_GET(self, request):
+        if len(request.postpath) > 1 and request.postpath[0] and request.postpath[1]:
+            operation = request.postpath[0]
+            argument = request.postpath[1]
+            d = self.operations[operation](argument)
+            d.addCallback(request.write)
+            d.addCallback(lambda _:request.finish())
+            return server.NOT_DONE_YET
+        else:
+            return ''
+

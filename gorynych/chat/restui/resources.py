@@ -24,6 +24,8 @@ class WebChat(resource.Resource):
                 return AuthenticationResource(udid, self.service)
         elif path == 'handshake':
             return HandshakeResource(self.service)
+        elif path == 'chatapi':
+            return ChatAPI(self.service)
         return self
 
 
@@ -149,3 +151,25 @@ class HandshakeResource(resource.Resource):
         failure.trap(AuthenticationError)
         request.setResponseCode(403)
         return ''
+
+
+class ChatAPI(resource.Resource):
+    isLeaf = True
+
+    def __init__(self, service):
+        resource.Resource.__init__(self)
+        self.service = service
+        self.operations = dict(person=self.service.get_phone_for_person,
+            phone=self.service.get_person_by_phone)
+
+    def render_GET(self, request):
+        if len(request.postpath) > 1 and request.postpath[0] and request.postpath[1]:
+            operation = request.postpath[0]
+            argument = request.postpath[1]
+            d = self.operations[operation](argument)
+            d.addCallback(request.write)
+            d.addCallback(lambda _:request.finish())
+            return server.NOT_DONE_YET
+        else:
+            return ''
+

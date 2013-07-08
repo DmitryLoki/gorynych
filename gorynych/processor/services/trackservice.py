@@ -79,14 +79,17 @@ class ProcessorService(EventPollingService):
         race_id = ev.aggregate_id
         track_id = ev.payload['track_id']
         cn = ev.payload.get('contest_number')
+        group_id = str(race_id)
+        if ev.payload['track_type'] == 'online':
+            group_id = group_id + '_online'
         try:
             log.msg(">>>Adding track %s to group %s <<<" % (track_id,
-                                str(race_id)))
-            yield self.pool.runOperation(ADD_TRACK_TO_GROUP, (str(race_id),
+                                                                group_id))
+            yield self.pool.runOperation(ADD_TRACK_TO_GROUP, (group_id,
                 track_id, cn))
         except Exception as e:
             log.msg("Track %s hasn't been added to group %s because of %r" %
-                    (track_id, race_id, e))
+                    (track_id, group_id, e))
         if ev.payload['track_type'] == 'online':
             defer.returnValue('')
         res = yield defer.maybeDeferred(API.get_track_archive, str(race_id))

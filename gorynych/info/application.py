@@ -1,17 +1,54 @@
 '''
 Application Services for info context.
 '''
+import cPickle
 import simplejson as json
+import time
 
-from twisted.internet import defer
+from twisted.internet import defer, task
+from twisted.python import log
 
-from gorynych.info.domain import contest, person, race
+from gorynych.info.domain import contest, person, race, tracker
 from gorynych.common.infrastructure import persistence
 from gorynych.common.domain.types import checkpoint_from_geojson
 from gorynych.common.domain.events import ContestRaceCreated
 from gorynych.common.application import EventPollingService, DBPoolService
+from gorynych.info.domain import interfaces
+from gorynych.receiver.receiver import RabbitMQService
 
-class ApplicationService(DBPoolService):
+
+class BaseApplicationService(DBPoolService):
+    def _get_aggregate(self, id, repository):
+        d = defer.succeed(id)
+        d.addCallback(persistence.get_repository(repository).get_by_id)
+        return d
+
+    def _change_aggregate(self, params, repo_interface, change_func):
+        id = params.get('id')
+        if not id:
+            raise ValueError("Aggregate's id hasn't been received.")
+        del params['id']
+
+        d = self._get_aggregate(id, repo_interface)
+        d.addCallback(change_func, params)
+        d.addCallback(persistence.get_repository(repo_interface).save)
+        return d
+
+    def _get_aggregates_list(self, limit_offset_params, repo_interface):
+        if limit_offset_params:
+            limit = limit_offset_params.get('limit', None)
+            offset = limit_offset_params.get('offset', 0)
+        else:
+            limit = None
+            offset = 0
+
+        d = defer.succeed(limit)
+        d.addCallback(persistence.get_repository(repo_interface).get_list,
+            offset)
+        return d
+
+
+class ApplicationService(BaseApplicationService):
 
     ############## Contest Service part #############
     def create_new_contest(self, params):
@@ -81,6 +118,11 @@ class ApplicationService(DBPoolService):
                 cont.change_times(params['start_time'], params['end_time'])
                 del params['start_time']
                 del params['end_time']
+
+            if params.get('coords'):
+                lat, lon = params['coords'].split(',')
+                cont.hq_coords = (lat, lon)
+                del params['coords']
 
             for param in params.keys():
                 setattr(cont, param, params[param])
@@ -175,6 +217,8 @@ class ApplicationService(DBPoolService):
         return self._get_aggregates_list(params, person.IPersonRepository)
 
     def change_person(self, params):
+        # TODO: create changing services instead of functions in application
+        #  layer.
         def change(pers, params):
             new_name = dict()
             if params.get('name'):
@@ -207,7 +251,8 @@ class ApplicationService(DBPoolService):
             pers = yield self._get_aggregate(key, person.IPersonRepository)
             plist.append(contest.Paraglider(key, pers.name, pers.country,
                          paragliders[key]['glider'],
-                         paragliders[key]['contest_number'], pers.tracker))
+                         paragliders[key]['contest_number'],
+                         pers.trackers.get(params['contest_id'])))
 
         factory = race.RaceFactory()
         r = factory.create_race(params['title'], params['race_type'],
@@ -293,44 +338,66 @@ class ApplicationService(DBPoolService):
 
     ############## Race Track's work ##################
     def get_race_tracks(self, params):
-        race_id = params['race_id']
+        group_id = params['race_id']
         ttype = params.get('type')
+        if ttype and ttype == 'online':
+            group_id = group_id + '_online'
         def filtr(rows):
             if not ttype:
                 return rows
             return filter(lambda row:row[0] == ttype, rows)
         d = self.pool.runQuery(persistence.select('tracks', 'track'),
-            (race_id,))
-        d.addCallback(filtr)
+            (group_id,))
+        # d.addCallback(filtr)
         return d
 
-    ############## common methods ###################
-    def _get_aggregate(self, id, repository):
-        d = defer.succeed(id)
-        d.addCallback(persistence.get_repository(repository).get_by_id)
+    ############## Tracker aggregate part ###################
+    def create_new_tracker(self, params):
+        from gorynych.info.domain.tracker import TrackerFactory
+        factory = TrackerFactory()
+        trcker = factory.create_tracker(device_id=params['device_id'],
+            device_type=params['device_type'], name=params.get('name'))
+        d = defer.succeed(trcker)
+        d.addCallback(persistence.get_repository(
+            interfaces.ITrackerRepository).save)
         return d
 
-    def _change_aggregate(self, params, repo_interface, change_func):
-        id = params.get('id')
-        if not id:
-            raise ValueError("Aggregate's id hasn't been received.")
-        del params['id']
+    def get_trackers(self, params=None):
+        return self._get_aggregates_list(params, interfaces.ITrackerRepository)
 
-        d = self._get_aggregate(id, repo_interface)
-        d.addCallback(change_func, params)
-        d.addCallback(persistence.get_repository(repo_interface).save)
+    def get_tracker(self, params):
+        return self._get_aggregate(params['tracker_id'],
+            interfaces.ITrackerRepository)
+
+    def change_tracker(self, params):
+        if params.has_key('tracker_id'):
+           params['id'] = params['tracker_id']
+           del params['tracker_id']
+        return self._change_aggregate(params, interfaces.ITrackerRepository,
+            tracker.change_tracker)
+
+
+class LastPointApplication(RabbitMQService):
+    def __init__(self, pool, **kw):
+        RabbitMQService.__init__(self, **kw)
+        self.pool = pool
+
+    def when_started(self):
+        d = defer.Deferred()
+        d.addCallback(self.open)
+        d.addCallback(lambda x: task.LoopingCall(self.read, x))
+        d.addCallback(lambda lc: lc.start(0.00))
+        d.callback('last_point')
         return d
 
-    def _get_aggregates_list(self, limit_offset_params, repo_interface):
-        if limit_offset_params:
-            limit = limit_offset_params.get('limit', None)
-            offset = limit_offset_params.get('offset', 0)
-        else:
-            limit = None
-            offset = 0
-
-        d = defer.succeed(limit)
-        d.addCallback(persistence.get_repository(repo_interface).get_list,
-                      offset)
-        return d
+    def handle_payload(self, queue_name, channel, method_frame, header_frame,
+            body):
+        data = cPickle.loads(body)
+        if not data.has_key('ts'):
+            # ts key MUST be in a data.
+            return
+        now = int(time.time())
+        return self.pool.runOperation(persistence.update('last_point',
+            'tracker'), (data['lat'], data['lon'], data['alt'], now,
+        data['battery'], data['h_speed'], data['imei']))
 

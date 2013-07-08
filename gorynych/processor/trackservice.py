@@ -2,7 +2,7 @@ from twisted.application import service
 from twisted.enterprise import adbapi
 
 from gorynych import BaseOptions
-from gorynych.processor.services.trackservice import TrackService, ProcessorService
+from gorynych.processor.services.trackservice import TrackService, ProcessorService, OnlineTrashService
 from gorynych.processor.infrastructure.persistence import TrackRepository
 from gorynych.common.infrastructure import persistence
 from gorynych.eventstore.eventstore import EventStore
@@ -28,10 +28,17 @@ def makeService(config, services=None):
 
     track_repository = TrackRepository(pool)
 
+    # Online
+    online_service = OnlineTrashService(pool, track_repository,
+        host='localhost',
+        port=5672, exchange='receiver', queues_no_ack=True, exchange_type='fanout')
+
+
     track_service = TrackService(pool, event_store, track_repository)
     processor_service = ProcessorService(pool, event_store)
 
     track_service.setServiceParent(services)
     processor_service.setServiceParent(services)
+    online_service.setServiceParent(services)
 
     return services

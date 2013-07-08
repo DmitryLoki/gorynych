@@ -272,7 +272,8 @@ class TrackArchive(object):
             self.progress['without_tracks'].add(item)
 
     def apply_RaceGotTrack(self, ev):
-        self.progress['parsed_tracks'].add(ev.payload['contest_number'])
+        if ev.payload['track_type'] == 'competition_aftertask':
+            self.progress['parsed_tracks'].add(ev.payload['contest_number'])
 
     def apply_TrackArchiveParsed(self, ev):
         self.state = 'parsed'

@@ -1,3 +1,4 @@
+# coding=utf-8
 from gorynych.common.domain.model import DomainEvent
 from gorynych.common.infrastructure import serializers
 
@@ -19,7 +20,7 @@ class TrackArchiveUnpacked(DomainEvent):
     '''
     Fired in L{gorynych.processor.services.trackservise.ProcessorService}
     @param id: Race ID
-    @payload:
+    @param payload:
         ([{person_id, trackfile, contest_number}, ...], - list of dicts
         [extra trackfile,], - list of str
          [person_id without tracks,]) - list of str
@@ -63,7 +64,7 @@ class RaceCheckpointsChanged(DomainEvent):
     @todo: think about more explicit name for this event.
     Event fields:
     @param id: Race id
-    @param payload: list with new checkpoints. List of L{Checkpoints}.
+    @param payload: list with new checkpoints. List of Checkpoint.
     '''
     from gorynych.common.domain.types import checkpoint_from_geojson
     serializer = serializers.GeoObjectsListSerializer(checkpoint_from_geojson)
@@ -136,9 +137,49 @@ class TrackEnded(DomainEvent):
     '''
     Track ended. Pilot landed or finished or time is gone.
     @param aggregate_id: Track ID
-    @param payload: track state
+    @param payload: {state, distance}
     '''
     serializer = serializers.JSONSerializer()
+
+
+class TrackDataReceived(DomainEvent):
+    '''
+    Contain data for processing.
+    @param payload:{c(coords - lat, lon, alt string), s(device_id string),
+    t, gs(ground speed)}
+    '''
+    serializer = serializers.JSONSerializer()
+
+
+class TrackInAir(DomainEvent):
+    '''
+    Появляется когда пилот взлетел
+    @param payload: None
+    '''
+    serializer = serializers.NoneSerializer()
+
+
+class TrackSpeedExceeded(DomainEvent):
+    '''
+    Скорость трека стала больше пороговой.
+    '''
+    serializer = serializers.NoneSerializer()
+
+
+class TrackSlowedDown(DomainEvent):
+    '''
+    Скорость трека стала меньше пороговой.
+    '''
+    serializer = serializers.NoneSerializer()
+
+
+class TrackLanded(DomainEvent):
+    '''
+    System decided that track landed.
+    @param payload: distance when track has been landed (distance to goal or
+     passed distance - depends on race).
+    '''
+    serializer = serializers.IntSerializer()
 
 
 ########## Person events ##################################
@@ -162,6 +203,28 @@ class ParagliderRegisteredOnContest(DomainEvent):
     serializer = serializers.DomainIdentifierSerializer('ContestID')
 
 
+class TrackerAssigned(DomainEvent):
+    '''
+    This event is fired then tracker is assigned to someone.
+
+    Event fields are:
+    @param aggregate_id: id of aggregate to which tracker has been assigned (
+    Person,
+    Transport).
+    @param payload: (tracker_id, contest_id).
+    '''
+    serializer = serializers.TupleOf(serializers.StringSerializer())
+
+
+class TrackerUnAssigned(DomainEvent):
+    '''
+    This event is fired then tracker is unassigned from person or transport.
+    @param aggregate_id: id of aggregate from which tracker has been
+    unassigned (Person, Transport).
+    @param payload: (tracker_id, contest_id)
+    '''
+    serializer = serializers.TupleOf(serializers.StringSerializer())
+
 ######### Contest events #################################
 
 
@@ -173,24 +236,3 @@ class ContestRaceCreated(DomainEvent):
     '''
     serializer = serializers.DomainIdentifierSerializer('RaceID')
 
-
-############## undecided events
-
-class TrackerAssigned(DomainEvent):
-    '''
-    This event is fired then tracker is assigned to someone.
-
-    Event fields are:
-    @param id: id of aggregate to which tracker has been assigned (Person,
-    Transport).
-    @param tracker_id: tracker id.
-    '''
-
-
-class TrackerUnAssigned(DomainEvent):
-    '''
-    This event is fired then tracker is unassigned from person or transport.
-    @param aggregate_id: id of aggregate from which tracker has been
-    unassigned (Person, Transport).
-    @param payload: id of Tracker aggregate.
-    '''

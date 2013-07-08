@@ -1,70 +1,69 @@
 '''
 Tracker Aggregate.
 '''
-from zope.interface.interfaces import Interface
-
 from gorynych.common.domain.events import TrackerAssigned, TrackerUnAssigned
 from gorynych.common.domain.model import AggregateRoot
-from gorynych.info.domain.ids import TrackerID
+from gorynych.info.domain.ids import TrackerID, PersonID
+from gorynych.common.infrastructure import persistence as pe
+from gorynych.common.exceptions import DomainError
 
 
 DEVICE_TYPES = ['tr203']
-
-class ITrackerRepository(Interface):
-    def get_by_id(tracker_id): # @NoSelf
-        '''
-        '''
-    def save(value): # @NoSelf
-        '''
-        '''
-
-
-class TrackerHasOwner(Exception):
-    pass
-
-class TrackerDontHasOwner(Exception):
-    pass
 
 
 class Tracker(AggregateRoot):
 
     def __init__(self, tracker_id, device_id, device_type):
+        super(Tracker, self).__init__()
         self.id = tracker_id
         self.device_id = device_id
         self.device_type = device_type
-        self.assignee_id = None
+        self.assignee = dict() # {contest_id:assignee_id}
         self._name = ''
+        self._last_point = dict()
 
     @property
-    def assignee(self):
-        return self.assignee_id
+    def last_point(self):
+        return [self._last_point.get('lat'), self._last_point.get('lon'),
+                    self._last_point.get('alt'), self._last_point.get('ts'),
+            self._last_point.get('bat'), self._last_point.get('speed')]
 
-    @assignee.setter
-    def assignee(self, value):
-        raise AttributeError("Assignee must be setted through assign_to"
-                             "(assignee_id) method. ")
+    @last_point.setter
+    def last_point(self, value):
+        lat, lon, alt, ts, bat, speed = value
+        self._last_point['lat'] = lat
+        self._last_point['lon'] = lon
+        self._last_point['alt'] = alt
+        self._last_point['ts'] = ts
+        self._last_point['bat'] = bat
+        self._last_point['speed'] = speed
 
     def is_free(self):
-        return self.assignee_id is None
+        return len(self.assignee) == 0
 
-    def assign_to(self, assignee_id):
-        if self.is_free():
-            self.assignee_id = assignee_id
-            self.event_publisher.publish(TrackerAssigned(
-                aggregate_id= assignee_id,
-                tracker_id = self.id
-                ))
-        else:
-            raise TrackerHasOwner("Tracker has owner: %s" % self.assignee_id)
+    def assign_to(self, assignee_id, contest_id):
+        assignee_id = PersonID.fromstring(assignee_id)
+        if assignee_id in self.assignee.values():
+            raise DomainError("Tracker already has owner %s for "
+                               "contest %s" %
+                               (self.assignee[contest_id], contest_id))
+        self.assignee[contest_id] = assignee_id
+        return pe.event_store().persist(TrackerAssigned(
+            aggregate_id=assignee_id,
+            payload = (str(self.id), str(contest_id))))
 
-    def unassign(self):
+    def unassign(self, contest_id):
         if self.is_free():
-            raise TrackerDontHasOwner("Tracker isn't assigned to anyone.")
+            raise DomainError("Tracker don't assigned to anyone.")
+        elif not self.assignee.has_key(contest_id):
+            raise DomainError("Tracker hasn't been assigned to contest %s" %
+                              contest_id)
         else:
-            _ass_id = self.assignee_id
-            self.assignee_id = None
-            self.event_publisher.publish(TrackerUnAssigned(id=_ass_id,
-                tracker_id=self.id))
+            aid = self.assignee[contest_id]
+            del self.assignee[contest_id]
+            aid = PersonID.fromstring(aid)
+            return pe.event_store().persist(TrackerUnAssigned(
+                aggregate_id=aid, payload=(str(self.id), str(contest_id))))
 
     @property
     def name(self):
@@ -72,28 +71,51 @@ class Tracker(AggregateRoot):
 
     @name.setter
     def name(self, value):
-        if isinstance(value, str):
-            self._name = value
-        else:
-            raise TypeError("Tracker name must be string.")
-
+        self._name = value.strip()
 
 
 class TrackerFactory(object):
 
-    def __init__(self, event_publisher):
-        self.event_publisher = event_publisher
-
     def create_tracker(self, tracker_id=None, device_id=None,
-                       device_type=None, name=None):
+                       device_type=None, name=None, assignee=None,
+            last_point=None):
         if not isinstance(tracker_id, TrackerID):
-            tracker_id = TrackerID(tracker_id)
+            tracker_id = TrackerID(device_type, device_id)
         if isinstance(device_id, str) and device_type in DEVICE_TYPES:
-            tracker = Tracker(tracker_id, device_id, device_type)
-            tracker.event_publisher = self.event_publisher
-            if isinstance(name, str):
-                tracker.name = name
-            return tracker
+            tracker = Tracker(TrackerID(device_type, device_id), device_id,
+                device_type)
         else:
-            raise ValueError("Wrong values has been passed for tracker "
-                             "creation.")
+            # We have device_id or device_type, and we have tracker_id.
+            tracker = Tracker(tracker_id, tracker_id.device_id,
+                tracker_id.device_type)
+
+        if isinstance(name, str):
+            tracker.name = name.strip()
+        if assignee:
+            tracker.assignee = assignee
+        else:
+            tracker.assignee = dict()
+
+        if isinstance(last_point, tuple) and len(last_point) == 6:
+            tracker.last_point = last_point
+        return tracker
+
+
+def change_tracker(trckr, params):
+    '''
+    Change some tracker properties.
+    @param trckr:
+    @type trckr: C{Tracker}
+    @param params:
+    @type params: C{dict}
+    @return: changed (or not) tracker
+    @rtype: C{Tracker}
+    '''
+    if params.has_key('name'):
+        trckr.name = params['name']
+    if params.has_key('assignee') and params.has_key('contest_id'):
+        if params['assignee']:
+            trckr.assign_to(params['assignee'], params['contest_id'])
+        else:
+            trckr.unassign(params['contest_id'])
+    return trckr

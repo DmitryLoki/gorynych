@@ -48,12 +48,17 @@ class ContestResource(APIResource):
     name = 'contest'
 
     def read_GET(self, cont, request_params=None):
+        '''
+        @type cont: gorynych.info.domain.contest.Contest
+        '''
         if cont:
             return dict(contest_title=cont.title,
                         contest_id=cont.id,
                         contest_country_code=cont.country,
                         contest_start_date=cont.start_time,
-                        contest_end_date=cont.end_time)
+                        contest_end_date=cont.end_time,
+                        contest_coords=json.dumps(cont.hq_coords))
+
 
     def read_PUT(self, cont, request_params=None):
         if cont:
@@ -61,7 +66,8 @@ class ContestResource(APIResource):
                         contest_id=cont.id,
                         contest_country_code=cont.country,
                         contest_start_date=cont.start_time,
-                        contest_end_date=cont.end_time)
+                        contest_end_date=cont.end_time,
+                        contest_coords=json.dumps(cont.hq_coords))
 
 
 class ContestRaceResourceCollection(APIResource):
@@ -111,7 +117,7 @@ class ContestRaceResource(APIResource):
         if cont and r:
             result = self.read_PUT(r)
             result['contest_title'] = cont.title
-            result['country'] = cont.country
+            result['country'] = pytz.country_names[cont.country]
             result['place'] = cont.place
             result['timeoffset'] = datetime.fromtimestamp(result[
                 'start_time'],
@@ -208,9 +214,13 @@ class PersonResource(APIResource):
 
     def read_PUT(self, pers, request_params=None):
         if pers:
+            trackers = []
+            for t in pers.trackers:
+                trackers.append([str(pers.trackers[t]), str(t)])
             return dict(person_name=pers.name.full(),
                         person_id=pers.id,
-                        person_country=pers.country)
+                        person_country=pers.country,
+                        trackers=json.dumps(trackers))
 
     def read_GET(self, pers, request_params=None):
         return self.read_PUT(pers)
@@ -232,7 +242,9 @@ class RaceParagliderResourceCollection(APIResource):
                                    glider=r.paragliders[key].glider,
                                    name=r.paragliders[key].name,
                                    person_id=r.paragliders[key].person_id,
-                                   country=r.paragliders[key].country))
+                                   country=r.paragliders[key].country,
+               tracker=r.paragliders[key].tracker_id if r.paragliders[key]
+               .tracker_id else ''))
             return result
 
 
@@ -321,6 +333,50 @@ class RaceTracksResource(APIResource):
                 result.append(dict(type=row[0], track_id=row[1],
                     start_time=st, end_time=et))
             return result
+
+
+class TrackerResourceCollection(APIResource):
+    '''
+    /tracker
+    '''
+    name = 'tracker_collection'
+    service_command = dict(POST='create_new_tracker', GET='get_trackers')
+
+    def read_POST(self, t, p=None):
+        '''
+        @type t: L{gorynych.info.domain.tracker.Tracker}
+        '''
+        if t:
+            result = dict()
+            result['device_id'] = t.device_id
+            result['name'] = t.name
+            result['device_type'] = t.device_type
+            result['id'] = t.id
+            result['last_point'] = json.dumps(t.last_point)
+            return result
+
+    def read_GET(self, tracker_list, p=None):
+        if tracker_list:
+            result = []
+            for t in tracker_list:
+                result.append(self.read_POST(t))
+            return result
+
+
+class TrackerResource(APIResource):
+    '''
+    /tracker/{id}
+    '''
+    service_command = dict(GET='get_tracker', PUT='change_tracker')
+    name = 'tracker'
+
+    def read_GET(self, t, p=None):
+        if t:
+            return dict(tracker_id=t.id, device_id=t.device_id, name=t.name,
+                last_point=json.dumps(t.last_point))
+
+    def read_PUT(self, t, p=None):
+        return self.read_GET(t)
 
 
 # TODO: this resource should be in processor package.

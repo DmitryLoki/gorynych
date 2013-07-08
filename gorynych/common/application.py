@@ -19,7 +19,8 @@ class EventPollingService(Service):
     '''
     dont_dispatch = set(['PersonGotTrack', 'PointsAddedToTrack', 'RaceCheckpointsChanged',
         'ContestRaceCreated', 'ParagliderRegisteredOnContest', 'TrackCheckpointTaken', 'TrackFinished',
-        'TrackFinishTimeReceived', 'TrackStarted', 'TrackEnded', 'TrackCreated', 'TrackArchiveUnpacked', 'TrackArchiveParsed', 'TrackWasNotParsed'])
+        'TrackFinishTimeReceived', 'TrackStarted', 'TrackEnded', 'TrackCreated', 'TrackArchiveUnpacked', 'TrackArchiveParsed', 'TrackWasNotParsed', 'TrackerAssigned', 'TrackerUnAssigned', 'TrackInAir', 'TrackSlowedDown',
+        'TrackSpeedExceeded', 'TrackLanded'])
     polling_interval = 1
 
     def __init__(self, pool, event_store):
@@ -69,7 +70,7 @@ class EventPollingService(Service):
         if ev_id in self.in_progress:
             self.in_progress.remove(ev_id)
         ev_id = long(ev_id)
-        log.msg("deleting dispatched event", ev_id)
+        # log.msg("deleting dispatched event", ev_id)
         return self.pool.runOperation(EVENT_DISPATCHED, (ev_id,))
 
 

@@ -10,7 +10,7 @@ from gorynych.common.domain.model import AggregateRoot, ValueObject
 from gorynych.common.domain.types import Address, Country, Name
 from gorynych.common.domain.events import ParagliderRegisteredOnContest
 from gorynych.common.infrastructure import persistence
-from gorynych.info.domain.ids import ContestID, PersonID
+from gorynych.info.domain.ids import ContestID, PersonID, TrackerID
 
 
 class IContestRepository(Interface):
@@ -180,6 +180,11 @@ class Contest(AggregateRoot):
 
     @property
     def hq_coords(self):
+        '''
+
+        @return:(float, float)
+        @rtype: C{tuple}
+        '''
         return self.address.coordinates
 
     @hq_coords.setter
@@ -258,7 +263,6 @@ class Paraglider(ValueObject):
 
     def __init__(self, person_id, name, country, glider, contest_number,
                  tracker_id=None):
-        # TODO: remove tracker_id=None when tracker assignment will work.
 
         if not isinstance(person_id, PersonID):
             person_id = PersonID().fromstring(person_id)
@@ -266,9 +270,8 @@ class Paraglider(ValueObject):
             raise TypeError("Name must be an instance of Name class.")
         if not isinstance(country, Country):
             country = Country(country)
-            # TODO: uncomment this when tracker assignment will work.
-        # if not isinstance(tracker_id, TrackerID):
-        #     tracker_id = TrackerID(tracker_id)
+        if tracker_id and not isinstance(tracker_id, TrackerID):
+            tracker_id = TrackerID.fromstring(tracker_id)
 
         self.person_id = person_id
         self._name = name

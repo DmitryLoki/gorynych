@@ -11,6 +11,8 @@ aliases:
     'r-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+'
   track_index: &track_index
     'trck-[a-z0-9]+'
+  tracker_index: &tracker_index
+    '[-a-z0-9]*'
 
 race:
   leaf: Placeholder
@@ -62,4 +64,10 @@ person:
       leaf: PersonResource
       package: *gorynych
 
-
+tracker:
+  leaf: TrackerResourceCollection
+  package: *gorynych
+  tree:
+    *tracker_index:
+      leaf: TrackerResource
+      package: *gorynych

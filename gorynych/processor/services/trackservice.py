@@ -1,7 +1,11 @@
+# coding=utf-8
+from collections import defaultdict
 import time
+import cPickle
+import mock
 
 from twisted.python import log
-from twisted.internet import threads, defer
+from twisted.internet import threads, defer, task
 
 from gorynych.common.domain import events
 from gorynych.common.exceptions import NoGPSData
@@ -10,12 +14,22 @@ from gorynych.processor.domain import TrackArchive, track
 from gorynych.common.application import EventPollingService
 from gorynych.common.domain.services import APIAccessor
 
+from gorynych.receiver.receiver import RabbitMQService
 
 API = APIAccessor()
+
+class A:
+    def process_data(self, data):
+        pass
 
 ADD_TRACK_TO_GROUP = """
     INSERT INTO TRACKS_GROUP VALUES (%s,
         (SELECT ID FROM TRACK WHERE TRACK_ID=%s), %s);
+"""
+
+IMEI_LIST = """
+    SELECT t.device_id, ta.assignee_id FROM tracker t, tracker_assignees.t
+    WHERE t.id = ta.id;
 """
 
 class ProcessorService(EventPollingService):
@@ -65,14 +79,19 @@ class ProcessorService(EventPollingService):
         race_id = ev.aggregate_id
         track_id = ev.payload['track_id']
         cn = ev.payload.get('contest_number')
+        group_id = str(race_id)
+        if ev.payload['track_type'] == 'online':
+            group_id = group_id + '_online'
         try:
             log.msg(">>>Adding track %s to group %s <<<" % (track_id,
-                                str(race_id)))
-            yield self.pool.runOperation(ADD_TRACK_TO_GROUP, (str(race_id),
+                                                                group_id))
+            yield self.pool.runOperation(ADD_TRACK_TO_GROUP, (group_id,
                 track_id, cn))
         except Exception as e:
             log.msg("Track %s hasn't been added to group %s because of %r" %
-                    (track_id, race_id, e))
+                    (track_id, group_id, e))
+        if ev.payload['track_type'] == 'online':
+            defer.returnValue('')
         res = yield defer.maybeDeferred(API.get_track_archive, str(race_id))
         if res:
             processed = len(res['progress']['parsed_tracks']) + len(
@@ -98,10 +117,6 @@ class TrackService(EventPollingService):
         '''
         After this message TrackService start to listen events for this
          track.
-        @param ev:
-        @type ev:
-        @return:
-        @rtype:
         '''
         trackfile = ev.payload['trackfile']
         person_id = ev.payload['person_id']
@@ -178,18 +193,6 @@ class TrackService(EventPollingService):
         '''
         When track is ready to be shown send messages for Race and Person to
          append this track to them.
-        @param race_id:
-        @type race_id:
-        @param track_id:
-        @type track_id:
-        @param track_type:
-        @type track_type:
-        @param contest_number:
-        @type contest_number:
-        @param person_id:
-        @type person_id:
-        @return:
-        @rtype:
         '''
         rgt = events.RaceGotTrack(race_id, aggregate_type='race')
         rgt.payload = dict(contest_number=contest_number,
@@ -201,17 +204,126 @@ class TrackService(EventPollingService):
 
     def persist(self, aggr):
         log.msg("Persist aggregate %s" % aggr.id)
-        d = self.event_store.persist(aggr.changes)
-        d.addCallback(lambda _:self.track_repository.save(aggr))
+        d = self.track_repository.save(aggr)
         return d
 
 
-def pic(x, name, suf):
-    import cPickle
-    try:
-        f = open('.'.join((name, suf, 'pickle')), 'wb')
-        cPickle.dump(x, f)
-        f.close()
-    except Exception as e:
-        print "in pic", str(e)
+class OnlineTrashService(RabbitMQService):
+    '''
+    receive messages with track data from rabbitmq queue.
+    '''
 
+    def __init__(self, pool, repo, **kw):
+        RabbitMQService.__init__(self, **kw)
+        self.pool = pool
+        self.did_aid = {}
+        self.repo = repo
+        # {race_id:{track_id:Track}}
+        self.tracks = defaultdict(dict)
+        self.saver = task.LoopingCall(self.persist)
+        self.saver.start(5, False)
+        # device_id:(race_id, contest_number, time)
+        self.devices = dict()
+
+    def when_started(self):
+        d = defer.Deferred()
+        d.addCallback(self.open)
+        d.addCallback(lambda x: task.LoopingCall(self.read, x))
+        d.addCallback(lambda lc: lc.start(0.00))
+        d.callback('rdp')
+        return d
+
+    def handle_payload(self, queue_name, channel, method_frame, header_frame,
+            body):
+        data = cPickle.loads(body)
+        if not data.has_key('ts'):
+            # ts key MUST be in a data.
+            return
+        if data['lat'] < 0.1 and data['lon'] < 0.1:
+            return
+        return self.handle_track_data(data)
+
+    @defer.inlineCallbacks
+    def _get_race_by_tracker(self, device_id, t):
+        result = self.devices.get(device_id)
+        if result and t - result[2] < 300:
+            defer.returnValue((result[0], result[1]))
+        row = yield self.pool.runQuery(pe.select('current_race_by_tracker',
+            'race'),(device_id, t))
+        if not row:
+            defer.returnValue(None)
+        self.devices[device_id] = (row[0][0], row[0][1], int(time.time()))
+        defer.returnValue(row[0])
+
+    def handle_track_data(self, data):
+        now = int(time.time())
+        d = self._get_race_by_tracker(data['imei'], now)
+        d.addCallback(self._get_track, data['imei'])
+        d.addCallback(lambda tr: tr.process_data(data))
+
+    def _get_track(self, rid, device_id):
+        if not rid:
+            # Null-object.
+            return A()
+        rid, cnumber = rid
+        if not cnumber:
+            return A()
+        if self.tracks.has_key(rid) and self.tracks[rid].has_key(device_id):
+            # Race and track are in memory. Return Track for work.
+            return self.tracks[rid][device_id]
+        else:
+            d = self.pool.runQuery(pe.select('track_n_label', 'track'),
+                (rid, cnumber))
+            # Результат запроса — существующий в гонке contest number для
+            # существующего трека. Трек может быть, может не быть,
+            # его надо создать или
+            # вернуть.
+            d.addCallback(self._restore_or_create_track, rid, device_id, cnumber)
+            return d
+
+    @defer.inlineCallbacks
+    def _restore_or_create_track(self, row, rid, device_id, contest_number):
+        '''
+        Отдаёт уже существующий трек, иначе создаёт его, сохраняет события о
+         его создании и добавлении в гонку, и отдаёт.
+
+        @param row: (track_type.name, track_id, track.start_time,
+        track.end_time, contest_number), может быть пустым если трека ещё не
+         существует.
+        @type row: C{tuple}
+        @return:
+        @rtype: C{Track}
+        '''
+        tracks = self.tracks[rid]
+        log.msg("Restore or create track for race %s and device %s" %
+                (rid, device_id))
+        if row:
+            log.msg("Restore track", row[1])
+            result = yield self.repo.get_by_id(row[1][1])
+        else:
+            log.msg("Create new track")
+            race_task = API.get_race_task(str(rid))
+            if not isinstance(race_task, dict):
+                log.msg("Race task wasn't received from API: %r" % race_task)
+                defer.returnValue('')
+            track_type = 'online'
+            track_id = track.TrackID()
+            tc = events.TrackCreated(track_id)
+            tc.payload = dict(race_task=race_task, track_type=track_type)
+            result = track.Track(track_id, [tc])
+            rgt = events.RaceGotTrack(rid, aggregate_type='race')
+            rgt.payload = dict(contest_number=contest_number,
+                track_type=track_type, track_id=str(track_id))
+            result.changes.append(rgt)
+            yield pe.event_store().persist([tc])
+        tracks[device_id] = result
+        log.msg("Restored or created track for device", device_id)
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def persist(self):
+        #log.msg("Start persist")
+        for rid in self.tracks.keys():
+            for key in self.tracks[rid].keys():
+                yield self.repo.save(self.tracks[rid][key])
+        return

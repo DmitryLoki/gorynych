@@ -191,7 +191,7 @@ def read_track(filename):
 
 def process_track(data, st, et):
     reader = services.FileParserAdapter(track.DTYPE)
-    return reader.process(data, st, et)
+    return reader.process(data, st, et, 1)
 
 
 class TestArchiveTrackParsing(unittest.TestCase):
@@ -223,8 +223,8 @@ class TestTrackTaskProcessing(unittest.TestCase):
             1371027600, 1371049200)
         t = json.loads(open('cameli1.json', 'r').read())
         ttype = track.RaceToGoal(t)
-        track_state = track.TrackState([])
         track_id = track.TrackID()
+        track_state = track.TrackState(track_id, [])
         res, evs = ttype.process(points, track_state, track_id)
         for e in evs:
             track_state.mutate(e)
@@ -240,4 +240,14 @@ class TestTrackTaskProcessing(unittest.TestCase):
             print e
 
 
+class IntegrationTestTrackProcessing(unittest.TestCase):
+    def test_test(self):
+        tid = track.TrackID()
+        tc = events.TrackCreated(tid)
+        tc.payload = dict(race_task=json.loads(open('cameli1.json',
+            'r').read()), track_type='competition_aftertask')
+
+        t = track.Track(tid, [tc])
+        t.process_data('nonetypeobjectisnotiterable.181.igc')
+        print t.changes
 

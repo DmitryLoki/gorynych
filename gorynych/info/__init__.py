@@ -23,16 +23,17 @@ def makeService(config, services=None):
     @return:
     @rtype:
     '''
-    from gorynych.info.application import ApplicationService
+    from gorynych.info.application import ApplicationService, LastPointApplication
     from gorynych.info.restui import base_resource
     # import persistence staff
     from gorynych.info.domain.contest import IContestRepository
     from gorynych.info.domain.race import IRaceRepository
     from gorynych.info.domain.person import IPersonRepository
+    from gorynych.info.domain import interfaces
     from gorynych.common.infrastructure import persistence
     from gorynych.eventstore.eventstore import EventStore
     from gorynych.eventstore.store import PGSQLAppendOnlyStore
-    from gorynych.info.infrastructure.persistence import PGSQLContestRepository, PGSQLPersonRepository, PGSQLRaceRepository
+    from gorynych.info.infrastructure.persistence import PGSQLContestRepository, PGSQLPersonRepository, PGSQLRaceRepository, PGSQLTrackerRepository
 
     if not services:
         services = service.MultiService()
@@ -51,6 +52,11 @@ def makeService(config, services=None):
     app_service = ApplicationService(pool, event_store)
     app_service.setServiceParent(services)
 
+    # LastPoint application service init
+    last_point = LastPointApplication(pool, host='localhost', port=5672,
+        exchange='receiver', queues_no_ack=True, exchange_type='fanout')
+    last_point.setServiceParent(services)
+
     # Test repositories init
     persistence.register_repository(IContestRepository,
                                     PGSQLContestRepository(pool) )
@@ -58,6 +64,8 @@ def makeService(config, services=None):
                                     PGSQLRaceRepository(pool))
     persistence.register_repository(IPersonRepository,
                                     PGSQLPersonRepository(pool))
+    persistence.register_repository(interfaces.ITrackerRepository,
+        PGSQLTrackerRepository(pool))
 
     # REST API init
     api_tree = base_resource.resource_tree()

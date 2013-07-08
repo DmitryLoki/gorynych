@@ -338,15 +338,17 @@ class ApplicationService(BaseApplicationService):
 
     ############## Race Track's work ##################
     def get_race_tracks(self, params):
-        race_id = params['race_id']
+        group_id = params['race_id']
         ttype = params.get('type')
+        if ttype and ttype == 'online':
+            group_id = group_id + '_online'
         def filtr(rows):
             if not ttype:
                 return rows
             return filter(lambda row:row[0] == ttype, rows)
         d = self.pool.runQuery(persistence.select('tracks', 'track'),
-            (race_id,))
-        d.addCallback(filtr)
+            (group_id,))
+        # d.addCallback(filtr)
         return d
 
     ############## Tracker aggregate part ###################

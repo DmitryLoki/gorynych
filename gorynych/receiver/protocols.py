@@ -6,7 +6,7 @@ from twisted.protocols import basic
 
 
 def check_device_type(msg):
-    if msg[1] == 'G':
+    if msg[0] == 'G':
         result = 'tr203'
     else:
         result = 'telt_gh3000'

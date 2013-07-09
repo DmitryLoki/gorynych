@@ -98,4 +98,126 @@ class GlobalSatTR203(object):
 
 @implementer(IParseMessage)
 class TeltonikaGH3000UDP(object):
-    pass
+
+    def parse(self, bytestring):
+
+        def bytes2coord(four_bytes):
+            hex_data = four_bytes.encode('hex')
+            c = int(hex_data, 16)
+            return (c & 0x7fffff | 0x800000) * 1.0 / 2**23 * 2**((c>>23 & 0xff) - 127)
+
+        def get_alt(two_bytes):
+            return int(two_bytes.encode('hex'), 16)
+
+        def get_angle(one_byte):
+            return ord(one_byte) * 360. / 256.
+
+        def get_speed(one_byte):
+            return ord(one_byte)
+
+        def parse_time(four_bytes):
+            ts_hex = four_bytes.encode('hex')
+            ts_bin = bin(int(ts_hex, base=16))
+            ts_bin = ts_bin[3:]
+            ts_int = int(ts_bin, base=2)
+            td = datetime.timedelta(seconds=ts_int)
+            tdd = starttime + td
+            real_ts = int(time.mktime(tdd.timetuple()))
+            return real_ts
+
+        def bitlify(mask):
+            hex_value = mask.encode('hex')
+            bin_str = bin(int(hex_value, base=16))
+            return '0' * (8 - len(bin_str[2:])) + bin_str[2:]
+
+        bytestring = bytestring[5:]
+
+        avl_id = bytestring[0]
+        # cutting if off too
+        bytestring = bytestring[1:]
+
+        imei = bytestring[2: 17]
+        data = bytestring[17:]
+        codec_id = data[0]
+        num_of_data = ord(data[1])
+
+        # strip nums from the end and begining
+        data = data[2:-1]
+        datalen = len(data)
+
+        starttime = datetime.datetime(2007, 1, 1, 0, 0)
+
+        gps_mask_map = {
+            0: (8, bytes2coord, 'latlng'),  # latlog
+            1: (2, get_alt, 'alt'),  # alt
+            2: (1, get_angle, 'angle'),  #
+            3: (1, get_speed, 'speed'),
+            4: (1, None, None),
+            5: (4, None, None),
+            6: (1, None, None),
+            7: (4, None, None)
+
+        }
+
+        message = {
+            'imei': imei,
+            'records': []
+        }
+
+        def read_gps(segment, mask):
+            gpsdata = {}
+            cursor2 = 0
+            for idx, bit in enumerate(mask[::-1]):
+                if bit == '1':
+                    step, func, argname = gps_mask_map[idx]
+                    if idx == 0:
+                        gpsdata['lat'] = bytes2coord(segment[cursor2: cursor2 + step/2])
+                        gpsdata['lon'] = bytes2coord(segment[cursor2 + step/2: cursor2 + step])
+                    else:
+                        if func:
+                            gpsdata[argname] = func(segment[cursor2: cursor2+step])
+                    cursor2 = cursor2 + step
+            return gpsdata
+
+
+        cursor = 0
+        while cursor < len(data):
+            # each loop pass is reading one record
+            # it always starts with 4 bytes of time
+            record = {
+                'ts': parse_time(data[cursor: cursor+4]),
+            }
+
+            # then global mask
+            gmask = bitlify(data[cursor+4])
+
+            # move cursor
+            cursor = cursor+4
+            # then looking at global mask we'll find whats ahead
+            for idx, bit in enumerate(gmask[::-1]):
+                if bit == '1':
+
+                    # read the next segment. we are particulary interested in gps
+                    if idx == 0:  # gps
+                        gps_mask = bitlify(data[cursor+1])
+                        gps_len = 0
+                        for i, bit in enumerate(gps_mask[::-1]):
+                            if bit == '1':
+                                gps_len += gps_mask_map[i][0]
+
+                        gpsdata = read_gps(data[cursor+2: cursor+gps_len+2], gps_mask)
+                        record.update(gpsdata)
+                        cursor = cursor+gps_len+1
+
+
+                    else:  # some other element. screw it for now, lets only find its length
+                        # read the next field, it'l tell you how many key-value pairs in the segment
+                        quantity = ord(data[cursor+1])
+
+                        # not skip this element
+                        cursor = cursor + quantity * 2 + 2
+            message['records'].append(record)
+
+        response = ''.join(['0005000201'.decode('hex'), avl_id, chr(num_of_data))]
+
+        return message, response

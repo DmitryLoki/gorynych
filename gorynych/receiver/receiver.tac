@@ -1,13 +1,11 @@
 from twisted.application import internet, service
+from twisted.web.server import Site
 
-# import sys
-# import os
-# sys.path.append('/'.join(os.getcwd().split('/')[:-1]))
 
-from gorynych.receiver.receiver import UDPReceivingProtocol, ReceiverRabbitService, ReceiverService, AuditFileLog, ReceivingFactory
+from gorynych.receiver.receiver import ReceiverRabbitService, ReceiverService, AuditFileLog, ReceivingFactory
+from gorynych.receiver.protocols import UDPReceivingProtocol
 ####### check_trackers ####
 from gorynych.receiver.online_tester import RetreiveJSON
-from twisted.web.server import Site
 
 audit_log = AuditFileLog('audit_log')
 sender = ReceiverRabbitService(host='localhost', port=5672,

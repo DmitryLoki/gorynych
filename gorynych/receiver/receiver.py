@@ -8,7 +8,6 @@ import time
 import cPickle
 import collections
 
-from twisted.protocols import basic
 from twisted.internet import protocol, task, defer, reactor
 from twisted.application.service import Service
 from twisted.python import log
@@ -17,12 +16,9 @@ from pika.connection import ConnectionParameters
 from pika.adapters.twisted_connection import TwistedProtocolConnection
 
 from gorynych.receiver.parsers import GlobalSatTR203
+from gorynych.receiver.protocols import ReceivingProtocol
 
-################### Network part ###############################################
-class ReceivingProtocol(basic.LineReceiver):
-
-    def lineReceived(self, data):
-        self.factory.service.handle_message(data, proto='TCP')
+################### Network part ##########################################
 
 class ReceivingFactory(protocol.ServerFactory):
 
@@ -32,15 +28,7 @@ class ReceivingFactory(protocol.ServerFactory):
         self.service = service
 
 
-class UDPReceivingProtocol(protocol.DatagramProtocol):
-
-    def __init__(self, service):
-        self.service = service
-
-    def datagramReceived(self, datagram, addr):
-        self.service.handle_message(datagram, proto='UDP', client=addr)
-
-###################### Different receivers #####################################
+###################### Different receivers ################################
 
 class FileReceiver:
     '''This class just write a message to file.'''

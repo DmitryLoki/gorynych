@@ -1,4 +1,5 @@
 # coding=utf-8
+import time
 from twisted.internet import defer
 from twisted.python import log
 
@@ -75,19 +76,19 @@ class TrackRepository(object):
             log.err(failure)
             return obj.reset()
 
-        d = defer.Deferred()
+        d = defer.succeed(1)
         if obj.changes:
             d.addCallback(lambda _: pe.event_store().persist(obj.changes))
         if not obj._id:
             d.addCallback(lambda _: self.pool.runInteraction(self._save_new,
                 obj))
-            d.addCallback(self._save_snapshots)
         else:
             d.addCallback(lambda _: self.pool.runInteraction(self._update,
                 obj))
+            d.addCallback(self._update_times)
+        d.addCallback(self._save_snapshots)
         d.addCallback(lambda obj: obj.reset())
         d.addErrback(handle_Failure)
-        d.callback(obj)
         return d
 
     def _save_new(self, cur, obj):
@@ -118,30 +119,32 @@ class TrackRepository(object):
     def _update(self, cur, obj):
         if len(obj.points) == 0:
             return obj
+        tdiff = int(time.time()) - obj.points[0]['timestamp']
+        log.msg("Save %s points for track %s" % (len(obj.points), obj._id))
+        log.msg("First points for track %s was %s second ago." % (obj._id,
+            tdiff))
         points = obj.points
         points['id'] = np.ones(len(points)) * obj._id
         data = np_as_text(points)
         try:
             cur.copy_expert("COPY track_data FROM STDIN ", data)
-        except:
-            pass
+        except Exception as e:
+            log.err("Error occured while COPY data on update for track %s: "
+                    "%r" % (obj._id, e))
+        return obj
 
-        snaps = find_snapshots(obj)
-        for snap in snaps:
-            try:
-                cur.execute(INSERT_SNAPSHOT, (snap['timestamp'], obj._id,
-                snap['snapshot']))
-            except:
-                pass
-
+    def _update_times(self, obj):
+        d = defer.succeed(1)
         for idx, item in enumerate(obj.changes):
             if item.name == 'TrackStarted':
                 t = obj._state.start_time
-                cur.execute("UPDATE track SET start_time=%s WHERE ID=%s",
-                    (t, obj._id))
+                d.addCallback(lambda _:self.pool.runOperation(
+                    "UPDATE track SET start_time=%s WHERE ID=%s", (t,
+                        obj._id)))
             if item.name == 'TrackEnded':
                 t = obj._state.end_time
-                cur.execute("UPDATE track SET end_time=%s WHERE ID=%s",
-                    (t, obj._id))
-        return obj
-
+                d.addCallback(lambda _:self.pool.runOperation(
+                    "UPDATE track SET end_time=%s WHERE ID=%s",
+                    (t, obj._id)))
+        d.addCallback(lambda _:obj)
+        return d

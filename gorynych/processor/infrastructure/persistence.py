@@ -1,4 +1,5 @@
 # coding=utf-8
+import time
 from twisted.internet import defer
 from twisted.python import log
 
@@ -118,13 +119,18 @@ class TrackRepository(object):
     def _update(self, cur, obj):
         if len(obj.points) == 0:
             return obj
+        tdiff = int(time.time()) - obj.points[0]['timestamp']
+        log.msg("Save %s points for track %s" % (len(obj.points), obj._id))
+        log.msg("First points for track %s was %s second ago." % (obj._id,
+            tdiff))
         points = obj.points
         points['id'] = np.ones(len(points)) * obj._id
         data = np_as_text(points)
         try:
             cur.copy_expert("COPY track_data FROM STDIN ", data)
         except Exception as e:
-            log.err("Error occured while COPY data on update: %r" % e)
+            log.err("Error occured while COPY data on update for track %s: "
+                    "%r" % (obj._id, e))
         return obj
 
     def _update_times(self, obj):

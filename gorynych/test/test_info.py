@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # coding=utf-8
 '''
 Tests for info context.
@@ -26,13 +27,17 @@ def create_contest(title='Contest with paragliders'):
     return r, title
 
 
-def create_persons(reg_date=None, email=None, name=None):
+def create_persons(reg_date=None, email=None, name=None, phone=None, udid=None):
     if not email:
         email = 'vasya@example.com'+ str(random.randint(1, 1000000))
     if not name:
         name='Vasylyi'
     params = dict(name=name, surname='Doe', country='SS',
         email=email, reg_date=reg_date)
+    if phone:
+        params.update({'phone': phone})
+    if udid:
+        params.update({'udid': udid})
     r = requests.post(URL + '/person', data=params)
     return r, email
 
@@ -125,6 +130,14 @@ class ContestRESTAPITest(unittest.TestCase):
 
 
 class PersonAPITest(unittest.TestCase):
+    def __init__(self, *args, **kwargs):
+        super(PersonAPITest, self).__init__(*args, **kwargs)
+        # dirty dirty hack
+        import psycopg2
+        self.con = psycopg2.connect('dbname=test_gorynych user=postgres password=postgres host=localhost')
+        self.cur = self.con.cursor()
+
+
     url = URL + '/person/'
     def test_1_get_fake_person(self):
         r = requests.get(self.url+'/1-1-1-1')
@@ -161,6 +174,33 @@ class PersonAPITest(unittest.TestCase):
         result = r2.json()
         self.assertEqual(result['name'], 'Juan Carlos')
         self.assertEqual(result['country'], 'ME')
+
+    def test_create_person_with_optparams(self):
+        import time
+        r, email = create_persons(phone='+7 (123) 456 78 98', udid='df34t34f')
+        self.assertEqual(r.status_code, 201)
+
+        # dirtiness 80lvl. but need to handle async somehow
+        time.sleep(1)
+
+        self.cur.execute('select * from person_data')
+        data = self.cur.fetchall()
+        print data
+        self.assertTrue(len(data) == 2)
+
+        data = {el[1]: el[2] for el in data}
+
+        self.assertTrue(data.get('phone') == '+7 (123) 456 78 98')
+        self.assertTrue(data.get('udid') == 'df34t34f')
+
+        self.cur.execute('delete from person_data')
+        self.con.commit()
+
+    def test_create_person_with_bad_phone(self):
+        import time
+        r, email = create_persons(phone='samsung')
+        self.assertEqual(r.status_code, 500)
+
 
 
 class ParaglidersTest(unittest.TestCase):

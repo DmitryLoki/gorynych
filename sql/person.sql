@@ -57,3 +57,13 @@ WHERE
   pd.DATA_VALUE=%s AND
   pd.ID=p.ID;
 
+-- Insert Person_Data
+INSERT INTO PERSON_DATA(ID, DATA_TYPE, DATA_VALUE)
+    VALUES (%s, %s, %s);
+
+-- Update Person_Data
+UPDATE PERSON_DATA SET
+  DATA_VALUE=%s
+WHERE
+  ID=%s AND
+  DATA_TYPE=%s;

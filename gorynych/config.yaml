@@ -15,3 +15,8 @@ develop:
 
 # Test options
 test:
+    dbname: test_gorynych
+    dbuser: postgres
+    dbhost: localhost
+    dbpassword: postgres
+    dbport: 5432

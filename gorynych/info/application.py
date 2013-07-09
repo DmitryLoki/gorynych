@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 '''
 Application Services for info context.
 '''
@@ -201,9 +202,12 @@ class ApplicationService(BaseApplicationService):
                 raise ValueError("Wrong regdate has been passed on pilot creation: %s" % regdate)
         else:
             year, month, day = None, None, None
+        print 'opts'
+        opt_data = {key: params[key] for key in factory.opt_params if key in params}
+        print opt_data
         pers = factory.create_person(params['name'], params['surname'],
                                      params['country'], params['email'], year,
-                                     month, day)
+                                     month, day, **opt_data)
         d = defer.succeed(pers)
         d.addCallback(persistence.get_repository(person.IPersonRepository).
         save)
@@ -217,24 +221,11 @@ class ApplicationService(BaseApplicationService):
         return self._get_aggregates_list(params, person.IPersonRepository)
 
     def change_person(self, params):
-        # TODO: create changing services instead of functions in application
-        #  layer.
-        def change(pers, params):
-            new_name = dict()
-            if params.get('name'):
-                new_name['name'] = params['name']
-            if params.get('surname'):
-                new_name['surname'] = params['surname']
-            pers.name = new_name
-            if params.get('country'):
-                pers.country = params['country']
-            return pers
-
         if params.has_key('person_id'):
             params['id'] = params['person_id']
             del params['person_id']
         return self._change_aggregate(params, person.IPersonRepository,
-                                      change)
+                                      person.change_person)
 
     ############## Race Service part ################
     def get_race(self, params):

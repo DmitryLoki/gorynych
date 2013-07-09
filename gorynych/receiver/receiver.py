@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 '''
 Thinkless copy/paste.
 I hope it works.

@@ -1,20 +1,25 @@
+# -*- coding: utf-8 -*-
 '''
 Aggregate Person.
 '''
 import datetime
+import re
 
 from zope.interface.interfaces import Interface
 
 from gorynych.common.domain.model import AggregateRoot
 from gorynych.common.domain.types import Name, Country
 from gorynych.info.domain.ids import PersonID, TrackerID
+from gorynych.info.restui.base_resource import BadParametersError
 
 
 # Person can participate in contest with one of this roles.
 ROLES = frozenset(['paraglider', 'organizator'])
 
+
 class Person(AggregateRoot):
-    def __init__(self, person_id, name, country, email, regdate):
+
+    def __init__(self, person_id, name, country, email, regdate, person_data):
         super(Person, self).__init__()
         self.id = person_id
         self.email = email
@@ -22,6 +27,7 @@ class Person(AggregateRoot):
         self._country = country
         self.regdate = regdate
         # contid:tracker_id
+        self.person_data = person_data
         self.trackers = dict()
         self._contests = dict()
 
@@ -69,7 +75,7 @@ class Person(AggregateRoot):
     def __eq__(self, other):
         return self.id == other.id and (
             self.name.full() == other.name.full()) and (
-            self.email == other.email)
+                self.email == other.email)
 
     def apply_TrackerAssigned(self, ev):
         tr, cont = ev.payload
@@ -81,9 +87,26 @@ class Person(AggregateRoot):
 
 
 class PersonFactory(object):
+    opt_params = ['phone', 'udid']
+
+    def _validate_phone(self, phone):
+        pattern = r'^((8|\+7)[\- ]?)?(\(?\d{3}\)?[\- ]?)?[\d\- ]{7,10}$'
+        print phone
+        m = re.match(pattern, phone)
+        if not m:
+            print 'here?'
+            raise BadParametersError('Phone seems to be not valid.')
+        return m.group()
+
+    def _validate_data(self, person_data):
+        for data_type in person_data:
+            if data_type == 'phone':
+                person_data[data_type] = self._validate_phone(person_data[data_type])
+            # ... other stuff to validate
+        return person_data
 
     def create_person(self, name, surname, country, email, year=None,
-                      month=None, day=None, person_id=None):
+                      month=None, day=None, person_id=None, **person_data):
         '''
         Create an instance of Person aggregate.
         @param name:
@@ -105,12 +128,14 @@ class PersonFactory(object):
                         Name(name, surname),
                         Country(country),
                         email,
-                        datetime.date.today())
+                        datetime.date.today(),
+                        self._validate_data(person_data))
         return person
 
 
 # TODO: move interfaces into domain.interfaces.
 class IPersonRepository(Interface):
+
     def get_by_id(id):
         '''
         Return a person with id.
@@ -133,3 +158,20 @@ class IPersonRepository(Interface):
         '''
         Return list of a person
         '''
+
+
+def change_person(person, params):
+    new_name = dict()
+    if params.get('name'):
+        new_name['name'] = params['name']
+    if params.get('surname'):
+        new_name['surname'] = params['surname']
+    person.name = new_name
+    if params.get('country'):
+        person.country = params['country']
+
+    # other secondary params
+    for key in ['phone', 'udid']:
+        if key in params:
+            person.person_data[key] = params[key]
+    return person

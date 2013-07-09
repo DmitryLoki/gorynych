@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 '''
 Realization of persistence logic.
 '''
@@ -116,12 +117,16 @@ class PGSQLPersonRepository(BasePGSQLRepository):
                 data = yield self.pool.runQuery(pe.insert('person'),
                     self._extract_sql_fields(pers))
             except psycopg2.IntegrityError as e:
-                if e.pgcode == '23505':
+                if e.pgcode == '23505':   # unique constraint
                     pid = yield self.pool.runQuery(pe.select('by_email',
                         'person'), (str(pers.email),))
                     result = yield self.get_by_id(pid[0][0])
                     defer.returnValue(result)
             result = yield self._process_insert_result(data, pers)
+
+        if pers.person_data:
+            resp = yield self._insert_opt_data(pers)
+
         defer.returnValue(result)
 
     def _extract_sql_fields(self, pers=None):
@@ -136,6 +141,20 @@ class PGSQLPersonRepository(BasePGSQLRepository):
             pers._id = inserted_id
             return pers
         return None
+
+    def _insert_opt_data(self, pers):
+        for data_type, date_value in pers.person_data.iteritems():
+            try:
+                self.pool.runOperation(pe.insert('person_data', filename='person'),
+                                             [pers._id, data_type,
+                                              date_value])
+            except psycopg2.IntegrityError as e:
+                if e.pgcode == '23505':   # unique constraint
+                    # or replace it with error if persistence is needed
+                    self.pool.runOperation(pe.update('person_data', filename='person'),
+                                                 [pers._id, data_type,
+                                                  date_value])
+
 
 
 class PGSQLRaceRepository(BasePGSQLRepository):
@@ -223,7 +242,7 @@ class PGSQLRaceRepository(BasePGSQLRepository):
         bearing = ''
         if obj.type == 'opendistance':
             if obj.task.bearing is None:
-                raise ValueError("Race don't have bearing.")
+                raise ValueError("Race doesn't have a bearing.")
             bearing = json.dumps(dict(bearing=int(obj.task.bearing)))
         result['race'] = (obj.title, obj.start_time, obj.end_time,
         obj.timezone, obj.type,

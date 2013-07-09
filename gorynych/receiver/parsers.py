@@ -1,5 +1,6 @@
 from operator import xor
 import time
+import datetime
 
 from zope.interface import Interface, implementer
 
@@ -99,6 +100,16 @@ class GlobalSatTR203(object):
 @implementer(IParseMessage)
 class TeltonikaGH3000UDP(object):
 
+    def check_message_correctness(self, msg):
+        return msg
+
+    def get_response(self, bytestring):
+        packet_id = bytestring[0]
+        num_of_data = ord(bytestring[1])
+        response = ''.join(('0005000201'.decode('hex'), packet_id,
+                            chr(num_of_data)))
+        return response
+
     def parse(self, bytestring):
 
         def bytes2coord(four_bytes):
@@ -151,7 +162,7 @@ class TeltonikaGH3000UDP(object):
             0: (8, bytes2coord, 'latlng'),  # latlog
             1: (2, get_alt, 'alt'),  # alt
             2: (1, get_angle, 'angle'),  #
-            3: (1, get_speed, 'speed'),
+            3: (1, get_speed, 'h_speed'),
             4: (1, None, None),
             5: (4, None, None),
             6: (1, None, None),
@@ -159,10 +170,7 @@ class TeltonikaGH3000UDP(object):
 
         }
 
-        message = {
-            'imei': imei,
-            'records': []
-        }
+        message = {'imei': imei}
 
         def read_gps(segment, mask):
             gpsdata = {}
@@ -210,14 +218,19 @@ class TeltonikaGH3000UDP(object):
                         cursor = cursor+gps_len+1
 
 
-                    else:  # some other element. screw it for now, lets only find its length
-                        # read the next field, it'l tell you how many key-value pairs in the segment
+                    else:
+                    # some other element. screw it for now, lets only find its length
+                    # read the next field, it'l tell you how many key-value pairs in the segment
                         quantity = ord(data[cursor+1])
 
                         # not skip this element
                         cursor = cursor + quantity * 2 + 2
-            message['records'].append(record)
 
-        response = ''.join(['0005000201'.decode('hex'), avl_id, chr(num_of_data))]
+            for key in ['alt', 'lat', 'lon', 'ts', 'h_speed']:
+                message[key] = record[key]
 
-        return message, response
+        response = ''.join(('0005000201'.decode('hex'),
+                            avl_id,
+                            chr(num_of_data)))
+
+        return message

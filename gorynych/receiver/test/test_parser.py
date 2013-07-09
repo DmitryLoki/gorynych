@@ -22,6 +22,12 @@ class ParserTest(unittest.TestCase):
             self.assertIn(item, result.keys())
 
     def _check_values(self, result, **kwargs):
+        self.assertTrue(result.has_key('alt'))
+        self.assertTrue(result.has_key('lat'))
+        self.assertTrue(result.has_key('lon'))
+        self.assertTrue(result.has_key('ts'))
+        self.assertTrue(result.has_key('imei'))
+        self.assertTrue(result.has_key('h_speed'))
         self.assertDictContainsSubset(kwargs, result)
 
 

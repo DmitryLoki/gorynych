@@ -1,13 +1,11 @@
 from twisted.application import internet, service
+from twisted.web.server import Site
 
-# import sys
-# import os
-# sys.path.append('/'.join(os.getcwd().split('/')[:-1]))
 
-from gorynych.receiver.receiver import UDPReceivingProtocol, ReceiverRabbitService, ReceiverService, AuditFileLog, ReceivingFactory
+from gorynych.receiver.receiver import ReceiverRabbitService, ReceiverService, AuditFileLog, ReceivingFactory
+from gorynych.receiver.protocols import UDPReceivingProtocol, UDPTeltonikaGH3000Protocol
 ####### check_trackers ####
 from gorynych.receiver.online_tester import RetreiveJSON
-from twisted.web.server import Site
 
 audit_log = AuditFileLog('audit_log')
 sender = ReceiverRabbitService(host='localhost', port=5672,
@@ -26,6 +24,10 @@ tcp_receiver.setServiceParent(sc)
 udp_server = UDPReceivingProtocol(receiver_service)
 udp_receiver = internet.UDPServer(9999, udp_server)
 udp_receiver.setServiceParent(sc)
+
+telt_udp_server = UDPTeltonikaGH3000Protocol(receiver_service)
+telt_udp_receiver = internet.UDPServer(9998, telt_udp_server)
+telt_udp_receiver.setServiceParent(sc)
 
 root = RetreiveJSON(receiver_service)
 internet.TCPServer(8084, Site(root)).setServiceParent(sc)

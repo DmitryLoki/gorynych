@@ -19,7 +19,8 @@ import simplejson as json
 sys.path.append('..')
 
 
-from gorynych.receiver.receiver import UDPReceivingProtocol, ReceiverRabbitService, ReceiverService, DumbAuditLog
+from gorynych.receiver.receiver import ReceiverRabbitService, ReceiverService, DumbAuditLog
+from gorynych.receiver.protocols import UDPReceivingProtocol
 
 HOST, PORT = 'localhost', 9998
 DIR = 'test_data'

@@ -1,6 +1,7 @@
 from operator import xor
 import datetime
 import time
+import datetime
 
 from zope.interface import Interface, implementer
 
@@ -131,18 +132,28 @@ class TeltonikaGH3000UDP(object):
         bin_str = bin(int(hex_value, base=16))
         return '0' * (8 - len(bin_str[2:])) + bin_str[2:]
 
+    def check_message_correctness(self, msg):
+        return msg
+
+    def get_response(self):
+        # 0005 is package length and should stay the same
+        # 0002 is package id. no matter what's it
+        # 01 is packet type (without ACK).
+        return ''.join(('0005000201'.decode('hex'), self.packet_id,
+                        chr(self.num_of_data)))
+
     def parse(self, bytestring):
         self.starttime = datetime.datetime(2007, 1, 1, 0, 0)
         bytestring = bytestring[5:]
 
-        avl_id = bytestring[0]
+        self.packet_id = bytestring[0]
         # cutting if off too
         bytestring = bytestring[1:]
 
         imei = bytestring[2: 17]
         data = bytestring[17:]
         # codec_id = data[0]
-        num_of_data = ord(data[1])
+        self.num_of_data = ord(data[1])
 
         # strip nums from the end and begining
         data = data[2:-1]

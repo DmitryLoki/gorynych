@@ -399,5 +399,5 @@ class LastPointApplication(RabbitMQService):
         now = int(time.time())
         return self.pool.runOperation(persistence.update('last_point',
             'tracker'), (data['lat'], data['lon'], data['alt'], now,
-        data['battery'], data['h_speed'], data['imei']))
+        data.get('battery'), data['h_speed'], data['imei']))
 

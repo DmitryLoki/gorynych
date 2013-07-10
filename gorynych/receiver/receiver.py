@@ -15,7 +15,7 @@ from twisted.python import log
 from pika.connection import ConnectionParameters
 from pika.adapters.twisted_connection import TwistedProtocolConnection
 
-from gorynych.receiver.parsers import GlobalSatTR203
+from gorynych.receiver.parsers import GlobalSatTR203, TeltonikaGH3000UDP
 from gorynych.receiver.protocols import ReceivingProtocol
 
 ################### Network part ##########################################
@@ -270,7 +270,7 @@ class ReceiverRabbitService(RabbitMQService):
 
 
 class ReceiverService(Service):
-
+    parsers = dict(tr203=GlobalSatTR203(), telt_gh3000=TeltonikaGH3000UDP())
 
     def __init__(self, sender, audit_log):
         self.sender = sender
@@ -287,7 +287,9 @@ class ReceiverService(Service):
         Send a message further.
         '''
         receiving_time = time.time()
-        d = defer.maybeDeferred(self.tr203.check_message_correctness, msg)
+        device_type = kw.get('device_type', 'tr203')
+        d = defer.succeed(
+                self.parsers[device_type].check_message_correctness(msg))
         d.addCallbacks(self.audit_log.log_msg,
             self.audit_log.log_err,
             callbackArgs=[],
@@ -295,9 +297,10 @@ class ReceiverService(Service):
                 'proto': kw.get('proto', 'Unknown')},
             errbackArgs=[],
             errbackKeywords={'data': msg, 'time': receiving_time,
-                'proto': kw.get('proto', 'Unknown')})
+                'proto': kw.get('proto', 'Unknown'),
+                'device':kw.get('device_type', 'Unknown')})
         if self.sender.running:
-            d.addCallback(self.tr203.parse)
+            d.addCallback(self.parsers[device_type].parse)
             d.addCallback(self._save_coords_for_checker)
             d.addCallback(self.sender.write)
         else:

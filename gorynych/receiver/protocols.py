@@ -20,12 +20,10 @@ class UDPReceivingProtocol(protocol.DatagramProtocol):
 
     def datagramReceived(self, datagram, addr):
         device_type = check_device_type(datagram)
-        if device_type == 'telt_gh3000':
-            response = self.service.parsers[device_type].get_response(
-                datagram)
         self.service.handle_message(datagram, proto='UDP', client=addr,
             device_type=device_type)
         if device_type == 'telt_gh3000':
+            response = self.service.parsers[device_type].get_response()
             self.transport.write(response, addr)
 
 
@@ -42,8 +40,7 @@ class UDPTeltonikaGH3000Protocol(protocol.DatagramProtocol):
         self.service = service
 
     def datagramReceived(self, datagram, sender):
-        response = self.service.parsers[self.device_type].get_response(
-                                                            datagram)
         self.service.handle_message(datagram, proto='UDP', client=sender,
             device_type=self.device_type)
+        response = self.service.parsers[self.device_type].get_response()
         self.transport.write(response, sender)

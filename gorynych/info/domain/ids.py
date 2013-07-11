@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from datetime import date
 import re
 from gorynych.common.domain.model import DomainIdentifier

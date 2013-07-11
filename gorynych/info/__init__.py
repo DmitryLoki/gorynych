@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 '''
 Package for context which collect information and supply other context with
 it.
@@ -38,6 +37,7 @@ def makeService(config, services=None):
 
     if not services:
         services = service.MultiService()
+
     pool = adbapi.ConnectionPool('psycopg2', database=config['dbname'],
                                  user=config['dbuser'],
                                  password=config['dbpassword'],

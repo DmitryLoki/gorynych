@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 '''
 Gorynych is a GPS-tracking and analyzing backend for airtribune.com.
 '''
@@ -25,11 +24,11 @@ def get_opts_from_config(env, filename):
 
 class BaseOptions(usage.Options):
     optParameters = [
-        ['environment', 'e', 'test'],
+        ['environment', 'e', 'develop'],
         ['config', 'c', 'config.yaml'],
         ['poolthreads', 'pt', 5, None, int],
         ['workdir', '', './'],
-        ['apiurl', 'url', 'http://api.airtribune.com'],
+        ['apiurl', 'url', 'http://api.airtribune.com']
     ]
 
     def postOptions(self):

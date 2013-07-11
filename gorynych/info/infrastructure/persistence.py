@@ -9,7 +9,7 @@ from zope.interface import implements, implementer
 import psycopg2
 
 from gorynych.info.domain.contest import Paraglider, IContestRepository, ContestFactory
-from gorynych.info.domain.ids import PersonID
+from gorynych.info.domain.ids import PersonID, TransportID
 from gorynych.info.domain.race import IRaceRepository, RaceFactory
 from gorynych.common.domain.types import checkpoint_collection_from_geojson, geojson_feature_collection, Name
 from gorynych.info.domain.person import IPersonRepository, PersonFactory
@@ -70,21 +70,16 @@ class BasePGSQLRepository(object):
     @defer.inlineCallbacks
     def save(self, obj):
         result = None
-        print "got object %s" % obj
         try:
             if obj._id:
                 yield self._update(obj)
                 result = obj
             else:
-                print "*"*40
-                print "I will save it!"
                 _id = yield self._save_new(obj)
                 obj._id = _id[0][0]
-                print ">>> got _id: ", _id[0][0]
                 result = obj
         except psycopg2.IntegrityError as e:
             if e.pgcode == '23505':
-                print ">>> exception"
                 # unique constraints violation
                 result = yield self._get_existed(obj, e)
                 defer.returnValue(result)
@@ -316,6 +311,8 @@ class PGSQLContestRepository(BasePGSQLRepository):
                     glider=str(glider))
             elif role == 'organizator':
                 participants[PersonID.fromstring(pid)] = dict(role=role)
+            elif role == 'transport':
+                participants[TransportID.fromstring(pid)] = dict(role=role)
         cont._participants = participants
         return cont
 
@@ -490,10 +487,7 @@ class PGSQLTransportRepository(BasePGSQLRepository):
         @return:
         @rtype: tuple
         '''
-        print "=" * 40
-        print "Now I will save."
         a = (obj.title, obj.type, obj.description, str(obj.id))
-        print a
         return a
 
     def _get_existed(self, obj, e):

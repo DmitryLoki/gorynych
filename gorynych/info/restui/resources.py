@@ -431,6 +431,26 @@ class TransportResource(APIResource):
             return self.__read(t)
 
 
+class ContestTransportCollection(APIResource):
+    '''
+    /contest/{id}/transport
+    '''
+    name = 'contest_transport_collection'
+    service_command = dict(POST='add_transport_to_contest',
+        GET='get_contest_transport')
+
+
+    def read_GET(self, t, p=None):
+        if t:
+            result = []
+            result.append(self.read_POST(t))
+            return self.read_POST(t)
+            # return list(dict(transport_ids=json.dumps(map(str, t))))
+
+    def read_POST(self, cont, p=None):
+        if cont:
+            return dict(transport_ids=json.dumps(map(str, cont.transport)))
+
 
 # TODO: this resource should be in processor package.
 class TracksResource(APIResource):

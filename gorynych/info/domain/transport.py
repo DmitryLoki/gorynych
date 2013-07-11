@@ -42,15 +42,10 @@ class TransportFactory(object):
             tr_id = TransportID()
         if not isinstance(tr_id, TransportID):
             tr_id = TransportID.fromstring(tr_id)
-        if not isinstance(description, str):
-            raise TypeError("Description has type %s but nees str." % type(
-                description))
         result = Transport(tr_id, title, description)
-        print ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>Got type!", transport_type
         if not transport_type:
             raise ValueError("Transport type must be given")
         result.type = transport_type
-        print ">>> transport with type:", result.type
         return result
 
 

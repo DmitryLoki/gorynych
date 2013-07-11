@@ -323,7 +323,6 @@ class APIResource(resource.Resource):
             if index % 2:
                 insert(path[index - 1], path[index])
 
-        print ">>>>>> request params:", result
         return result
 
     def _get_args(self, args):

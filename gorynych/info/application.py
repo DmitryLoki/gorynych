@@ -152,6 +152,17 @@ class ApplicationService(BaseApplicationService):
             persistence.get_repository(contest.IContestRepository).save)
         return d
 
+    def add_transport_to_contest(self, params):
+        d = self.get_contest(params)
+        d.addCallback(lambda cont: cont.add_transport(params['transport_id']))
+        d.addCallback(
+            persistence.get_repository(contest.IContestRepository).save)
+        return d
+
+    def get_contest_transport(self, params):
+        d = self.get_contest(params)
+        return d
+
     def get_contest_paragliders(self, params):
         '''
         Return list with race paragliders.

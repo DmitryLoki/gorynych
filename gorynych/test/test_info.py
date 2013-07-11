@@ -523,5 +523,30 @@ class TestTransportAPI(unittest.TestCase):
             'description':'New description.','id':tid}, r.json())
 
 
+class ContestTransportTest(unittest.TestCase):
+    url = URL + '/contest'
+    def test_add_transport_to_contest(self):
+        try:
+            c_, t_ = create_contest(title='Contest with transport')
+            tr_ = create_transport()
+        except:
+            raise unittest.SkipTest("I need contest for test")
+
+        c_id = c_.json()['id']
+        tr_id = tr_.json()['id']
+        r = requests.post('/'.join((self.url, c_id, 'transport')), data=dict(
+            transport_id=tr_id))
+        self.assertEqual(r.status_code, 201)
+        self.assertIn(tr_id, r.json())
+
+        # GET /contest/{id}/transport
+        r = requests.get('/'.join((self.url, c_id, 'transport')))
+        self.assertEqual(r.status_code, 200)
+        self.assertGreaterEqual(len(r.json()), 1)
+        self.assertIsInstance(r.json(), list)
+
+
+
+
 if __name__ == '__main__':
     unittest.main()

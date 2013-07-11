@@ -49,6 +49,9 @@ contest:
             *person_index:
               leaf: ContestParagliderResource
               package: *gorynych
+        transport:
+          leaf: ContestTransportCollection
+          package: *gorynych
         race:
           leaf: ContestRaceResourceCollection
           package: *gorynych

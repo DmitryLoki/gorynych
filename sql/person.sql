@@ -18,6 +18,10 @@ CREATE TABLE PERSON_DATA(
   PRIMARY KEY (ID, DATA_TYPE, DATA_VALUE)
 );
 
+CREATE UNIQUE INDEX UNIQUE_PHONE
+ON PERSON_DATA (ID, DATA_VALUE)
+WHERE DATA_TYPE='phone';
+
 -- Insert Person
 INSERT INTO PERSON(NAME, SURNAME, REGDATE, COUNTRY, EMAIL, PERSON_ID)
     VALUES (%s, %s, %s, %s, %s, %s)
@@ -57,11 +61,11 @@ WHERE
   pd.DATA_VALUE=%s AND
   pd.ID=p.ID;
 
--- Insert Person_Data
+-- Insert person_data
 INSERT INTO PERSON_DATA(ID, DATA_TYPE, DATA_VALUE)
     VALUES (%s, %s, %s);
 
--- Update Person_Data
+-- Update person_data
 UPDATE PERSON_DATA SET
   DATA_VALUE=%s
 WHERE

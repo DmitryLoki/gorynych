@@ -1,9 +1,7 @@
-# -*- coding: utf-8 -*-
 '''
 Realization of persistence logic.
 '''
 import simplejson as json
-import time
 
 from twisted.internet import defer
 from twisted.python import log
@@ -124,8 +122,8 @@ class PGSQLPersonRepository(BasePGSQLRepository):
                     defer.returnValue(result)
             result = yield self._process_insert_result(data, pers)
 
-        if pers.person_data:
-            resp = yield self._insert_opt_data(pers)
+        if pers._person_data:
+            yield self._insert_person_data(pers)
 
         defer.returnValue(result)
 
@@ -142,18 +140,21 @@ class PGSQLPersonRepository(BasePGSQLRepository):
             return pers
         return None
 
-    def _insert_opt_data(self, pers):
-        for data_type, date_value in pers.person_data.iteritems():
+    @defer.inlineCallbacks
+    def _insert_person_data(self, pers):
+        for data_type, data_value in pers._person_data.iteritems():
             try:
-                self.pool.runOperation(pe.insert('person_data', filename='person'),
-                                             [pers._id, data_type,
-                                              date_value])
+                yield self.pool.runOperation(
+                    pe.insert('person_data', 'person'),
+                                             (pers._id, data_type,
+                                              data_value))
             except psycopg2.IntegrityError as e:
                 if e.pgcode == '23505':   # unique constraint
                     # or replace it with error if persistence is needed
-                    self.pool.runOperation(pe.update('person_data', filename='person'),
-                                                 [pers._id, data_type,
-                                                  date_value])
+                    yield self.pool.runOperation(
+                        pe.update('person_data', 'person'),
+                                                 (data_value, pers._id,
+                                                  data_type))
 
 
 
@@ -451,7 +452,7 @@ class PGSQLTrackerRepository(BasePGSQLRepository):
         @return:
         @rtype:
         '''
-        return (obj.device_id, obj.device_type, obj.name, str(obj.id))
+        return obj.device_id, obj.device_type, obj.name, str(obj.id)
 
     def _get_existed(self, obj, e):
         return self.get_by_id(obj.id)

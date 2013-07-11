@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # coding=utf-8
 '''
 Tests for info context.
@@ -130,15 +129,9 @@ class ContestRESTAPITest(unittest.TestCase):
 
 
 class PersonAPITest(unittest.TestCase):
-    def __init__(self, *args, **kwargs):
-        super(PersonAPITest, self).__init__(*args, **kwargs)
-        # dirty dirty hack
-        import psycopg2
-        self.con = psycopg2.connect('dbname=test_gorynych user=postgres password=postgres host=localhost')
-        self.cur = self.con.cursor()
-
 
     url = URL + '/person/'
+
     def test_1_get_fake_person(self):
         r = requests.get(self.url+'/1-1-1-1')
         self.assertEqual(r.status_code, 404)
@@ -175,32 +168,54 @@ class PersonAPITest(unittest.TestCase):
         self.assertEqual(result['name'], 'Juan Carlos')
         self.assertEqual(result['country'], 'ME')
 
-    def test_create_person_with_optparams(self):
-        import time
-        r, email = create_persons(phone='+7 (123) 456 78 98', udid='df34t34f')
+
+class PersonWithDataTest(unittest.TestCase):
+    url = URL + '/person/'
+
+    def setUp(self):
+        # dirty dirty hack
+        import psycopg2
+        from gorynych import OPTS
+        try:
+            self.con = psycopg2.connect(database=OPTS['dbname'],
+            user=OPTS['dbuser'], host=OPTS['dbhost'], password=OPTS[
+                'dbpassword'])
+        except Exception as e:
+            raise unittest.SkipTest("Can't connect to database: %r" % e)
+        self.cur = self.con.cursor()
+
+    def tearDown(self):
+        self.con.close()
+
+    def test_add_change_person_phone(self):
+        r, email = create_persons()
         self.assertEqual(r.status_code, 201)
+        pid = r.json()['id']
+        params = json.dumps(dict(phone='+7123456'))
+        r = requests.put(self.url + pid, data=params)
+        self.assertEqual(r.status_code, 200)
+        self._check_phone_change(pid, '+7123456')
 
-        # dirtiness 80lvl. but need to handle async somehow
-        time.sleep(1)
+        params = json.dumps(dict(phone='+21'))
+        r = requests.put(self.url + pid, data=params)
+        self.assertEqual(r.status_code, 200)
+        self._check_phone_change(pid, '+21')
 
-        self.cur.execute('select * from person_data')
+    def _check_phone_change(self, pid, phone):
+        self.cur.execute('''
+         select data_type, data_value
+         from person_data, person
+         where
+            person_id=%s
+            and person.id = person_data.id
+        ''', (pid, ))
         data = self.cur.fetchall()
-        print data
-        self.assertTrue(len(data) == 2)
+        self.assertEqual(len(data), 1)
 
-        data = {el[1]: el[2] for el in data}
+        data = {data[0][0]:data[0][1]}
 
-        self.assertTrue(data.get('phone') == '+7 (123) 456 78 98')
-        self.assertTrue(data.get('udid') == 'df34t34f')
-
-        self.cur.execute('delete from person_data')
+        self.assertEqual(data['phone'], phone)
         self.con.commit()
-
-    def test_create_person_with_bad_phone(self):
-        import time
-        r, email = create_persons(phone='samsung')
-        self.assertEqual(r.status_code, 500)
-
 
 
 class ParaglidersTest(unittest.TestCase):

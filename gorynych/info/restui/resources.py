@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import simplejson as json
 import pytz
 from datetime import datetime
@@ -222,7 +221,6 @@ class PersonResource(APIResource):
                             person_id=pers.id,
                             person_country=pers.country,
                             trackers=json.dumps(trackers))
-            response.update(pers.person_data)
             return response
 
     def read_GET(self, pers, request_params=None):

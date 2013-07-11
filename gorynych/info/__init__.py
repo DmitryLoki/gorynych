@@ -33,7 +33,7 @@ def makeService(config, services=None):
     from gorynych.common.infrastructure import persistence
     from gorynych.eventstore.eventstore import EventStore
     from gorynych.eventstore.store import PGSQLAppendOnlyStore
-    from gorynych.info.infrastructure.persistence import PGSQLContestRepository, PGSQLPersonRepository, PGSQLRaceRepository, PGSQLTrackerRepository
+    from gorynych.info.infrastructure.persistence import PGSQLContestRepository, PGSQLPersonRepository, PGSQLRaceRepository, PGSQLTrackerRepository, PGSQLTransportRepository
 
     if not services:
         services = service.MultiService()
@@ -44,20 +44,20 @@ def makeService(config, services=None):
                                  host=config['dbhost'], cp_max=10,
                                  cp_reconnect=True)
 
-    # EventStore init
+    # EventStore init.
     event_store = EventStore(PGSQLAppendOnlyStore(pool))
     persistence.add_event_store(event_store)
 
-    # Application Service init
+    # Application Service init.
     app_service = ApplicationService(pool, event_store)
     app_service.setServiceParent(services)
 
-    # LastPoint application service init
+    # LastPoint application service init.
     last_point = LastPointApplication(pool, host='localhost', port=5672,
         exchange='receiver', queues_no_ack=True, exchange_type='fanout')
     last_point.setServiceParent(services)
 
-    # Test repositories init
+    # Repositories init.
     persistence.register_repository(IContestRepository,
                                     PGSQLContestRepository(pool) )
     persistence.register_repository(IRaceRepository,
@@ -66,6 +66,8 @@ def makeService(config, services=None):
                                     PGSQLPersonRepository(pool))
     persistence.register_repository(interfaces.ITrackerRepository,
         PGSQLTrackerRepository(pool))
+    persistence.register_repository(interfaces.ITransportRepository,
+        PGSQLTransportRepository(pool))
 
     # REST API init
     api_tree = base_resource.resource_tree()

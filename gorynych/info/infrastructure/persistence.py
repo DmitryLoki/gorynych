@@ -17,6 +17,7 @@ from gorynych.common.exceptions import NoAggregate, DatabaseValueError
 from gorynych.common.infrastructure import persistence as pe
 from gorynych.info.domain import interfaces
 from gorynych.info.domain.tracker import TrackerFactory
+from gorynych.info.domain.transport import TransportFactory
 
 
 def create_participants(paragliders_row):
@@ -68,16 +69,22 @@ class BasePGSQLRepository(object):
 
     @defer.inlineCallbacks
     def save(self, obj):
+        result = None
+        print "got object %s" % obj
         try:
             if obj._id:
                 yield self._update(obj)
                 result = obj
             else:
+                print "*"*40
+                print "I will save it!"
                 _id = yield self._save_new(obj)
                 obj._id = _id[0][0]
+                print ">>> got _id: ", _id[0][0]
                 result = obj
         except psycopg2.IntegrityError as e:
             if e.pgcode == '23505':
+                print ">>> exception"
                 # unique constraints violation
                 result = yield self._get_existed(obj, e)
                 defer.returnValue(result)
@@ -155,7 +162,6 @@ class PGSQLPersonRepository(BasePGSQLRepository):
                         pe.update('person_data', 'person'),
                                                  (data_value, pers._id,
                                                   data_type))
-
 
 
 class PGSQLRaceRepository(BasePGSQLRepository):
@@ -453,6 +459,42 @@ class PGSQLTrackerRepository(BasePGSQLRepository):
         @rtype:
         '''
         return obj.device_id, obj.device_type, obj.name, str(obj.id)
+
+    def _get_existed(self, obj, e):
+        return self.get_by_id(obj.id)
+
+
+@implementer(interfaces.ITransportRepository)
+class PGSQLTransportRepository(BasePGSQLRepository):
+
+    def _restore_aggregate(self, rows):
+        factory = TransportFactory()
+        _id, _tid, _title, _ttype, _desc = rows
+        result = factory.create_transport( _ttype, _title, _desc, tr_id=_tid)
+        result._id = _id
+        return result
+
+    def _save_new(self, obj):
+        return self.pool.runQuery(pe.insert('transport'),
+            self._extract_sql_fields(obj))
+
+    def _update(self, obj):
+        return self.pool.runOperation(pe.update('transport'),
+            self._extract_sql_fields(obj))
+
+    def _extract_sql_fields(self, obj):
+        '''
+
+        @param obj:
+        @type obj: gorynych.info.domain.transport.Transport
+        @return:
+        @rtype: tuple
+        '''
+        print "=" * 40
+        print "Now I will save."
+        a = (obj.title, obj.type, obj.description, str(obj.id))
+        print a
+        return a
 
     def _get_existed(self, obj, e):
         return self.get_by_id(obj.id)

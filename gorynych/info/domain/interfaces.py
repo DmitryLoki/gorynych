@@ -26,3 +26,12 @@ class IRepository(Interface):
 
 
 class ITrackerRepository(IRepository): pass
+
+
+class ITransportRepository(Interface):
+    def get_by_id(transport_id):
+        '''
+        '''
+    def save(obj):
+        '''
+        '''

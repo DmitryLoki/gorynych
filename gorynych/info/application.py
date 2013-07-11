@@ -9,7 +9,7 @@ import time
 from twisted.internet import defer, task
 from twisted.python import log
 
-from gorynych.info.domain import contest, person, race, tracker
+from gorynych.info.domain import contest, person, race, tracker, transport
 from gorynych.common.infrastructure import persistence
 from gorynych.common.domain.types import checkpoint_from_geojson
 from gorynych.common.domain.events import ContestRaceCreated
@@ -363,6 +363,32 @@ class ApplicationService(BaseApplicationService):
            del params['tracker_id']
         return self._change_aggregate(params, interfaces.ITrackerRepository,
             tracker.change_tracker)
+
+    ############## Transport aggregate part ################
+    def create_new_transport(self, params):
+        from gorynych.info.domain.transport import TransportFactory
+        factory = TransportFactory()
+        trns = factory.create_transport(params['type'], params['title'],
+            params.get('description'))
+        d = defer.succeed(trns)
+        d.addCallback(persistence.get_repository(
+            interfaces.ITransportRepository).save)
+        return d
+
+    def get_transports(self, params=None):
+        return self._get_aggregates_list(
+            params, interfaces.ITransportRepository)
+
+    def get_transport(self, params):
+        return self._get_aggregate(params['transport_id'],
+            interfaces.ITransportRepository)
+
+    def change_transport(self, params):
+        if params.has_key('transport_id'):
+            params['id'] = params['transport_id']
+            del params['transport_id']
+        return self._change_aggregate(params, interfaces.ITransportRepository,
+            transport.change_transport)
 
 
 class LastPointApplication(RabbitMQService):

@@ -380,6 +380,58 @@ class TrackerResource(APIResource):
         return self.read_GET(t)
 
 
+class TransportResourceCollection(APIResource):
+    '''
+    /transport
+    '''
+    name = 'transport_collection'
+    service_command = dict(POST='create_new_transport', GET='get_transports')
+
+    def read_GET(self, transport_list, p=None):
+        if transport_list:
+            result = []
+            for t in transport_list:
+                result.append(self.read_POST(t))
+            return result
+
+    def read_POST(self, t, p=None):
+        '''
+        @type t: L{gorynych.info.domain.transport.Transport}
+        '''
+        if t:
+            result = dict()
+            result['transport_id'] = str(t.id)
+            result['title'] = t.title
+            result['description'] = t.description
+            result['type'] = t.type
+            return result
+
+
+class TransportResource(APIResource):
+    '''
+    /transport/{id}
+    '''
+    name = 'transport'
+    service_command = dict(GET='get_transport', PUT='change_transport')
+
+    def __read(self, t):
+        result = dict()
+        result['transport_id'] = str(t.id)
+        result['title'] = t.title
+        result['description'] = t.description
+        result['type'] = t.type
+        return result
+
+    def read_PUT(self, t, p=None):
+        if t:
+            return self.__read(t)
+
+    def read_GET(self, t, p=None):
+        if t:
+            return self.__read(t)
+
+
+
 # TODO: this resource should be in processor package.
 class TracksResource(APIResource):
     '''

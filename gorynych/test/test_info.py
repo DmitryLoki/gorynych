@@ -82,6 +82,16 @@ def register_paraglider(pers_id, cont_id):
     return r, cn
 
 
+def create_transport(ttype=None, title=None, description=None):
+    if not ttype:
+        ttype='bus'
+    if not title:
+        title='Some bus.'
+    params = dict(type=ttype, title=title, description=description)
+    r = requests.post(URL + '/transport', data=params)
+    return r
+
+
 class RESTAPITest(unittest.TestCase):
     '''
     REST API must be started and running before tests.
@@ -441,6 +451,76 @@ class TrackerTest(unittest.TestCase):
         r1 = requests.post(self.url, data=params)
         self.assertEqual(r1.status_code, 201)
         self.assertEqual(r1.json()['id'], tid)
+
+
+class TestTransportAPI(unittest.TestCase):
+    url = URL + '/transport'
+    def test_create(self):
+        r = create_transport(ttype='bus', title='Yellow bus',
+            description='Cool yellow bus with condition')
+        self.assertEqual(r.status_code, 201)
+        self.assertDictContainsSubset({'title': 'Yellow bus', 'type': 'bus',
+            'description': 'Cool yellow bus with condition'}, r.json())
+
+    def test_get_list(self):
+        try:
+            r = create_transport(ttype='car', title='Good car',
+                description='car')
+            tid = r.json()['id']
+        except Exception:
+            raise unittest.SkipTest("Can't create transport.")
+        if not tid:
+            raise unittest.SkipTest("Transport id needed for test.")
+
+        r = requests.get(self.url)
+        self.assertEqual(r.status_code, 200)
+        result = r.json()
+        self.assertIsInstance(result, list)
+        self.assertGreaterEqual(len(result), 1)
+        ids = []
+        for t in result:
+            ids.append(t['id'])
+        self.assertIn(tid, ids)
+
+    def test_get_transport(self):
+        try:
+            r = create_transport(ttype='car', title='Good car',
+                description='card')
+            tid = r.json()['id']
+        except Exception:
+            raise unittest.SkipTest("Can't create transport.")
+        if not tid:
+            raise unittest.SkipTest("Transport id needed for test.")
+
+        r = requests.get('/'.join((self.url, tid)))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['id'], tid)
+        self.assertDictContainsSubset({'title': 'Good car',
+            'description':'Card', 'type':'car'}, r.json())
+
+    def test_change_transport(self):
+        try:
+            r = create_transport(ttype='car', title='Good car',
+                description='car')
+            tid = r.json()['id']
+        except Exception:
+            raise unittest.SkipTest("Can't create transport.")
+        if not tid:
+            raise unittest.SkipTest("Transport id needed for test.")
+
+        # change it
+        params = json.dumps(dict(type='bus', title='A bus.',
+            description='New description.'))
+        r = requests.put('/'.join((self.url, tid)), data=params)
+        self.assertEqual(r.status_code, 200)
+        self.assertDictContainsSubset({'type':'bus', 'title':'A bus.',
+            'description':'New description.','id':tid}, r.json())
+
+        # get it from API
+        r = requests.get('/'.join((self.url, tid)))
+        self.assertEqual(r.status_code, 200)
+        self.assertDictContainsSubset({'type':'bus', 'title':'A bus.',
+            'description':'New description.','id':tid}, r.json())
 
 
 if __name__ == '__main__':

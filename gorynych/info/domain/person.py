@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 '''
 Aggregate Person.
 '''
@@ -9,8 +8,7 @@ from zope.interface.interfaces import Interface
 
 from gorynych.common.domain.model import AggregateRoot
 from gorynych.common.domain.types import Name, Country
-from gorynych.info.domain.ids import PersonID, TrackerID
-from gorynych.info.restui.base_resource import BadParametersError
+from gorynych.info.domain.ids import PersonID
 
 
 # Person can participate in contest with one of this roles.
@@ -19,7 +17,7 @@ ROLES = frozenset(['paraglider', 'organizator'])
 
 class Person(AggregateRoot):
 
-    def __init__(self, person_id, name, country, email, regdate, person_data):
+    def __init__(self, person_id, name, country, email, regdate):
         super(Person, self).__init__()
         self.id = person_id
         self.email = email
@@ -27,9 +25,10 @@ class Person(AggregateRoot):
         self._country = country
         self.regdate = regdate
         # contid:tracker_id
-        self.person_data = person_data
         self.trackers = dict()
         self._contests = dict()
+        # data_type:value
+        self._person_data = dict()
 
     @property
     def country(self):
@@ -38,6 +37,18 @@ class Person(AggregateRoot):
     @country.setter
     def country(self, value):
         self._country = Country(value)
+
+    @property
+    def phone(self):
+        return self._person_data.get('phone')
+
+    @phone.setter
+    def phone(self, value):
+        if re.match(r'^\+\d+', value):
+            self._person_data['phone'] = value
+        else:
+            raise ValueError("Incorrect phone %s, I'm waiting for phone like"
+                             " this: +3123456789")
 
     @property
     def name(self):
@@ -67,6 +78,7 @@ class Person(AggregateRoot):
         return self._contests.keys()
 
     def dont_participate_in_contest(self, contest_id):
+        # TODO: check if this method used.
         try:
             del self._contests[contest_id]
         except KeyError:
@@ -87,26 +99,11 @@ class Person(AggregateRoot):
 
 
 class PersonFactory(object):
-    opt_params = ['phone', 'udid']
-
-    def _validate_phone(self, phone):
-        pattern = r'^((8|\+7)[\- ]?)?(\(?\d{3}\)?[\- ]?)?[\d\- ]{7,10}$'
-        print phone
-        m = re.match(pattern, phone)
-        if not m:
-            print 'here?'
-            raise BadParametersError('Phone seems to be not valid.')
-        return m.group()
-
-    def _validate_data(self, person_data):
-        for data_type in person_data:
-            if data_type == 'phone':
-                person_data[data_type] = self._validate_phone(person_data[data_type])
-            # ... other stuff to validate
-        return person_data
+    # Person can hold additional data of those types.
+    person_data_types = ['phone']
 
     def create_person(self, name, surname, country, email, year=None,
-                      month=None, day=None, person_id=None, **person_data):
+            month=None, day=None, person_id=None, **person_data):
         '''
         Create an instance of Person aggregate.
         @param name:
@@ -125,11 +122,14 @@ class PersonFactory(object):
         elif not isinstance(person_id, PersonID):
             person_id = PersonID.fromstring(person_id)
         person = Person(person_id,
-                        Name(name, surname),
-                        Country(country),
-                        email,
-                        datetime.date.today(),
-                        self._validate_data(person_data))
+            Name(name, surname),
+            Country(country),
+            email,
+            datetime.date.today())
+        for data_type in self.person_data_types:
+            if person_data.get(data_type) and hasattr(person, data_type):
+                setattr(person, data_type, person_data[data_type])
+
         return person
 
 
@@ -145,7 +145,7 @@ class IPersonRepository(Interface):
         @rtype: Person
         '''
 
-    def save(person):  # @NoSelf
+    def save(person):
         '''
         Persist person.
         @param person:
@@ -172,6 +172,6 @@ def change_person(person, params):
 
     # other secondary params
     for key in ['phone', 'udid']:
-        if key in params:
-            person.person_data[key] = params[key]
+        if key in params and hasattr(person, key):
+            setattr(person, key, params[key])
     return person

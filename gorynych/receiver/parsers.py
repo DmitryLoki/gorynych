@@ -256,7 +256,8 @@ class TeltonikaGH3000UDP(object):
             'lat': message['records'][0]['lat'],
             'lon': message['records'][0]['lon'],
             'h_speed': message['records'][0]['speed'],
-            'alt': message['records'][0]['alt']
+            'alt': message['records'][0]['alt'],
+            'ts': message['records'][0]['ts']
         }
 
         return compatible_response

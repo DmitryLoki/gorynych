@@ -56,8 +56,19 @@ class GlobalSatTR203Test(ParserTest):
 
 class TeltonikaGH3000UDPTest(ParserTest):
     def setUp(self):
-        self.parser = TeltonikaGH3000UDP
+        self.parser = TeltonikaGH3000UDP()
+        self.message = message = "003c00000102000F313233343536373839303132333435070441bf9db00fff425adbd741ca6e1e009e1205070001030b160000601a02015e02000314006615000a160067010500000ce441bf9d920fff425adbb141ca6fc900a2b218070001030b160000601a02015e02000314006615000a160067010500000cc641bf9d740fff425adbee41ca739200b6c91e070001030b1f0000601a02015f02000314006615000a160066010500000ca841bf9cfc0fff425adba041ca70c100b93813070001030b1f0000601a02015f02000314002315000a160025010500000c3004".decode('hex')
 
+    def test_parse(self):
+        should_be = {'imei': '123456789012345', 'records': [{'angle': 25.3125, 'lat': 54.714687, 'speed': 5, 'alt': 158, 'lon': 25.303768, 'ts': 1196933760}, {'angle': 250.3125, 'lat': 54.714542, 'speed': 24, 'alt': 162, 'lon': 25.304583, 'ts': 1196933730}, {'angle': 282.65625, 'lat': 54.714775, 'speed': 30, 'alt': 182, 'lon': 25.306431, 'ts': 1196933700}, {'angle': 78.75, 'lat': 54.714478, 'speed': 19, 'alt': 185, 'lon': 25.305056, 'ts': 1196933580}]}
+        result = self.parser.parse(self.message)
+        self.assertEquals(result, should_be)
+
+
+    def test_response(self):
+        self.parser.parse(self.message)
+        response = self.parser.get_response()
+        self.assertEqual(response.encode('hex'), '00050002010204')
 
 if __name__ == '__main__':
     unittest.main()

@@ -251,6 +251,4 @@ class TeltonikaGH3000UDP(object):
 
             message['records'].append(record)
 
-        response = ''.join(
-            ['0005000201'.decode('hex'), avl_id, chr(num_of_data)])
-        return message, response
+        return message

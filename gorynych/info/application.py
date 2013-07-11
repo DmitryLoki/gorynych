@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 '''
 Application Services for info context.
 '''
@@ -217,24 +218,11 @@ class ApplicationService(BaseApplicationService):
         return self._get_aggregates_list(params, person.IPersonRepository)
 
     def change_person(self, params):
-        # TODO: create changing services instead of functions in application
-        #  layer.
-        def change(pers, params):
-            new_name = dict()
-            if params.get('name'):
-                new_name['name'] = params['name']
-            if params.get('surname'):
-                new_name['surname'] = params['surname']
-            pers.name = new_name
-            if params.get('country'):
-                pers.country = params['country']
-            return pers
-
         if params.has_key('person_id'):
             params['id'] = params['person_id']
             del params['person_id']
         return self._change_aggregate(params, person.IPersonRepository,
-                                      change)
+                                      person.change_person)
 
     ############## Race Service part ################
     def get_race(self, params):

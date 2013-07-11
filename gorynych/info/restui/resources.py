@@ -217,10 +217,11 @@ class PersonResource(APIResource):
             trackers = []
             for t in pers.trackers:
                 trackers.append([str(pers.trackers[t]), str(t)])
-            return dict(person_name=pers.name.full(),
-                        person_id=pers.id,
-                        person_country=pers.country,
-                        trackers=json.dumps(trackers))
+            response = dict(person_name=pers.name.full(),
+                            person_id=pers.id,
+                            person_country=pers.country,
+                            trackers=json.dumps(trackers))
+            return response
 
     def read_GET(self, pers, request_params=None):
         return self.read_PUT(pers)

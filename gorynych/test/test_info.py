@@ -26,13 +26,17 @@ def create_contest(title='Contest with paragliders'):
     return r, title
 
 
-def create_persons(reg_date=None, email=None, name=None):
+def create_persons(reg_date=None, email=None, name=None, phone=None, udid=None):
     if not email:
         email = 'vasya@example.com'+ str(random.randint(1, 1000000))
     if not name:
         name='Vasylyi'
     params = dict(name=name, surname='Doe', country='SS',
         email=email, reg_date=reg_date)
+    if phone:
+        params.update({'phone': phone})
+    if udid:
+        params.update({'udid': udid})
     r = requests.post(URL + '/person', data=params)
     return r, email
 
@@ -125,7 +129,9 @@ class ContestRESTAPITest(unittest.TestCase):
 
 
 class PersonAPITest(unittest.TestCase):
+
     url = URL + '/person/'
+
     def test_1_get_fake_person(self):
         r = requests.get(self.url+'/1-1-1-1')
         self.assertEqual(r.status_code, 404)
@@ -161,6 +167,55 @@ class PersonAPITest(unittest.TestCase):
         result = r2.json()
         self.assertEqual(result['name'], 'Juan Carlos')
         self.assertEqual(result['country'], 'ME')
+
+
+class PersonWithDataTest(unittest.TestCase):
+    url = URL + '/person/'
+
+    def setUp(self):
+        # dirty dirty hack
+        import psycopg2
+        from gorynych import OPTS
+        try:
+            self.con = psycopg2.connect(database=OPTS['dbname'],
+            user=OPTS['dbuser'], host=OPTS['dbhost'], password=OPTS[
+                'dbpassword'])
+        except Exception as e:
+            raise unittest.SkipTest("Can't connect to database: %r" % e)
+        self.cur = self.con.cursor()
+
+    def tearDown(self):
+        self.con.close()
+
+    def test_add_change_person_phone(self):
+        r, email = create_persons()
+        self.assertEqual(r.status_code, 201)
+        pid = r.json()['id']
+        params = json.dumps(dict(phone='+7123456'))
+        r = requests.put(self.url + pid, data=params)
+        self.assertEqual(r.status_code, 200)
+        self._check_phone_change(pid, '+7123456')
+
+        params = json.dumps(dict(phone='+21'))
+        r = requests.put(self.url + pid, data=params)
+        self.assertEqual(r.status_code, 200)
+        self._check_phone_change(pid, '+21')
+
+    def _check_phone_change(self, pid, phone):
+        self.cur.execute('''
+         select data_type, data_value
+         from person_data, person
+         where
+            person_id=%s
+            and person.id = person_data.id
+        ''', (pid, ))
+        data = self.cur.fetchall()
+        self.assertEqual(len(data), 1)
+
+        data = {data[0][0]:data[0][1]}
+
+        self.assertEqual(data['phone'], phone)
+        self.con.commit()
 
 
 class ParaglidersTest(unittest.TestCase):

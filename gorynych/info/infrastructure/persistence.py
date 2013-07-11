@@ -2,7 +2,6 @@
 Realization of persistence logic.
 '''
 import simplejson as json
-import time
 
 from twisted.internet import defer
 from twisted.python import log
@@ -116,12 +115,16 @@ class PGSQLPersonRepository(BasePGSQLRepository):
                 data = yield self.pool.runQuery(pe.insert('person'),
                     self._extract_sql_fields(pers))
             except psycopg2.IntegrityError as e:
-                if e.pgcode == '23505':
+                if e.pgcode == '23505':   # unique constraint
                     pid = yield self.pool.runQuery(pe.select('by_email',
                         'person'), (str(pers.email),))
                     result = yield self.get_by_id(pid[0][0])
                     defer.returnValue(result)
             result = yield self._process_insert_result(data, pers)
+
+        if pers._person_data:
+            yield self._insert_person_data(pers)
+
         defer.returnValue(result)
 
     def _extract_sql_fields(self, pers=None):
@@ -136,6 +139,23 @@ class PGSQLPersonRepository(BasePGSQLRepository):
             pers._id = inserted_id
             return pers
         return None
+
+    @defer.inlineCallbacks
+    def _insert_person_data(self, pers):
+        for data_type, data_value in pers._person_data.iteritems():
+            try:
+                yield self.pool.runOperation(
+                    pe.insert('person_data', 'person'),
+                                             (pers._id, data_type,
+                                              data_value))
+            except psycopg2.IntegrityError as e:
+                if e.pgcode == '23505':   # unique constraint
+                    # or replace it with error if persistence is needed
+                    yield self.pool.runOperation(
+                        pe.update('person_data', 'person'),
+                                                 (data_value, pers._id,
+                                                  data_type))
+
 
 
 class PGSQLRaceRepository(BasePGSQLRepository):
@@ -223,7 +243,7 @@ class PGSQLRaceRepository(BasePGSQLRepository):
         bearing = ''
         if obj.type == 'opendistance':
             if obj.task.bearing is None:
-                raise ValueError("Race don't have bearing.")
+                raise ValueError("Race doesn't have a bearing.")
             bearing = json.dumps(dict(bearing=int(obj.task.bearing)))
         result['race'] = (obj.title, obj.start_time, obj.end_time,
         obj.timezone, obj.type,
@@ -432,7 +452,7 @@ class PGSQLTrackerRepository(BasePGSQLRepository):
         @return:
         @rtype:
         '''
-        return (obj.device_id, obj.device_type, obj.name, str(obj.id))
+        return obj.device_id, obj.device_type, obj.name, str(obj.id)
 
     def _get_existed(self, obj, e):
         return self.get_by_id(obj.id)

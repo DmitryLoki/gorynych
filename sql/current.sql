@@ -21,6 +21,9 @@ CREATE TABLE PERSON_DATA(
   PRIMARY KEY (ID, DATA_TYPE, DATA_VALUE)
 );
 
+CREATE UNIQUE INDEX UNIQUE_PHONE
+ON PERSON_DATA (ID, DATA_VALUE)
+WHERE DATA_TYPE='phone';
 
 -- Aggregate Contest ------------------------------------
 

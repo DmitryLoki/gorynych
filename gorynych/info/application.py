@@ -202,12 +202,9 @@ class ApplicationService(BaseApplicationService):
                 raise ValueError("Wrong regdate has been passed on pilot creation: %s" % regdate)
         else:
             year, month, day = None, None, None
-        print 'opts'
-        opt_data = {key: params[key] for key in factory.opt_params if key in params}
-        print opt_data
         pers = factory.create_person(params['name'], params['surname'],
                                      params['country'], params['email'], year,
-                                     month, day, **opt_data)
+                                     month, day)
         d = defer.succeed(pers)
         d.addCallback(persistence.get_repository(person.IPersonRepository).
         save)

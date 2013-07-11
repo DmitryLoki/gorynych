@@ -251,4 +251,12 @@ class TeltonikaGH3000UDP(object):
 
             message['records'].append(record)
 
-        return message
+        compatible_response = {
+            'imei': imei,
+            'lat': message['records'][0]['lat'],
+            'lon': message['records'][0]['lon'],
+            'h_speed': message['records'][0]['speed'],
+            'alt': message['records'][0]['alt']
+        }
+
+        return compatible_response

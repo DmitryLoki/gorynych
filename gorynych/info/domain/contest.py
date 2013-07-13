@@ -163,6 +163,11 @@ class Contest(AggregateRoot):
 
     @property
     def transport(self):
+        '''
+
+        @return: list of transport ids (type TransportID)
+        @rtype: list
+        '''
         result = list()
         for key in self._participants.keys():
             if self._participants[key]['role'] == 'transport':

@@ -69,8 +69,8 @@ class TeltonikaGH3000UDPTest(ParserTest):
                            lat=54.714687, imei='123456789012345', alt=158)
 
     def test_response(self):
-        self.parser.parse(self.message)
-        response = self.parser.get_response()
+        # self.parser.parse(self.message)
+        response = self.parser.get_response(self.message)
         self.assertEqual(response.encode('hex'), '00050002010204')
 
 if __name__ == '__main__':

@@ -1,9 +1,9 @@
 from operator import xor
 import datetime
 import time
-import datetime
 
 from zope.interface import Interface, implementer
+from functools import reduce
 
 
 class IParseMessage(Interface):
@@ -120,7 +120,7 @@ class TeltonikaGH3000UDP(object):
     def parse_time(self, four_bytes):
         ts_hex = four_bytes.encode('hex')
         ts_bin = bin(int(ts_hex, base=16))
-        ts_bin = ts_bin[3:]
+        ts_bin = ts_bin[4:]
         ts_int = int(ts_bin, base=2)
         td = datetime.timedelta(seconds=ts_int)
         tdd = self.starttime + td
@@ -135,12 +135,14 @@ class TeltonikaGH3000UDP(object):
     def check_message_correctness(self, msg):
         return msg
 
-    def get_response(self):
+    def get_response(self, bytestring):
         # 0005 is package length and should stay the same
         # 0002 is package id. no matter what's it
         # 01 is packet type (without ACK).
-        return ''.join(('0005000201'.decode('hex'), self.packet_id,
-                        chr(self.num_of_data)))
+        packet_id = bytestring[5]
+        num_of_data = bytestring[-1]
+        return ''.join(('0005000201'.decode('hex'), packet_id,
+                        num_of_data))
 
     def parse(self, bytestring):
         self.starttime = datetime.datetime(2007, 1, 1, 0, 0)
@@ -162,7 +164,7 @@ class TeltonikaGH3000UDP(object):
         gps_mask_map = {
             0: (8, self.bytes2coord, 'latlng'),  # latlog
             1: (2, self.get_alt, 'alt'),  # alt
-            2: (1, self.get_angle, 'angle'),  #
+            2: (1, self.get_angle, 'angle'),
             3: (1, self.get_speed, 'speed'),
             4: (1, None, None),
             5: (4, None, None),
@@ -253,11 +255,15 @@ class TeltonikaGH3000UDP(object):
 
         compatible_response = {
             'imei': imei,
-            'lat': message['records'][0]['lat'],
-            'lon': message['records'][0]['lon'],
-            'h_speed': message['records'][0]['speed'],
-            'alt': message['records'][0]['alt'],
-            'ts': message['records'][0]['ts']
+            'lat': message['records'][0].get('lat'),
+            'lon': message['records'][0].get('lon'),
+            'h_speed': message['records'][0].get('speed'),
+            'alt': message['records'][0].get('alt'),
+            'ts': message['records'][0].get('ts')
         }
+
+        compatible_response = {key: value for key, value in
+                               compatible_response.iteritems()
+                               if value is not None}
 
         return compatible_response

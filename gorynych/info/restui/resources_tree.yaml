@@ -13,6 +13,8 @@ aliases:
     'trck-[a-z0-9]+'
   tracker_index: &tracker_index
     '[-a-z0-9]*'
+  transport_index: &transport_index
+    'trns-[a-z0-9]+'
 
 race:
   leaf: Placeholder
@@ -31,6 +33,9 @@ race:
         tracks:
           leaf: RaceTracksResource
           package: *gorynych
+        transport:
+          leaf: RaceTransportCollection
+          package: *gorynych
 
 contest:
   leaf: ContestResourceCollection
@@ -47,6 +52,9 @@ contest:
             *person_index:
               leaf: ContestParagliderResource
               package: *gorynych
+        transport:
+          leaf: ContestTransportCollection
+          package: *gorynych
         race:
           leaf: ContestRaceResourceCollection
           package: *gorynych
@@ -70,4 +78,12 @@ tracker:
   tree:
     *tracker_index:
       leaf: TrackerResource
+      package: *gorynych
+
+transport:
+  leaf: TransportResourceCollection
+  package: *gorynych
+  tree:
+    *transport_index:
+      leaf: TransportResource
       package: *gorynych

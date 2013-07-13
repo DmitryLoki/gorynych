@@ -275,9 +275,13 @@ class APIResource(resource.Resource):
         # Mapping between uri path and parameters keys because I don't want
         # to se in result {'contest': some_id} but want to see
         # {'contest_id': some_id}.
-        maps = {'contest': 'contest_id', 'person': 'person_id',
-                'race': 'race_id', 'paraglider': 'person_id',
-            'group':'group_id', 'tracker': 'tracker_id'}
+        maps = dict(contest='contest_id',
+                    person='person_id',
+                    race='race_id',
+                    paraglider='person_id',
+                    group='group_id',
+                    tracker='tracker_id',
+                    transport='transport_id')
 
         result = dict()
         if req.method == "PUT":

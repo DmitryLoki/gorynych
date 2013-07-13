@@ -3,7 +3,7 @@ Tracker Aggregate.
 '''
 from gorynych.common.domain.events import TrackerAssigned, TrackerUnAssigned
 from gorynych.common.domain.model import AggregateRoot
-from gorynych.info.domain.ids import TrackerID, PersonID
+from gorynych.info.domain.ids import TrackerID, PersonID, TransportID
 from gorynych.common.infrastructure import persistence as pe
 from gorynych.common.exceptions import DomainError
 
@@ -42,7 +42,11 @@ class Tracker(AggregateRoot):
         return len(self.assignee) == 0
 
     def assign_to(self, assignee_id, contest_id):
-        assignee_id = PersonID.fromstring(assignee_id)
+        assignee_type = assignee_id.split('-', 1)[0]
+        if assignee_type == 'pers':
+            assignee_id = PersonID.fromstring(assignee_id)
+        elif assignee_type == 'trns':
+            assignee_id = TransportID.fromstring(assignee_id)
         if assignee_id in self.assignee.values():
             raise DomainError("Tracker already has owner %s for "
                                "contest %s" %

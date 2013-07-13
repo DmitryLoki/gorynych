@@ -10,7 +10,8 @@ from gorynych.common.domain.model import AggregateRoot, ValueObject
 from gorynych.common.domain.types import Address, Country, Name
 from gorynych.common.domain.events import ParagliderRegisteredOnContest
 from gorynych.common.infrastructure import persistence
-from gorynych.info.domain.ids import ContestID, PersonID, TrackerID
+from gorynych.info.domain.ids import ContestID, PersonID, TrackerID, TransportID
+from gorynych.common.exceptions import DomainError
 
 
 class IContestRepository(Interface):
@@ -161,6 +162,19 @@ class Contest(AggregateRoot):
         return result
 
     @property
+    def transport(self):
+        '''
+
+        @return: list of transport ids (type TransportID)
+        @rtype: list
+        '''
+        result = list()
+        for key in self._participants.keys():
+            if self._participants[key]['role'] == 'transport':
+                result.append(key)
+        return result
+
+    @property
     def country(self):
         return self.address.country
 
@@ -212,6 +226,23 @@ class Contest(AggregateRoot):
                             person_id, self.id))
         return self
 
+    def add_transport(self, transport_id):
+        if not isinstance(transport_id, TransportID):
+            transport_id = TransportID.fromstring(transport_id)
+        if not transport_id in self._participants:
+            self._participants[transport_id] = dict(role='transport')
+            return self
+        if transport_id in self._participants and (
+                self._participants[transport_id]['role'] == 'transport'):
+            return self
+        raise DomainError("Received id already in contest and it's not "
+                          "transport id: %s" % transport_id)
+
+    def remove_transport(self, transport_id):
+        if self._participants.has_key(str(transport_id)) and (
+                self._participants[transport_id]['role'] == 'transport'):
+            del self._participants[transport_id]
+
     def _invariants_are_correct(self):
         """
         Check next invariants for contest:
@@ -256,7 +287,6 @@ class Contest(AggregateRoot):
         if not self._invariants_are_correct():
             self._participants[person_id] = old_person
             raise ValueError("Contest invariants violated.")
-
 
 
 class Paraglider(ValueObject):

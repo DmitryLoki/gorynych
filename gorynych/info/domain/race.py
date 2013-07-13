@@ -56,7 +56,7 @@ RACETASKS = {'speedrun': SpeedRunTask,
 class RaceFactory(object):
 
     def create_race(self, title, race_type, timezone,
-                    paragliders, checkpoints, **kw):
+                    paragliders, checkpoints, transport=None, **kw):
         '''
 
         @param title:
@@ -69,6 +69,8 @@ class RaceFactory(object):
         @type timezone:
         @param paragliders: list of L{Paragliders}
         @type paragliders: C{list}
+        @param transport: list of transport ids
+        @type transport: list
         @param checkpoints:
         @type checkpoints:
         @param race_id:
@@ -86,26 +88,47 @@ class RaceFactory(object):
             result.task = RACETASKS[race_type]()
         else:
             raise ValueError("Unknown race type.")
-        timelimits = kw.get('timelimits')
-        if timelimits:
-            result.timelimits = timelimits
+        if kw.get('timelimits'):
+            result.timelimits = kw['timelimits']
         result.title = title
         result.timezone = timezone
         result = self._fill_with_paragliders(result, paragliders)
+        if transport:
+            result = self._fill_with_transport(result, transport)
         result.checkpoints = checkpoints
         if race_type == 'opendistance':
             result.task.bearing = kw['bearing']
-
         return result
 
-    def _fill_with_paragliders(self, race, paragliders):
+    def _fill_with_paragliders(self, result, paragliders):
         '''
         @param paragliders: list of Paraglider.
         @type paragliders: C{list}
         '''
         for p in paragliders:
-            race.paragliders[p.contest_number] = p
-        return race
+            result.paragliders[p.contest_number] = p
+        return result
+
+    def _fill_with_transport(self, result, transport):
+        '''
+
+        @param result:
+        @type result: gorynych.info.domain.race.Race
+        @param transport:[(type, title, desc, tracker_id, transport_id), ...]
+        @type transport: list
+        @return:
+        @rtype:
+        '''
+        tr_list = []
+        if transport and isinstance(transport, list):
+            for row in transport:
+                tr_list.append({'type':row[0],
+                                'title':row[1],
+                                'description': row[2],
+                                'tracker_id': row[3],
+                                'transport_id': row[4]})
+        result.transport = tr_list
+        return result
 
 
 class Race(AggregateRoot):
@@ -117,6 +140,8 @@ class Race(AggregateRoot):
         self._title = ''
         self.timelimits = ()
         self.paragliders = dict()
+        # [{type, title, description, tracker_id, transport_id}, ]
+        self.transport = list()
         self._timezone = pytz.utc
         self.start_time = 0
         self.end_time = 0
@@ -312,3 +337,5 @@ class IRaceRepository(Interface):
         '''
 
 
+def change_race_transport(rc, params):
+    return rc

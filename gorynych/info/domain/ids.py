@@ -1,7 +1,8 @@
 from datetime import date
 import re
-from gorynych.common.domain.model import DomainIdentifier
 import uuid
+
+from gorynych.common.domain.model import DomainIdentifier
 
 def namespace_date_random_validator(string, atype):
     aggr_type, creation_date, random_number = string.split('-')
@@ -109,3 +110,16 @@ class TrackerID(DomainIdentifier):
     def device_id(self):
         dtype, did = self._id.split('-', 1)
         return did
+
+
+class TransportID(DomainIdentifier):
+    '''
+    trns-uuid
+    r-uuid4
+    '''
+    def __init__(self):
+        _uid = str(uuid.uuid4())
+        self._id = '-'.join(('trns', _uid))
+
+    def _string_is_valid_id(self, string):
+        return namespace_uuid_validator(string, 'trns')

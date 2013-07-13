@@ -254,7 +254,7 @@ class ApplicationService(BaseApplicationService):
                          paragliders[key]['contest_number'],
                          pers.trackers.get(params['contest_id'])))
         # TODO: do in domain model style. Think before.
-        # [(type, title, desc, tracker_id),]
+        # [(type, title, desc, tracker_id, transport_id),]
         tr_dtos = yield self.pool.runQuery(
             persistence.select('transport_for_contest', 'transport'),
                                                         (str(cont.id),))

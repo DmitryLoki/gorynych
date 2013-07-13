@@ -113,7 +113,7 @@ class RaceFactory(object):
 
         @param result:
         @type result: gorynych.info.domain.race.Race
-        @param transport:[(type, title, desc, tracker_id), ...]
+        @param transport:[(type, title, desc, tracker_id, transport_id), ...]
         @type transport: list
         @return:
         @rtype:
@@ -124,7 +124,8 @@ class RaceFactory(object):
                 tr_list.append({'type':row[0],
                                 'title':row[1],
                                 'description': row[2],
-                                'tracker_id': row[3]})
+                                'tracker_id': row[3],
+                                'transport_id': row[4]})
         result.transport = tr_list
         return result
 
@@ -138,6 +139,7 @@ class Race(AggregateRoot):
         self._title = ''
         self.timelimits = ()
         self.paragliders = dict()
+        # [{type, title, description, tracker_id, transport_id}, ]
         self.transport = list()
         self._timezone = pytz.utc
         self.start_time = 0

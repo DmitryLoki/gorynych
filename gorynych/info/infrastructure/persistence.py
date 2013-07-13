@@ -30,6 +30,16 @@ def create_participants(paragliders_row):
                 gl, cn, ti))
     return result
 
+
+def find_delete_insert(indb, inobj, _id):
+    for idx, p in enumerate(inobj):
+        p.insert(0, _id)
+        inobj[idx] = tuple(p)
+    to_insert = set(inobj).difference(set(indb))
+    to_delete = set(indb).difference(set(inobj))
+    return to_delete, to_insert
+
+
 # TODO: simplify repositories.
 
 @implementer(interfaces.IRepository)
@@ -203,28 +213,13 @@ class PGSQLRaceRepository(BasePGSQLRepository):
             pq = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s, %s)",
                 (insert_id(x[0], p))) for p in values['paragliders'])
             cur.execute("INSERT INTO paraglider VALUES " + pq)
+            if values['transport']:
+                tr = ','.join(cur.mogrify("(%s, %s, %s, %s, %s)",
+                    (insert_id(x[0], p))) for p in values['transport'])
+                cur.execute("INSERT INTO race_transport VALUES" + tr)
+            if values['organizers']:
+                pass
             return x
-
-        def update(cur, pgs):
-            cur.execute(pe.update('race'), values['race'])
-
-            inobj = values['paragliders']
-            indb = pgs
-            for idx, p in enumerate(inobj):
-                p.insert(0, obj._id)
-                inobj[idx] = tuple(p)
-            to_insert = set(inobj).difference(set(indb))
-            to_delete = set(indb).difference(set(inobj))
-            if to_delete:
-                ids = tuple([x[1] for x in to_delete])
-                cur.execute("DELETE FROM paraglider WHERE id=%s "
-                            "AND person_id in %s", (obj._id, ids))
-            if to_insert:
-                q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s, %s)",
-                    (pitem)) for pitem in to_insert)
-                cur.execute("INSERT into paraglider values " + q)
-            return obj
-
 
         if obj._id:
             pgs = yield self.pool.runQuery(pe.select('paragliders', 'race'),
@@ -232,14 +227,68 @@ class PGSQLRaceRepository(BasePGSQLRepository):
             if not pgs:
                 raise DatabaseValueError(
                     "No paragliders has been found for race %s." % obj.id)
-            result = yield self.pool.runInteraction(update, pgs)
+            trs = yield self.pool.runQuery(pe.select('transport', 'race'),
+                (obj._id,))
+            result = yield self.pool.runInteraction(self._update, pgs, trs,
+                values, obj)
         else:
             r_id = yield self.pool.runInteraction(save_new)
             obj._id = r_id[0]
             result = obj
         defer.returnValue(result)
 
+    def _update(self, cur, pgs, trs, values, obj):
+        '''
+
+        @param cur:
+        @type cur:
+        @param pgs: [(id, pers_id, cnumber, country, glider, tr_id, name,
+        sn),]
+        @type pgs: list
+        @param trs: [(id, transport_id, description, title, tracker_id),]
+        @type trs: list
+        @param values:
+        @type values: dict
+        @param obj:
+        @type obj:
+        @return: obj
+        @rtype:
+        '''
+        cur.execute(pe.update('race'), values['race'])
+
+        # Update paragliders. Should it be in a separate method/function?
+        to_delete_pg, to_insert_pg = find_delete_insert(
+                                pgs, values['paragliders'], obj._id)
+        if to_delete_pg:
+            ids = tuple([x[1] for x in to_delete_pg])
+            cur.execute("DELETE FROM paraglider WHERE id=%s "
+                        "AND person_id in %s", (obj._id, ids))
+        if to_insert_pg:
+            q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s, %s)",
+                (pitem)) for pitem in to_insert_pg)
+            cur.execute("INSERT into paraglider values " + q)
+
+        # Update transport. Should it be in a separate general method/func?
+        to_delete_tr, to_insert_tr = find_delete_insert(
+                                trs, values['transport'], obj._id)
+        if to_delete_tr:
+            ids = tuple([x[1] for x in to_delete_tr])
+            cur.execute("DELETE FROM race_transport WHERE id=%s AND "
+                        "transport_id in %s", (obj._id, ids))
+        if to_insert_tr:
+            q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s)",
+                (pitem)) for pitem in to_insert_tr)
+            cur.execute("INSERT INTO race_transport VALUES " + q)
+        return obj
+
     def _get_values_from_obj(self, obj):
+        '''
+
+        @param obj:
+        @type obj: gorynych.info.domain.race.Race
+        @return:
+        @rtype:
+        '''
         result = dict()
         bearing = ''
         if obj.type == 'opendistance':
@@ -259,6 +308,11 @@ class PGSQLRaceRepository(BasePGSQLRepository):
                     p.country, p.glider,
                     str(p.tracker_id) if p.tracker_id else '',
                     p._name.name, p._name.surname])
+        result['transport'] = []
+        for item in obj.transport:
+            result['transport'].append(item['transport_id'],
+                item['description'], item['title'], item['tracker_id'])
+        result['organizers'] = []
         return result
 
 

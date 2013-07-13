@@ -51,7 +51,8 @@ SELECT
   transport_type.transport_type,
   transport.title,
   transport.description,
-  tracker.tracker_id
+  tracker.tracker_id,
+  transport.transport_id
 FROM
   contest,
   participant,

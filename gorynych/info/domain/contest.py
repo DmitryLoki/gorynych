@@ -289,7 +289,6 @@ class Contest(AggregateRoot):
             raise ValueError("Contest invariants violated.")
 
 
-
 class Paraglider(ValueObject):
 
     def __init__(self, person_id, name, country, glider, contest_number,

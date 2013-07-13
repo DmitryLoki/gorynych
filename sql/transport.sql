@@ -45,3 +45,26 @@ UPDATE TRANSPORT SET
   TYPE=(SELECT ID FROM TRANSPORT_TYPE WHERE TRANSPORT_TYPE=%s),
   DESCRIPTION=%s
 WHERE TRANSPORT_ID=%s;
+
+-- Select transport_for_contest
+SELECT
+  transport_type.transport_type,
+  transport.title,
+  transport.description,
+  tracker.tracker_id
+FROM
+  contest,
+  participant,
+  tracker,
+  tracker_assignees,
+  transport,
+  transport_type
+WHERE
+  participant.participant_id = transport.transport_id AND
+  participant.id = contest.id AND
+  tracker.id = tracker_assignees.id AND
+  tracker_assignees.assignee_id = participant.participant_id AND
+  transport.type = transport_type.id AND
+  participant.type = 'transport' AND
+  contest.contest_id = %s;
+

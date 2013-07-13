@@ -253,18 +253,18 @@ class ApplicationService(BaseApplicationService):
                          paragliders[key]['glider'],
                          paragliders[key]['contest_number'],
                          pers.trackers.get(params['contest_id'])))
-        transport_list = []
-        for key in cont.transport:
-            # TODO: do less db queries for transport.
-            tr = yield self.get_transport({'transport_id':key})
-            transport_list.append(tr)
+        # TODO: do in domain model style. Think before.
+        # [(type, title, desc, tracker_id),]
+        tr_dtos = yield self.pool.runQuery(
+            persistence.select('transport_for_contest', 'transport'),
+                                                        (str(cont.id),))
 
         factory = race.RaceFactory()
         r = factory.create_race(params['title'], params['race_type'],
                                    cont.timezone, plist,
                                    params['checkpoints'],
                                    bearing=params.get('bearing'),
-                                   transport=transport_list,
+                                   transport=tr_dtos,
                                 timelimits=(cont.start_time, cont.end_time))
         # TODO: do it transactionally.
         d = persistence.get_repository(race.IRaceRepository).save(r)

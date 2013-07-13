@@ -113,13 +113,19 @@ class RaceFactory(object):
 
         @param result:
         @type result: gorynych.info.domain.race.Race
-        @param transport:
+        @param transport:[(type, title, desc, tracker_id), ...]
         @type transport: list
         @return:
         @rtype:
         '''
+        tr_list = []
         if transport and isinstance(transport, list):
-            result.transport = transport
+            for row in transport:
+                tr_list.append({'type':row[0],
+                                'title':row[1],
+                                'description': row[2],
+                                'tracker_id': row[3]})
+        result.transport = tr_list
         return result
 
 

@@ -93,7 +93,8 @@ class RaceFactory(object):
         result.title = title
         result.timezone = timezone
         result = self._fill_with_paragliders(result, paragliders)
-        result = self._fill_with_transport(result, transport)
+        if transport:
+            result = self._fill_with_transport(result, transport)
         result.checkpoints = checkpoints
         if race_type == 'opendistance':
             result.task.bearing = kw['bearing']
@@ -336,3 +337,5 @@ class IRaceRepository(Interface):
         '''
 
 
+def change_race_transport(rc, params):
+    return rc

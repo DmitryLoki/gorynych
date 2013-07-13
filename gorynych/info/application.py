@@ -25,12 +25,14 @@ class BaseApplicationService(DBPoolService):
         return d
 
     def _change_aggregate(self, params, repo_interface, change_func):
-        id = params.get('id')
-        if not id:
+        aggregate_type = repo_interface.getName()[1:-10].lower()
+        id_ = params.get(aggregate_type + '_id')
+        if not id_:
             raise ValueError("Aggregate's id hasn't been received.")
-        del params['id']
+        if params.get('id'):
+            del params['id']
 
-        d = self._get_aggregate(id, repo_interface)
+        d = self._get_aggregate(id_, repo_interface)
         d.addCallback(change_func, params)
         d.addCallback(persistence.get_repository(repo_interface).save)
         return d
@@ -129,9 +131,6 @@ class ApplicationService(BaseApplicationService):
                 setattr(cont, param, params[param])
             return cont
 
-        if params.has_key('contest_id'):
-            params['id'] = params['contest_id']
-            del params['contest_id']
         return self._change_aggregate(params, contest.IContestRepository,
                                       change)
 
@@ -229,9 +228,6 @@ class ApplicationService(BaseApplicationService):
         return self._get_aggregates_list(params, person.IPersonRepository)
 
     def change_person(self, params):
-        if params.has_key('person_id'):
-            params['id'] = params['person_id']
-            del params['person_id']
         return self._change_aggregate(params, person.IPersonRepository,
                                       person.change_person)
 
@@ -342,6 +338,11 @@ class ApplicationService(BaseApplicationService):
         d.addCallback(lambda r: r.add_track_archive(params['url']))
         return d
 
+    def change_race_transport(self, params):
+        return self._change_aggregate(params, race.IRaceRepository,
+            race.change_race_transport)
+
+
     ############## Race Track's work ##################
     def get_race_tracks(self, params):
         group_id = params['race_id']
@@ -376,9 +377,6 @@ class ApplicationService(BaseApplicationService):
             interfaces.ITrackerRepository)
 
     def change_tracker(self, params):
-        if params.has_key('tracker_id'):
-           params['id'] = params['tracker_id']
-           del params['tracker_id']
         return self._change_aggregate(params, interfaces.ITrackerRepository,
             tracker.change_tracker)
 
@@ -402,9 +400,6 @@ class ApplicationService(BaseApplicationService):
             interfaces.ITransportRepository)
 
     def change_transport(self, params):
-        if params.has_key('transport_id'):
-            params['id'] = params['transport_id']
-            del params['transport_id']
         return self._change_aggregate(params, interfaces.ITransportRepository,
             transport.change_transport)
 

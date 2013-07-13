@@ -133,6 +133,7 @@ class ContestRESTAPITest(unittest.TestCase):
             coords='42.6,11.3', timezone='Europe/Paris'))
         r2 = requests.put('/'.join((URL, 'contest', cont_id)), data=params)
         result = r2.json()
+        self.assertEqual(r2.status_code, 200)
         self.assertEqual(result['title'], title.strip())
         self.assertEqual(result['country'], 'MC')
         self.assertEqual(result['coords'], [42.6, 11.3])
@@ -525,26 +526,63 @@ class TestTransportAPI(unittest.TestCase):
 
 class ContestTransportTest(unittest.TestCase):
     url = URL + '/contest'
-    def test_add_transport_to_contest(self):
+
+    def setUp(self):
         try:
             c_, t_ = create_contest(title='Contest with transport')
             tr_ = create_transport()
         except:
             raise unittest.SkipTest("I need contest for test")
+        self.c_id = c_.json()['id']
+        self.tr_id = tr_.json()['id']
 
-        c_id = c_.json()['id']
-        tr_id = tr_.json()['id']
-        r = requests.post('/'.join((self.url, c_id, 'transport')), data=dict(
-            transport_id=tr_id))
+    def tearDown(self):
+        del self.c_id
+        del self.tr_id
+
+    def test_add_transport_to_contest(self):
+        r = requests.post('/'.join((self.url, self.c_id, 'transport')),
+            data=dict(transport_id=self.tr_id))
         self.assertEqual(r.status_code, 201)
-        self.assertIn(tr_id, r.json())
+        self.assertIn(self.tr_id, r.json())
 
         # GET /contest/{id}/transport
-        r = requests.get('/'.join((self.url, c_id, 'transport')))
+        r = requests.get('/'.join((self.url, self.c_id, 'transport')))
         self.assertEqual(r.status_code, 200)
         self.assertGreaterEqual(len(r.json()), 1)
         self.assertIsInstance(r.json(), list)
 
+    def test_get_race_transport(self):
+        try:
+            # Create paraglider for contest.
+            p_, e = create_persons()
+            p_id = p_.json()['id']
+            i, cn = register_paraglider(p_id, self.c_id)
+            # Append transport to contest.
+            r = requests.post('/'.join((self.url, self.c_id, 'transport')),
+                data=dict(transport_id=self.tr_id))
+            # Create tracker and assign it to transport.
+            params = dict(device_id=random.randint(1, 1000),
+                device_type='tr203')
+            r = requests.post('/'.join((URL, 'tracker')), data=params)
+            tid = r.json()['id']
+            params = json.dumps(dict(assignee=str(self.tr_id),
+                contest_id='cont'))
+            r = requests.put('/'.join((URL, 'tracker', tid)), data=params)
+            # Create race.
+            race_id = create_race(self.c_id).json()['id']
+        except Exception as error:
+            raise unittest.SkipTest("Something went wrong and I need race "
+                                    "for test: %r" % error)
+
+        r = requests.get('/'.join((self.url, self.c_id, 'race', race_id,
+                        'transport')))
+        self.assertEqual(r.status_code, 200)
+        res = r.json()
+        self.assertIsInstance(res, list)
+        self.assertEqual(len(res), 1)
+        self.assertEqual(tid, res[0]['tracker'])
+        self.assertEqual(self.tr_id, res[0]['id'])
 
 
 

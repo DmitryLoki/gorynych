@@ -183,6 +183,10 @@ class PGSQLRaceRepository(BasePGSQLRepository):
             raise DatabaseValueError("No paragliders has been found for race"
                                      " %s." % race_data[1])
         ps = create_participants(pgs)
+
+        trs = yield self.pool.runQuery(pe.select('race_transport', 'race'),
+            (rid,))
+
         chs = checkpoint_collection_from_geojson(_chs)
 
         if _aux:
@@ -192,7 +196,7 @@ class PGSQLRaceRepository(BasePGSQLRepository):
             b = None
         factory = RaceFactory()
         result = factory.create_race(t, rt, tz, ps, chs, race_id=rid,
-            bearing=b, timelimits=(slt, elt))
+            transport=trs, bearing=b, timelimits=(slt, elt))
         result._start_time = st
         result._end_time = et
         result._id = long(i)
@@ -214,7 +218,7 @@ class PGSQLRaceRepository(BasePGSQLRepository):
                 (insert_id(x[0], p))) for p in values['paragliders'])
             cur.execute("INSERT INTO paraglider VALUES " + pq)
             if values['transport']:
-                tr = ','.join(cur.mogrify("(%s, %s, %s, %s, %s)",
+                tr = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s)",
                     (insert_id(x[0], p))) for p in values['transport'])
                 cur.execute("INSERT INTO race_transport VALUES" + tr)
             if values['organizers']:
@@ -310,8 +314,9 @@ class PGSQLRaceRepository(BasePGSQLRepository):
                     p._name.name, p._name.surname])
         result['transport'] = []
         for item in obj.transport:
-            result['transport'].append(item['transport_id'],
-                item['description'], item['title'], item['tracker_id'])
+            result['transport'].append([str(item['transport_id']),
+                item['description'], item['title'], str(item['tracker_id']),
+                item['type']])
         result['organizers'] = []
         return result
 

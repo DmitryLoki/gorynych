@@ -33,6 +33,9 @@ race:
         tracks:
           leaf: RaceTracksResource
           package: *gorynych
+        transport:
+          leaf: RaceTransportCollection
+          package: *gorynych
 
 contest:
   leaf: ContestResourceCollection

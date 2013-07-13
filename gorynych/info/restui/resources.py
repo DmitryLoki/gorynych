@@ -319,6 +319,7 @@ class RaceTracksResource(APIResource):
     '''
     name = 'race_tracks'
     service_command = dict(GET='get_race_tracks')
+
     def read_GET(self, rows, params=None):
         if rows:
             result = []
@@ -450,6 +451,22 @@ class ContestTransportCollection(APIResource):
     def read_POST(self, cont, p=None):
         if cont:
             return dict(transport_ids=json.dumps(map(str, cont.transport)))
+
+
+class RaceTransportCollection(APIResource):
+    '''
+    /race/{id}/transport
+    '''
+    name = 'race_transport_collection'
+    service_command = dict(GET='get_race',
+                           PUT='change_race_transport')
+
+    def read_GET(self, r, p=None):
+        '''
+        @type r: gorynych.info.domain.race.Race
+        '''
+        if r:
+            return r.transport
 
 
 # TODO: this resource should be in processor package.

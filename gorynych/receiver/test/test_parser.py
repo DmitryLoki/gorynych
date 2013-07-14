@@ -23,12 +23,12 @@ class ParserTest(unittest.TestCase):
             self.assertIn(item, result.keys())
 
     def _check_values(self, result, **kwargs):
-        self.assertTrue(result.has_key('alt'))
-        self.assertTrue(result.has_key('lat'))
-        self.assertTrue(result.has_key('lon'))
-        self.assertTrue(result.has_key('ts'))
-        self.assertTrue(result.has_key('imei'))
-        self.assertTrue(result.has_key('h_speed'))
+        self.assertTrue('alt' in result)
+        self.assertTrue('lat' in result)
+        self.assertTrue('lon' in result)
+        self.assertTrue('ts' in result)
+        self.assertTrue('imei' in result)
+        self.assertTrue('h_speed' in result)
         self.assertDictContainsSubset(kwargs, result)
 
 
@@ -60,18 +60,35 @@ class TeltonikaGH3000UDPTest(ParserTest):
 
     def setUp(self):
         self.parser = TeltonikaGH3000UDP()
-        self.message = message = "003c00000102000F313233343536373839303132333435070441bf9db00fff425adbd741ca6e1e009e1205070001030b160000601a02015e02000314006615000a160067010500000ce441bf9d920fff425adbb141ca6fc900a2b218070001030b160000601a02015e02000314006615000a160067010500000cc641bf9d740fff425adbee41ca739200b6c91e070001030b1f0000601a02015f02000314006615000a160066010500000ca841bf9cfc0fff425adba041ca70c100b93813070001030b1f0000601a02015f02000314002315000a160025010500000c3004".decode(
+        self.message = "003c00000102000F313233343536373839303132333435070441bf9db00fff425adbd741ca6e1e009e1205070001030b160000601a02015e02000314006615000a160067010500000ce441bf9d920fff425adbb141ca6fc900a2b218070001030b160000601a02015e02000314006615000a160067010500000cc641bf9d740fff425adbee41ca739200b6c91e070001030b1f0000601a02015f02000314006615000a160066010500000ca841bf9cfc0fff425adba041ca70c100b93813070001030b1f0000601a02015f02000314002315000a160025010500000c3004".decode(
             'hex')
 
     def test_parse(self):
+        awaited = [{'lat': 54.714687, 'h_speed': 5, 'imei': '123456789012345',
+                    'alt': 158, 'lon': 25.303768, 'ts': 1196933760},
+                   {'lat': 54.714542, 'h_speed': 24, 'imei': '123456789012345',
+                       'alt': 162, 'lon': 25.304583, 'ts': 1196933730},
+                   {'lat': 54.714775, 'h_speed': 30, 'imei': '123456789012345',
+                       'alt': 182, 'lon': 25.306431, 'ts': 1196933700},
+                   {'lat': 54.714478, 'h_speed': 19, 'imei': '123456789012345',
+                       'alt': 185, 'lon': 25.305056, 'ts': 1196933580}]
+
         result = self.parser.parse(self.message)
-        self._check_values(result, h_speed=5, lon=25.303768,
-                           lat=54.714687, imei='123456789012345', alt=158)
+        self.assertEqual(len(result), 4)
+        for i, item in enumerate(result):
+            self._check_values(
+                item, h_speed=awaited[i]['h_speed'], lon=awaited[i]['lon'],
+                lat=awaited[i]['lat'], imei=awaited[i]['imei'], alt=awaited[i]['alt'])
 
     def test_response(self):
-        # self.parser.parse(self.message)
         response = self.parser.get_response(self.message)
         self.assertEqual(response.encode('hex'), '00050002010204')
+
+    def test_incorrect_message(self):
+        message = 'too_short'
+        self.assertRaises(IndexError, self.parser.parse, message)
+        message = 'enough_long_but_still_not_enough_correct_message_to_be_parsed'
+        self.assertRaises(KeyError, self.parser.parse, message)
 
 if __name__ == '__main__':
     unittest.main()

@@ -4,7 +4,9 @@ import math
 import decimal
 
 import requests
+import simplejson as json
 from twisted.python import log
+from twisted.web.client import getPage
 
 from gorynych import __version__, OPTS
 from gorynych.common.exceptions import BadCheckpoint
@@ -15,6 +17,31 @@ EARTH_RADIUS = 6371000
 from twisted.web.client import HTTPClientFactory
 HTTPClientFactory.noisy = False
 
+
+class AsynchronousAPIAccessor(object):
+    def __init__(self, url=None, version=None):
+        if not version:
+            version = str(__version__)
+        if not version.startswith('v'):
+            version = 'v' + version
+        if not url:
+            url = OPTS['apiurl']
+            if url.endswith('/'):
+                url = url[:-1]
+        self.url = '/'.join((url, version))
+
+    def _return_page(self, url):
+        d = getPage(url)
+        d.addCallback(json.loads)
+        d.addErrback(lambda _:None)
+        return d
+
+    def get_contest_races(self, contest_id):
+        url = '/'.join((self.url, 'contest', contest_id, 'race'))
+        return self._return_page(url)
+
+
+# TODO: do all of this in async way.
 class APIAccessor(object):
     '''
     Implement asynchronous methods for convinient access to JSON api.

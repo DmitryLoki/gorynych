@@ -300,10 +300,17 @@ class ReceiverService(Service):
             errbackKeywords={'data': msg, 'time': receiving_time,
                 'proto': kw.get('proto', 'Unknown'),
                 'device':kw.get('device_type', 'Unknown')})
+        def handle_list(message):
+            if isinstance(message, list):
+                for item in message:
+                    d.addCallback(self.sender.write, item)
+            else:
+                d.addCallback(self.sender.write, message)
+            return d
         if self.sender.running:
             d.addCallback(self.parsers[device_type].parse)
-            d.addCallback(self._save_coords_for_checker)
-            d.addCallback(self.sender.write)
+            d.addCallback(handle_list)
+            # d.addCallback(self._save_coords_for_checker)
         else:
             log.msg("Received but not sent: %s" % msg)
         d.addErrback(log.err)

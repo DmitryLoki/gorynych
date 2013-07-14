@@ -260,8 +260,7 @@ class TeltonikaGH3000UDP(object):
                         cursor = iocursor
                         # now skip this element
 
-            print record
-            if set(record.keys()) == set(self.format.keys()):
+            if  set(self.format.keys()).issubset(set(record.keys())):
                 records.append(record)
 
         return records

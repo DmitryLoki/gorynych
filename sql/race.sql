@@ -96,17 +96,6 @@ SELECT * FROM PARAGLIDER WHERE ID=%s;
 -- Insert paraglider
 INSERT INTO PARAGLIDER VALUES (%s, %s, %s, %s, %s, %s, %s, %s);
 
--- Select race_id_by_organizator
-SELECT
-  r.race_id
-FROM
-  organizator o,
-  race r
-WHERE
-  o.id = r.id
-  AND o.person_id=%s
-  AND (r.end_time BETWEEN %s AND %s or r.start_time BETWEEN %s AND %s);
-
 -- Select current_race_by_tracker
 SELECT
   r.race_id, p.contest_number

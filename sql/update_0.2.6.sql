@@ -32,4 +32,10 @@ CREATE TABLE RACE_TRANSPORT(
 CREATE TABLE CONTEST_RETRIEVE_ID(
   ID BIGINT REFERENCES CONTEST(ID) ON DELETE CASCADE PRIMARY KEY ,
   RETRIEVE_ID TEXT
+<<<<<<< Updated upstream
 )
+=======
+);
+
+insert into contest_retrieve_id(id) select id from contest;
+>>>>>>> Stashed changes

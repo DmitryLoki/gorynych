@@ -301,12 +301,15 @@ class ReceiverService(Service):
                 'proto': kw.get('proto', 'Unknown'),
                 'device':kw.get('device_type', 'Unknown')})
         def handle_list(message):
+            d2 = defer.Deferred()
             if isinstance(message, list):
                 for item in message:
-                    d.addCallback(self.sender.write, item)
+                    d2.addCallback(lambda _: self.sender.write(item))
             else:
-                d.addCallback(self.sender.write, message)
-            return d
+                d2.addCallback(lambda _: self.sender.write(message))
+
+            d2.callback('go!')
+            return d2
         if self.sender.running:
             d.addCallback(self.parsers[device_type].parse)
             d.addCallback(handle_list)

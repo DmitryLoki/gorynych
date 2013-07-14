@@ -134,7 +134,7 @@ class AuthenticationResource(resource.Resource):
         @return: token for which key is registered.
         @rtype:
         '''
-        d = self.service.get_udid_token(self.key)
+        d = self.service.get_contest_id_for_retrieve_id(self.key)
         d.addErrback(log.err)
         d.addCallback(self.write_request, request)
         return server.NOT_DONE_YET

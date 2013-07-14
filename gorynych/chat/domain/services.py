@@ -13,16 +13,16 @@ class AuthenticationService(object):
     def __init__(self, pool):
         self.pool = pool
 
-    def get_udid_token(self, udid):
+    def get_contest_id_for_retrieve_id(self, retrieve_id):
         '''
         Return token for application udid.
-        @param udid:
-        @type udid:
+        @param retrieve_id:
+        @type retrieve_id:
         @return: person_id
         @rtype: C{str}
         '''
-        d = self.pool.runQuery(pe.select('person_id_by_udid', 'person'),
-            (udid,))
+        d = self.pool.runQuery(pe.select('id_for_retrieve', 'contest'),
+            (retrieve_id,))
         d.addCallback(lambda x: x[0][0])
         return d
 

@@ -1,10 +1,18 @@
 from operator import xor
 import datetime
 import time
-import datetime
 
 from zope.interface import Interface, implementer
+from functools import reduce
 
+FORMAT = {
+    'lat': 'latitude (decimal degree)',
+    'lon': 'longitude (decimal degree)',
+    'alt': 'altitude (meters)',
+    'h_speed': 'speed (kilometers per hour)',
+    'imei': 'unique 15-digit sequence',
+    'ts': 'unix timestamp (seconds)'
+}
 
 class IParseMessage(Interface):
 
@@ -101,6 +109,9 @@ class GlobalSatTR203(object):
 @implementer(IParseMessage)
 class TeltonikaGH3000UDP(object):
 
+    def __init__(self):
+        self.format = FORMAT
+
     def bytes2coord(self, four_bytes):
         hex_data = four_bytes.encode('hex')
         c = int(hex_data, 16)
@@ -111,8 +122,8 @@ class TeltonikaGH3000UDP(object):
     def get_alt(self, two_bytes):
         return int(two_bytes.encode('hex'), 16)
 
-    def get_angle(self, one_byte):
-        return ord(one_byte) * 360. / 256.
+    # def get_angle(self, one_byte):
+    #     return ord(one_byte) * 360. / 256.
 
     def get_speed(self, one_byte):
         return ord(one_byte)
@@ -120,7 +131,7 @@ class TeltonikaGH3000UDP(object):
     def parse_time(self, four_bytes):
         ts_hex = four_bytes.encode('hex')
         ts_bin = bin(int(ts_hex, base=16))
-        ts_bin = ts_bin[3:]
+        ts_bin = ts_bin[4:]
         ts_int = int(ts_bin, base=2)
         td = datetime.timedelta(seconds=ts_int)
         tdd = self.starttime + td
@@ -135,12 +146,14 @@ class TeltonikaGH3000UDP(object):
     def check_message_correctness(self, msg):
         return msg
 
-    def get_response(self):
+    def get_response(self, bytestring):
         # 0005 is package length and should stay the same
         # 0002 is package id. no matter what's it
         # 01 is packet type (without ACK).
-        return ''.join(('0005000201'.decode('hex'), self.packet_id,
-                        chr(self.num_of_data)))
+        packet_id = bytestring[5]
+        num_of_data = bytestring[-1]
+        return ''.join(('0005000201'.decode('hex'), packet_id,
+                        num_of_data))
 
     def parse(self, bytestring):
         self.starttime = datetime.datetime(2007, 1, 1, 0, 0)
@@ -162,8 +175,8 @@ class TeltonikaGH3000UDP(object):
         gps_mask_map = {
             0: (8, self.bytes2coord, 'latlng'),  # latlog
             1: (2, self.get_alt, 'alt'),  # alt
-            2: (1, self.get_angle, 'angle'),  #
-            3: (1, self.get_speed, 'speed'),
+            2: (1, None, None),  # (1, self.get_angle, 'angle'),
+            3: (1, self.get_speed, 'h_speed'),
             4: (1, None, None),
             5: (4, None, None),
             6: (1, None, None),
@@ -186,10 +199,7 @@ class TeltonikaGH3000UDP(object):
             'F4'.decode('hex'): 1
         }
 
-        message = {
-            'imei': imei,
-            'records': []
-        }
+        records = []
 
         def read_gps(segment, mask):
             gpsdata = {}
@@ -214,6 +224,7 @@ class TeltonikaGH3000UDP(object):
             # each loop pass is reading one record
             # it always starts with 4 bytes of time
             record = {
+                'imei': imei,
                 'ts': self.parse_time(data[cursor: cursor + 4]),
             }
 
@@ -249,15 +260,7 @@ class TeltonikaGH3000UDP(object):
                         cursor = iocursor
                         # now skip this element
 
-            message['records'].append(record)
+            if  set(self.format.keys()).issubset(set(record.keys())):
+                records.append(record)
 
-        compatible_response = {
-            'imei': imei,
-            'lat': message['records'][0]['lat'],
-            'lon': message['records'][0]['lon'],
-            'h_speed': message['records'][0]['speed'],
-            'alt': message['records'][0]['alt'],
-            'ts': message['records'][0]['ts']
-        }
-
-        return compatible_response
+        return records

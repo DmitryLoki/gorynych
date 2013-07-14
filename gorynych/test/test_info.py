@@ -122,21 +122,32 @@ class ContestRESTAPITest(unittest.TestCase):
 
     def test_3_change_contest(self):
         try:
-            r = requests.get(self.url)
-            cont_id = r.json()[0]["id"]
+            c_, t_ = create_contest()
+            cont_id = c_.json()["id"]
+            print cont_id
         except:
-            raise unittest.SkipTest("Can't get contest id is needed for this "
-                                 "test.")
+            raise unittest.SkipTest(
+                "Can't get contest id which is needed for this test.")
         title = '  besT Contest changed' + str(random.randint(1, 1000)) + '  '
         params = json.dumps(dict(title=title,
             start_time=11, end_time=15, place='Paris', country='mc',
-            coords='42.6,11.3', timezone='Europe/Paris'))
-        r2 = requests.put('/'.join((URL, 'contest', cont_id)), data=params)
+            coords='42.6,11.3', timezone='Europe/Paris', retrieve_id='45'))
+        r2 = requests.put('/'.join((self.url, cont_id)), data=params)
         result = r2.json()
         self.assertEqual(r2.status_code, 200)
         self.assertEqual(result['title'], title.strip())
         self.assertEqual(result['country'], 'MC')
         self.assertEqual(result['coords'], [42.6, 11.3])
+        self.assertEqual(result['retrieve_id'], '45')
+
+        params = json.dumps(dict(retrieve_id='some retrieve'))
+        r3 = requests.put('/'.join((self.url, cont_id)), data=params)
+        self.assertEqual(r3.status_code, 200)
+        result = r3.json()
+        self.assertEqual(result['title'], title.strip())
+        self.assertEqual(result['country'], 'MC')
+        self.assertEqual(result['coords'], [42.6, 11.3])
+        self.assertEqual(result['retrieve_id'], 'some retrieve')
 
 
 class PersonAPITest(unittest.TestCase):

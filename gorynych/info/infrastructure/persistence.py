@@ -325,14 +325,6 @@ class PGSQLContestRepository(BasePGSQLRepository):
     implements(IContestRepository)
 
     @defer.inlineCallbacks
-    def _append_data_to_contest(self, cont):
-        participants = yield self.pool.runQuery(
-            pe.select('participants', 'contest'), (cont._id,))
-        if participants:
-            cont = self._add_participants_to_contest(cont, participants)
-        defer.returnValue(cont)
-
-    @defer.inlineCallbacks
     def _restore_aggregate(self, row):
         '''
 
@@ -347,6 +339,18 @@ class PGSQLContestRepository(BasePGSQLRepository):
         cont = factory.create_contest(ti, st, et, pl, co, (lat, lon), tz, cid)
         cont._id = sid
         cont = yield self._append_data_to_contest(cont)
+        defer.returnValue(cont)
+
+    @defer.inlineCallbacks
+    def _append_data_to_contest(self, cont):
+        participants = yield self.pool.runQuery(
+            pe.select('participants', 'contest'), (cont._id,))
+        if participants:
+            cont = self._add_participants_to_contest(cont, participants)
+        retrieve_id = yield self.pool.runQuery(
+            pe.select('retrieve_id', 'contest'), (cont._id,))
+        if retrieve_id:
+            cont.retrieve_id = retrieve_id[0][0]
         defer.returnValue(cont)
 
     def _add_participants_to_contest(self, cont, rows):
@@ -389,17 +393,19 @@ class PGSQLContestRepository(BasePGSQLRepository):
             '''
 
             i = cur.execute(pe.insert('contest'), values['contest'])
-            x = cur.fetchone()
+            _id = cur.fetchone()[0]
 
             if values['participants']:
                 # Callbacks wan't work in for loop, so i insert multiple values
                 # in one query.
                 # Oh yes, executemany also wan't work in asynchronous mode.
                 q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s)",
-                    (insert_id(x[0], p))) for p in values['participants'])
+                    (insert_id(_id, p))) for p in values['participants'])
                 cur.execute("INSERT into participant values " + q)
+            cur.execute("INSERT INTO contest_retrieve_id values (%s, %s)",
+                (_id, obj.retrieve_id))
 
-            return x
+            return _id
 
         def update(cur, prts):
             cur.execute(pe.update('contest'), values['contest'])
@@ -419,6 +425,10 @@ class PGSQLContestRepository(BasePGSQLRepository):
                     q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s)",
                         (pitem)) for pitem in to_insert)
                     cur.execute("INSERT into participant values " + q)
+            if obj.retrieve_id:
+                cur.execute(
+                    "UPDATE contest_retrieve_id SET retrieve_id=%s where"
+                            " id=%s", (obj.retrieve_id, obj._id))
 
             return obj
 
@@ -429,7 +439,7 @@ class PGSQLContestRepository(BasePGSQLRepository):
             result = yield self.pool.runInteraction(update, prts)
         else:
             c__id = yield self.pool.runInteraction(save_new)
-            obj._id = c__id[0]
+            obj._id = c__id
             result = obj
         defer.returnValue(result)
 

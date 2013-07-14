@@ -107,32 +107,8 @@ class ApplicationService(BaseApplicationService):
         @rtype:
         '''
 
-        def change(cont, params):
-            '''
-            Do actual changes in contest.
-            @param cont:
-            @type cont:
-            @param params:
-            @type params:
-            @return:
-            @rtype:
-            '''
-            if params.get('start_time') and params.get('end_time'):
-                cont.change_times(params['start_time'], params['end_time'])
-                del params['start_time']
-                del params['end_time']
-
-            if params.get('coords'):
-                lat, lon = params['coords'].split(',')
-                cont.hq_coords = (lat, lon)
-                del params['coords']
-
-            for param in params.keys():
-                setattr(cont, param, params[param])
-            return cont
-
         return self._change_aggregate(params, contest.IContestRepository,
-                                      change)
+                                      contest.change)
 
     def register_paraglider_on_contest(self, params):
         '''

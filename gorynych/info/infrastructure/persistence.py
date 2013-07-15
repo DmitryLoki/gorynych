@@ -167,6 +167,8 @@ class PGSQLPersonRepository(BasePGSQLRepository):
                         pe.update('person_data', 'person'),
                                                  (data_value, pers._id,
                                                   data_type))
+                else:
+                    log.err("Error occured with code %s: %r" % (e.pgcode, e))
 
 
 class PGSQLRaceRepository(BasePGSQLRepository):

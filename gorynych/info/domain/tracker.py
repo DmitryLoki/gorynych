@@ -47,10 +47,10 @@ class Tracker(AggregateRoot):
             assignee_id = PersonID.fromstring(assignee_id)
         elif assignee_type == 'trns':
             assignee_id = TransportID.fromstring(assignee_id)
-        if assignee_id in self.assignee.values():
+        if contest_id in self.assignee.keys():
             raise DomainError("Tracker already has owner %s for "
                                "contest %s" %
-                               (self.assignee[contest_id], contest_id))
+                               (self.assignee.get(contest_id), contest_id))
         self.assignee[contest_id] = assignee_id
         return pe.event_store().persist(TrackerAssigned(
             aggregate_id=assignee_id,

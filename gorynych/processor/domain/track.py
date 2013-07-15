@@ -254,12 +254,18 @@ class RaceToGoal(object):
         else:
             # Last point taken but we still have data.
             for p in points:
-                p['distance'] = 0
+                p['distance'] = 200
             return points, []
         if taskstate.state == 'landed':
-            for p in points:
-                p['distance'] = taskstate.last_distance
-            return points, []
+            if taskstate.last_distance:
+                for p in points:
+                    p['distance'] = taskstate.last_distance
+                return points, []
+            else:
+                for p in points:
+                    p['distance'] = 200
+                return points, []
+
         ended = taskstate.ended
         for idx, p in np.ndenumerate(points):
             dist = nextchp.distance_to((p['lat'], p['lon']))

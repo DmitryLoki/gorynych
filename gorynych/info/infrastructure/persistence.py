@@ -166,10 +166,13 @@ class PGSQLPersonRepository(BasePGSQLRepository):
                     log.msg("Error occured while inserting %s, %s, %s" % (
                         data_value, pers._id, data_type
                     ))
-                    yield self.pool.runOperation(
+                    try:
+                        yield self.pool.runOperation(
                         pe.update('person_data', 'person'),
                                                  (data_value, pers._id,
                                                   data_type))
+                    except Exception as error:
+                        log.msg("Pizdec occured while updating %r" % error)
                 else:
                     log.err("Error occured with code %s: %r" % (e.pgcode, e))
 

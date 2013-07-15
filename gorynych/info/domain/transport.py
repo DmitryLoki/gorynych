@@ -7,7 +7,7 @@ from gorynych.common.exceptions import DomainError
 from gorynych.info.domain.ids import TransportID
 
 # Allowed transport types
-TYPES = frozenset(['bus', 'car', 'motorcycle', 'helicopter'])
+TYPES = frozenset(['bus', 'car', 'motorcycle', 'helicopter', 'van'])
 
 class Transport(AggregateRoot):
     def __init__(self, transport_id, title, description=None):

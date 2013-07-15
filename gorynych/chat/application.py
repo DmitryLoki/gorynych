@@ -62,9 +62,15 @@ class ChatApplication(Service):
     def get_messages(self, chatroom, from_time=None, to_time=None):
         return self.repository.get_messages(chatroom, from_time, to_time)
 
-
-    def get_udid_token(self, udid):
-        return self.auth_service.get_udid_token(udid)
+    def get_contest_id_for_retrieve_id(self, retrieve_id):
+        '''
+        Return contest id for retrieve_id
+        @param retrieve_id:
+        @type retrieve_id:
+        @return:
+        @rtype:
+        '''
+        return self.auth_service.get_contest_id_for_retrieve_id(retrieve_id)
 
     def authenticate(self, token):
         return self.auth_service.authenticate(token)

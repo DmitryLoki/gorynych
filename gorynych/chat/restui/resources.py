@@ -127,7 +127,14 @@ class AuthenticationResource(resource.Resource):
         return
 
     def render_GET(self, request):
-        d = self.service.get_udid_token(self.key)
+        '''
+
+        @param request:
+        @type request:
+        @return: token for which key is registered.
+        @rtype:
+        '''
+        d = self.service.get_contest_id_for_retrieve_id(self.key)
         d.addErrback(log.err)
         d.addCallback(self.write_request, request)
         return server.NOT_DONE_YET
@@ -140,6 +147,11 @@ class HandshakeResource(resource.Resource):
         self.service = service
 
     def render_GET(self, request):
+        '''
+        Return chatroom id for taken token.
+        @return: chatroom id
+        @rtype: str
+        '''
         token = request.getHeader(b'x-app-token')
         d = self.service.authenticate(token)
         d.addErrback(self._trap_auth_error, request)

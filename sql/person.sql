@@ -51,16 +51,6 @@ WHERE PERSON_ID = %s;
 -- select by_email
 SELECT PERSON_ID FROM PERSON WHERE EMAIL=%s;
 
--- Select person_id_by_udid
-SELECT p.PERSON_ID
-FROM
-  PERSON p,
-  PERSON_DATA pd
-WHERE
-  pd.DATA_TYPE='udid' AND
-  pd.DATA_VALUE=%s AND
-  pd.ID=p.ID;
-
 -- Insert person_data
 INSERT INTO PERSON_DATA(ID, DATA_TYPE, DATA_VALUE)
     VALUES (%s, %s, %s);

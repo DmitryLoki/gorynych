@@ -163,6 +163,9 @@ class PGSQLPersonRepository(BasePGSQLRepository):
             except psycopg2.IntegrityError as e:
                 if e.pgcode == '23505':   # unique constraint
                     # or replace it with error if persistence is needed
+                    log.msg("Error occured while inserting %s, %s, %s" % (
+                        data_value, pers._id, data_type
+                    ))
                     yield self.pool.runOperation(
                         pe.update('person_data', 'person'),
                                                  (data_value, pers._id,

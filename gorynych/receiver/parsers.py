@@ -11,7 +11,8 @@ FORMAT = {
     'alt': 'altitude (meters)',
     'h_speed': 'speed (kilometers per hour)',
     'imei': 'unique 15-digit sequence',
-    'ts': 'unix timestamp (seconds)'
+    'ts': 'unix timestamp (seconds)',
+    'battery': 'battery charge left (percentage)'
 }
 
 class IParseMessage(Interface):
@@ -185,7 +186,7 @@ class TeltonikaGH3000UDP(object):
         }
 
         io_map = {
-            '01'.decode('hex'): 1,
+            '01'.decode('hex'): 1,  # battery
             '02'.decode('hex'): 1,
             '05'.decode('hex'): 4,
             '14'.decode('hex'): 2,
@@ -255,6 +256,11 @@ class TeltonikaGH3000UDP(object):
                         iocursor = cursor + 1
                         for io_element in xrange(quantity):
                             io_id = data[iocursor]
+
+                            # check if it's a battery
+                            if io_id == '01'.decode('hex'):
+                                record['battery'] = ord(data[iocursor + io_map[io_id]])
+
                             iocursor += io_map[io_id] + 1
 
                         cursor = iocursor

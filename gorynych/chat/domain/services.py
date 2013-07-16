@@ -50,7 +50,7 @@ class AuthenticationService(object):
             raise AuthenticationError()
         result = None
         for item in rlist:
-            if item['start_time'] < now < item['end_time'] + time_offset:
+            if int(item['start_time']) < now < int(item['end_time']) + time_offset:
                 result = item
                 break
         if result:

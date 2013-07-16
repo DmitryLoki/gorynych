@@ -346,6 +346,7 @@ class RaceRepositoryTest(unittest.TestCase):
             self.assertEqual(pgs[key].person_id, rc.paragliders[key].person_id)
             self.assertEqual(pgs[key].glider, rc.paragliders[key].glider)
             self.assertEqual(pgs[key].contest_number, rc.paragliders[key].contest_number)
+            self.assertTrue(not pgs[key].tracker_id and not rc.paragliders[key].tracker_id)
 
     @defer.inlineCallbacks
     def test_update(self):
@@ -378,4 +379,5 @@ class RaceRepositoryTest(unittest.TestCase):
             self.assertEqual(pgs[key].person_id, rc.paragliders[key].person_id)
             self.assertEqual(pgs[key].glider, rc.paragliders[key].glider)
             self.assertEqual(pgs[key].contest_number, rc.paragliders[key].contest_number)
+            self.assertTrue(not pgs[key].tracker_id and not rc.paragliders[key].tracker_id)
         yield db_helpers.tearDownDB('transport', POOL)

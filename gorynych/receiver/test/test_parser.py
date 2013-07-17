@@ -85,10 +85,8 @@ class TeltonikaGH3000UDPTest(ParserTest):
         self.assertEqual(response.encode('hex'), '00050002010204')
 
     def test_incorrect_message(self):
-        message = 'too_short'
-        self.assertRaises(IndexError, self.parser.parse, message)
-        message = 'enough_long_but_still_not_enough_correct_message_to_be_parsed'
-        self.assertRaises(KeyError, self.parser.parse, message)
+        message = '\nat+cgreg?\r\nat+csq\r\nGSr,011412001291453,3,3,00,,3,170713,114926,E02444.8435,N4239.2881,2276,12.99,40,7,1.1,81,284,01'
+        self.assertEqual(self.parser.parse(message), [])
 
 if __name__ == '__main__':
     unittest.main()

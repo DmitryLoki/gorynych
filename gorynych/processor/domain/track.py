@@ -276,11 +276,12 @@ class RaceToGoal(object):
                 if nextchp.type == 'es':
                     eventlist.append(events.TrackFinishTimeReceived(_id,
                         payload=p['timestamp']))
-                    self.wp_error = 30
+                    self.wp_error = 20
                 if nextchp.type == 'goal':
                     eventlist.append(events.TrackFinished(_id,
                         occured_on=taskstate.finish_time))
                     ended = True
+                    self.wp_error = 20
                 if nextchp.type == 'ss':
                     eventlist.append(events.TrackStarted(_id,
                         occured_on=p['timestamp']))

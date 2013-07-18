@@ -407,6 +407,12 @@ class TrackerTest(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         r = r.json()
         self.assertIsInstance(r, list)
+        self.assertGreaterEqual(len(r), 1)
+        device = None
+        for item in r:
+            if item['device_type'] == 'tr203':
+                device = item['device_type']
+        self.assertIsNotNone(device)
 
         # Test GET /tracker/{id}
         tid = r[0]['id']

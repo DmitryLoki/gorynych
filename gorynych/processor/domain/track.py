@@ -16,6 +16,7 @@ from gorynych.info.domain.ids import namespace_uuid_validator
 from gorynych.common.domain import events
 from gorynych.common.domain.types import checkpoint_collection_from_geojson
 from gorynych.processor.domain import services
+from twisted.python import log
 
 
 DTYPE = [('id', 'i4'), ('timestamp', 'i4'), ('lat', 'f4'),
@@ -56,7 +57,7 @@ class TrackState(ValueObject):
     Hold track state. Memento.
     '''
     states = ['not started', 'started', 'finished', 'landed']
-    def __init__(self, id, events):
+    def __init__(self, id, event_list):
         self.id = id
         # Time when track speed become more then threshold.
         self.become_fast = None
@@ -75,16 +76,13 @@ class TrackState(ValueObject):
         self.end_time = None
         self.ended = False
         self.finish_time = None
-        for ev in events:
+        self.last_distance = 0
+        for ev in event_list:
             self.mutate(ev)
 
     def mutate(self, ev):
         '''
         Mutate state according to event. Analog of apply method in AggregateRoot.
-        @param ev:
-        @type ev:
-        @return:
-        @rtype:
         '''
         evname = ev.__class__.__name__
         if hasattr(self, 'apply_' + evname):
@@ -112,6 +110,7 @@ class TrackState(ValueObject):
             self.statechanged_at = ev.occured_on
         self.ended = True
         self.end_time = ev.occured_on
+        self.last_distance = ev.payload.get('distance')
 
     def apply_TrackFinished(self, ev):
         if not self.state == 'finished':
@@ -134,6 +133,7 @@ class TrackState(ValueObject):
         self.in_air = False
         if not self.state == 'finished':
             self.state = 'landed'
+            self.last_distance = int(ev.payload)
             self.statechanged_at = ev.occured_on
 
     def get_state(self):
@@ -170,24 +170,21 @@ class Track(AggregateRoot):
     def process_data(self, data):
         # Here TrackType read data and return it in good common format.
         data = self.type.read(data)
-        # Проверить летит или не летит.
-        evs = services.ParagliderSkyEarth(self._state.track_type)\
-            .state_work(data, self._state)
-        self.apply(evs)
         # Now TrackType correct points and calculate smth if needed.
         points, evs = self.type.process(data,
             self.task.start_time, self.task.end_time, self._state)
         self.apply(evs)
-        if not points:
+        if points is None:
             return
+        evs = services.ParagliderSkyEarth(self._state).state_work(points)
+        self.apply(evs)
         # Task process points and emit new events if occur.
         points, ev_list = self.task.process(points, self._state, self.id)
         self.apply(ev_list)
         self.points = np.hstack((self.points, points))
         # Look for state after processing and do all correctness.
-        evlist = self.type.correct(self._state, self.id)
+        evlist = self.type.correct(self)
         self.apply(evlist)
-        return self
 
     @property
     def state(self):
@@ -255,15 +252,20 @@ class RaceToGoal(object):
         if lastchp < len(self.checkpoints) - 1:
             nextchp = self.checkpoints[lastchp + 1]
         else:
-            # Последняя точка взята, но данные продолжают поступать. Для
-            # этого заменяем дистанцию во всех на последнюю посчитанную.
+            # Last point taken but we still have data.
             for p in points:
-                p['distance'] = 0
+                p['distance'] = 200
             return points, []
         if taskstate.state == 'landed':
-            for p in points:
-                p['distance'] = 0
-            return points, []
+            if taskstate.last_distance:
+                for p in points:
+                    p['distance'] = taskstate.last_distance
+                return points, []
+            else:
+                for p in points:
+                    p['distance'] = 200
+                return points, []
+
         ended = taskstate.ended
         for idx, p in np.ndenumerate(points):
             dist = nextchp.distance_to((p['lat'], p['lon']))
@@ -274,10 +276,12 @@ class RaceToGoal(object):
                 if nextchp.type == 'es':
                     eventlist.append(events.TrackFinishTimeReceived(_id,
                         payload=p['timestamp']))
+                    self.wp_error = 20
                 if nextchp.type == 'goal':
                     eventlist.append(events.TrackFinished(_id,
                         occured_on=taskstate.finish_time))
                     ended = True
+                    self.wp_error = 20
                 if nextchp.type == 'ss':
                     eventlist.append(events.TrackStarted(_id,
                         occured_on=p['timestamp']))

@@ -1,1 +1,1 @@
-{"id":"$tracker_id","device_id":"$device_id","name":"$name"}
+{"id":"$tracker_id","device_id":"$device_id","name":"$name","last_point":$last_point}

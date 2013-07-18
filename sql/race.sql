@@ -47,6 +47,18 @@ CREATE TABLE ORGANIZATOR(
 );
 
 
+CREATE TABLE RACE_TRANSPORT(
+  ID BIGINT REFERENCES RACE(ID) ON DELETE CASCADE ,
+  TRANSPORT_ID TEXT NOT NULL ,
+  DESCRIPTION TEXT ,
+  TITLE TEXT ,
+  TRACKER_ID TEXT NOT NULL ,
+  TYPE TEXT NOT NULL ,
+
+  PRIMARY KEY (ID, TRANSPORT_ID)
+);
+
+
 -- Insert racetype
 INSERT INTO RACE_TYPE(TYPE) VALUES (%s);
 
@@ -71,22 +83,18 @@ UPDATE RACE SET (TITLE, START_TIME, END_TIME, TIMEZONE, RACE_TYPE,
       SELECT ID FROM RACE_TYPE WHERE TYPE=%s), %s, %s, %s, %s)
 WHERE RACE_ID=%s;
 
+
+-- Select all_race
+SELECT
+  RACE_ID, ID, RACE_ID, TITLE, START_TIME, END_TIME, TIMEZONE, (SELECT TYPE FROM RACE_TYPE WHERE ID=RACE.RACE_TYPE), CHECKPOINTS, AUX_FIELDS, START_LIMIT_TIME, END_LIMIT_TIME
+FROM RACE;
+
+
 -- Select paragliders
 SELECT * FROM PARAGLIDER WHERE ID=%s;
 
 -- Insert paraglider
 INSERT INTO PARAGLIDER VALUES (%s, %s, %s, %s, %s, %s, %s, %s);
-
--- Select race_id_by_organizator
-SELECT
-  r.race_id
-FROM
-  organizator o,
-  race r
-WHERE
-  o.id = r.id
-  AND o.person_id=%s
-  AND (r.end_time BETWEEN %s AND %s or r.start_time BETWEEN %s AND %s);
 
 -- Select current_race_by_tracker
 SELECT
@@ -96,15 +104,20 @@ FROM
   paraglider p
 WHERE
   r.id = p.id AND
-  p.tracker_id = %s AND
+  p.tracker_id = (select tracker_id from tracker where device_id=%s) AND
   %s BETWEEN r.start_time AND r.end_time + 7*3600;
 
 
--- Select cn_by_rid
-SELECT p.contest_number
+-- select transport
+select * from transport where id=%s;
+
+
+-- Select race_transport
+SELECT
+  TYPE, RACE_TRANSPORT.TITLE, DESCRIPTION, TRACKER_ID, TRANSPORT_ID
 FROM
-  paraglider p,
-  race r
+  RACE_TRANSPORT,
+  RACE
 WHERE
-  p.id = r.id AND
-  p.tracker_id=%s;
+  RACE.RACE_ID=%s
+  AND RACE.ID = RACE_TRANSPORT.ID;

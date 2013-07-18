@@ -8,11 +8,12 @@ import scipy as sc
 from scipy import signal, interpolate
 import numpy as np
 import numpy.ma as ma
+from zope.interface import implementer
 
 from gorynych.common.domain.services import point_dist_calculator
-from gorynych.common.domain.events import TrackEnded
 from gorynych.common.exceptions import NoGPSData
 from gorynych.common.domain import events
+from gorynych.processor import interfaces
 
 def choose_offline_parser(trackname):
     if trackname.endswith('.igc'): return IGCTrackParser
@@ -98,6 +99,7 @@ class KMLTrackParser(object):
     pass
 
 
+@implementer(interfaces.ITrackType)
 class FileParserAdapter(object):
     type = 'competition_aftertask'
     def __init__(self, dtype):
@@ -125,10 +127,11 @@ class FileParserAdapter(object):
             track['timestamp'])
         return track, []
 
-    def correct(self, trackstate, _id):
-        if not trackstate.finish_time:
-            return [TrackEnded(_id, dict(state='landed'),
-                occured_on=trackstate._buffer[ -1]['timestamp'])]
+    def correct(self, obj):
+        if not obj._state.finish_time:
+            return [events.TrackEnded(obj.id, dict(state='landed',
+                                            distance=int(obj.points[-1]['distance'])),
+                occured_on=obj.points[-1]['timestamp'])]
         return []
 
 
@@ -394,63 +397,101 @@ def runs_of_ones_array(bits):
 
 
 class ParagliderSkyEarth(object):
-    # Threshold value for 'not started'-'flying' change in km/h.
-    sf_speed = 20
     # Threshold value for 'flying'-'not started' or 'not started-flying'
     # change in km/h.
     t_speed = 10
-    # Time interval in which is allowed for pilot to be slow, seconds.
-    slow_interval = 60
-    alt_interval = 5
 
-    def __init__(self, tt):
-        self.track_type = tt
+    def __init__(self, trackstate):
+        self._bs = trackstate.become_slow
+        self._bf = trackstate.become_fast
+        self._in_air = trackstate.in_air
+        self._state = trackstate.state
+        self._id = trackstate.id
+        self.trackstate = trackstate
 
-    def state_work(self, data, trackstate):
-        ''' Calculate pilot's state.'''
-        if self.track_type == 'online':
-            return self.online_state_work(data, trackstate)
+    def state_work(self, data):
+        '''
 
-    def online_state_work(self, data, trackstate):
+        @param data:
+        @type data: numpy.ndarray
+        @param trackstate:
+        @type trackstate: gorynych.processor.domain.track.TrackState
+        @return:
+        @rtype:
+        '''
         result = []
-        _id = trackstate.id
-        if not trackstate.in_air and not trackstate.state == 'landed':
+        for point in data:
+            result.append(self._state_work(point))
+        return [item for sublist in result for item in sublist]
+
+    def _state_work(self, data):
+        result = []
+        if self._state == 'landed' or self._state == 'finished':
+            return []
+
+        if not self._in_air:
             # Ещё не в воздухе
-            if trackstate.become_fast:
+            if self._bf:
                 # Пилот уже летит быстрее пороговой скорости.
-                bf = trackstate.become_fast
                 in_air_by_speed = data['g_speed'] > self.t_speed and (
-                    data['timestamp'] - bf > 60)
+                    data['timestamp'] - self._bf > 60)
                 if in_air_by_speed:
-                    result.append(events.TrackInAir(_id,
-                        occured_on=data['timestamp']))
+                    result.append(self._track_in_air(data))
                 elif data['g_speed'] < self.t_speed:
-                    result.append(events.TrackSlowedDown(_id,
-                        occured_on=data['timestamp']))
+                    result.append(self._slowed_down(data))
             else:
                 if data['g_speed'] > self.t_speed:
                     # Был медленный, стал быстрый.
-                    result.append(events.TrackSpeedExceeded(_id,
-                        occured_on=data['timestamp']))
+                    result.append(self._speed_exceed(data))
         else:
-            if trackstate.become_fast:
+            if self._bf:
                 if data['g_speed'] < self.t_speed:
-                    result.append(events.TrackSlowedDown(_id,
-                        occured_on=data['timestamp']))
+                    result.append(self._slowed_down(data))
             else:
                 # Пилот уже медленный, но ещё в воздухе.
-                bs = trackstate.become_slow
                 if data['g_speed'] > self.t_speed:
-                    result.append(events.TrackSpeedExceeded(_id,
-                        occured_on=data['timestamp']))
-                elif data['timestamp'] - bs > 60:
+                    result.append(self._speed_exceed(data))
+
+                elif data['timestamp'] - self._bs > 60 and (
+                    self._alt_diff(data, 5)):
                     # Landed
-                    result.append(events.TrackLanded(_id,
-                        occured_on=data['timestamp']))
+                    result.append(self._track_landed(data))
         return result
 
 
+    def _speed_exceed(self, data):
+        self._bf = data['timestamp']
+        self._bs = None
+        return events.TrackSpeedExceeded(self._id, occured_on=data[
+            'timestamp'])
+
+    def _slowed_down(self, data):
+        self._bf = None
+        self._bs = data['timestamp']
+        return events.TrackSlowedDown(self._id, occured_on=data['timestamp'])
+
+    def _track_in_air(self, data):
+        self._in_air = True
+        return events.TrackInAir(self._id, occured_on=data['timestamp'])
+
+    def _track_landed(self, data):
+        self._state = 'landed'
+        self._in_air = False
+        return events.TrackLanded(self._id, payload=data['distance'],
+            occured_on=data['timestamp'])
+
+    def _alt_diff(self, data, dif):
+        ts = data['timestamp']
+        idxs = np.where(self.trackstate._buffer['timestamp'] < ts - 50)
+        if len(idxs) == 0:
+            return False
+        a1 = self.trackstate._buffer['alt'][idxs[-1]]
+        return abs(a1 - data['alt']) < dif
+
+
+@implementer(interfaces.ITrackType)
 class OnlineTrashAdapter(object):
+    type = 'online'
     store_second = 60
     def __init__(self, dtype):
         self.dtype = dtype
@@ -468,7 +509,7 @@ class OnlineTrashAdapter(object):
         '''
         На выходе получили самые ранние пришедшие точки (те, которые раньше
         чем за store_second.
-        @param data:
+        @param data: 1-length array
         @type data: np.ndarray
         @param stime:
         @type stime:
@@ -487,11 +528,17 @@ class OnlineTrashAdapter(object):
         # Select points for return.
         buf = trackstate._buffer
         now = int(time.time())
-        s = np.min(trackstate._buffer['timestamp'])
+        s = np.min(buf['timestamp'])
         if now - s < self.store_second:
             return None, []
         idxs = np.where(buf['timestamp'] < now - self.store_second)
         result = buf[idxs]
         trackstate._buffer = np.delete(trackstate._buffer, idxs)
+        result = np.sort(result, order='timestamp')
+        result['v_speed'] = vspeed_calculator(result['alt'], result['timestamp'])
+        result['g_speed'] = result['g_speed'] / 3.6
         return result, []
+
+    def correct(self, b):
+        return []
 

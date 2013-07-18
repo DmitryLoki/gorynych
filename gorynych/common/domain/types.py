@@ -60,6 +60,8 @@ class Address(ValueObject):
         if not isinstance(country, Country):
             country = Country(country)
         self._country = country
+        if isinstance(coordinates, str):
+            coordinates = coordinates.split(',')
         self.lat = float(coordinates[0])
         self.lon = float(coordinates[1])
         if not (-90 < self.lat < 90 and -180 <= self.lon <= 180):

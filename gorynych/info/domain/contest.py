@@ -10,7 +10,8 @@ from gorynych.common.domain.model import AggregateRoot, ValueObject
 from gorynych.common.domain.types import Address, Country, Name
 from gorynych.common.domain.events import ParagliderRegisteredOnContest
 from gorynych.common.infrastructure import persistence
-from gorynych.info.domain.ids import ContestID, PersonID, TrackerID
+from gorynych.info.domain.ids import ContestID, PersonID, TrackerID, TransportID
+from gorynych.common.exceptions import DomainError
 
 
 class IContestRepository(Interface):
@@ -65,6 +66,7 @@ class Contest(AggregateRoot):
         self.address = address
         self._participants = dict()
         self.race_ids = set()
+        self.retrieve_id = None
 
     @property
     def timezone(self):
@@ -161,6 +163,19 @@ class Contest(AggregateRoot):
         return result
 
     @property
+    def transport(self):
+        '''
+
+        @return: list of transport ids (type TransportID)
+        @rtype: list
+        '''
+        result = list()
+        for key in self._participants.keys():
+            if self._participants[key]['role'] == 'transport':
+                result.append(key)
+        return result
+
+    @property
     def country(self):
         return self.address.country
 
@@ -180,6 +195,11 @@ class Contest(AggregateRoot):
 
     @property
     def hq_coords(self):
+        '''
+
+        @return:(float, float)
+        @rtype: C{tuple}
+        '''
         return self.address.coordinates
 
     @hq_coords.setter
@@ -206,6 +226,23 @@ class Contest(AggregateRoot):
         persistence.event_store().persist(ParagliderRegisteredOnContest(
                             person_id, self.id))
         return self
+
+    def add_transport(self, transport_id):
+        if not isinstance(transport_id, TransportID):
+            transport_id = TransportID.fromstring(transport_id)
+        if not transport_id in self._participants:
+            self._participants[transport_id] = dict(role='transport')
+            return self
+        if transport_id in self._participants and (
+                self._participants[transport_id]['role'] == 'transport'):
+            return self
+        raise DomainError("Received id already in contest and it's not "
+                          "transport id: %s" % transport_id)
+
+    def remove_transport(self, transport_id):
+        if self._participants.has_key(str(transport_id)) and (
+                self._participants[transport_id]['role'] == 'transport'):
+            del self._participants[transport_id]
 
     def _invariants_are_correct(self):
         """
@@ -253,7 +290,6 @@ class Contest(AggregateRoot):
             raise ValueError("Contest invariants violated.")
 
 
-
 class Paraglider(ValueObject):
 
     def __init__(self, person_id, name, country, glider, contest_number,
@@ -292,3 +328,29 @@ class Paraglider(ValueObject):
         return self.person_id == other.person_id and (self.glider == other
         .glider) and (self.contest_number == other.contest_number) and (self
                                                                                        .tracker_id == other.tracker_id)
+
+
+def change(cont, params):
+    '''
+    Do changes in contest.
+    @param cont:
+    @type cont: Contest
+    @param params:
+    @type params: dict
+    @return:
+    @rtype: Contest
+    '''
+    if params.get('start_time') and params.get('end_time'):
+        cont.change_times(params['start_time'], params['end_time'])
+        del params['start_time']
+        del params['end_time']
+
+    if params.get('coords'):
+        lat, lon = params['coords'].split(',')
+        cont.hq_coords = (lat, lon)
+        del params['coords']
+
+    for param in params.keys():
+        setattr(cont, param, params[param])
+    return cont
+

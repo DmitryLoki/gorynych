@@ -2,6 +2,7 @@
 This application service return tracks data to visualisation.
 '''
 import time
+import math
 
 from twisted.internet import defer
 from twisted.python import log
@@ -98,7 +99,7 @@ GET_HEADERS_SNAPSHOTS = """
 
 class TrackVisualizationService(Service):
     # don't show pilots earlier then time - track_gap. In seconds
-    track_gap = 10800
+    track_gap = 15000
 
     def __init__(self, pool):
         self.pool = pool
@@ -114,31 +115,29 @@ class TrackVisualizationService(Service):
 
     @defer.inlineCallbacks
     def get_track_data(self, params):
-        t1 = time.time()
         result = dict()
         race_id = params['group_id']
         from_time = int(params['from_time'])
         to_time = int(params['to_time'])
         start_positions = params.get('start_positions')
+        t1 = time.time()
         tracks = yield self.pool.runQuery(SELECT_DATA, (race_id, from_time,
                                                   to_time))
-        snaps = yield self.pool.runQuery(SELECT_DATA_SNAPSHOTS, (race_id, from_time,
-                                                  to_time))
+        snaps = yield self.pool.runQuery(SELECT_DATA_SNAPSHOTS,
+                                    (race_id, from_time, to_time))
         t2 = time.time()
         result['timeline'] = self.prepare_result(tracks, snaps)
-        t3 = time.time()
-        log.msg("result requested in %s:" % (t2-t1))
-        log.msg("result ready in: %s, preparation time is: %s" % (t3-t1, t3-t2))
+        log.msg("data requested in %0.3f" % (t2-t1))
         if start_positions:
             ts1 = time.time()
             hdata = yield self.pool.runQuery(GET_HEADERS_DATA, (race_id,
                                 from_time - self.track_gap, from_time))
             hsnaps = yield self.pool.runQuery(GET_HEADERS_SNAPSHOTS,
                                               (race_id, from_time))
-            start_data = self.prepare_start_data(hdata, hsnaps)
             ts2 = time.time()
+            start_data = self.prepare_start_data(hdata, hsnaps)
             result['start'] = start_data
-            log.msg("start positions ready in: %s" % (ts2-ts1))
+            log.msg("start positions requested in %0.3f" % (ts2-ts1))
         defer.returnValue(result)
 
     def prepare_start_data(self, hdata, hsnaps):
@@ -152,32 +151,20 @@ class TrackVisualizationService(Service):
         'state':'finished', 'statechanged_at': 2134} - that's not true
         @rtype:
         '''
-        t1 = time.time()
         result = defaultdict(dict)
         # Add last coords and speeds to result.
         for row in hdata:
-            result[str(row[0])] = parse_result(row[1].split(','))
-            #result[str(row[0])]['ts'] = str(row[2])
+            cont_number, data, timestamp = row
+            result[cont_number] = parse_result(data.split(','))
 
-
-        t2 = time.time()
         # Add last state to result.
         for row in hsnaps:
             result[str(row[0])]['state'] = str(row[1])
             result[str(row[0])]['statechanged_at'] = int(row[2])
 
-        t3 = time.time()
         for pilot in result:
             if not result[pilot].has_key('state'):
                 result[pilot]['state'] = 'not started'
-        log.msg("start data prepared in: %s" % (t3-t1))
-
-        #final_result = defaultdict(dict)
-        #for key in result:
-            #ts = result[key]['ts']
-            #del result[key]['ts']
-            #final_result[ts][key] = result[key]
-
         return result
 
     def prepare_result(self, tracks, snaps):
@@ -197,7 +184,8 @@ class TrackVisualizationService(Service):
                                     ] = parse_result(data.split(',')[1:])
 
         for row in snaps:
-            result[int(row[0])][row[2]]['state'] = row[1]
+            timestamp, snapshot, contest_number = row
+            result[timestamp][contest_number]['state'] = snapshot
 
         return result
 
@@ -206,8 +194,17 @@ def parse_result(data):
     res = dict()
     res['lat'], res['lon'], res['alt'], res['vspd'], res['gspd'], \
     res['dist'] = data
+    def _float(num):
+        result = float(num)
+        if math.isnan(result):
+            log.msg("Nan found in vspeed.")
+            result = 0
+        if math.isinf(result):
+            log.msg("Infinity found in vspeed.")
+            result = 1
+        return result
 
-    formats = dict(lat=float, lon=float, alt=int, gspd=float, vspd=float,
+    formats = dict(lat=_float, lon=_float, alt=int, gspd=_float, vspd=_float,
                    dist=int)
     for key in res:
         res[key] = formats[key](res[key])

@@ -3,12 +3,12 @@ Tracker Aggregate.
 '''
 from gorynych.common.domain.events import TrackerAssigned, TrackerUnAssigned
 from gorynych.common.domain.model import AggregateRoot
-from gorynych.info.domain.ids import TrackerID, PersonID
+from gorynych.info.domain.ids import TrackerID, PersonID, TransportID
 from gorynych.common.infrastructure import persistence as pe
 from gorynych.common.exceptions import DomainError
 
 
-DEVICE_TYPES = ['tr203']
+DEVICE_TYPES = ['tr203', 'telt_gh3000']
 
 
 class Tracker(AggregateRoot):
@@ -20,16 +20,37 @@ class Tracker(AggregateRoot):
         self.device_type = device_type
         self.assignee = dict() # {contest_id:assignee_id}
         self._name = ''
+        self._last_point = dict()
+
+    @property
+    def last_point(self):
+        return [self._last_point.get('lat'), self._last_point.get('lon'),
+                    self._last_point.get('alt'), self._last_point.get('ts'),
+            self._last_point.get('bat'), self._last_point.get('speed')]
+
+    @last_point.setter
+    def last_point(self, value):
+        lat, lon, alt, ts, bat, speed = value
+        self._last_point['lat'] = lat
+        self._last_point['lon'] = lon
+        self._last_point['alt'] = alt
+        self._last_point['ts'] = ts
+        self._last_point['bat'] = bat
+        self._last_point['speed'] = speed
 
     def is_free(self):
         return len(self.assignee) == 0
 
     def assign_to(self, assignee_id, contest_id):
-        assignee_id = PersonID.fromstring(assignee_id)
-        if assignee_id in self.assignee.values():
+        assignee_type = assignee_id.split('-', 1)[0]
+        if assignee_type == 'pers':
+            assignee_id = PersonID.fromstring(assignee_id)
+        elif assignee_type == 'trns':
+            assignee_id = TransportID.fromstring(assignee_id)
+        if contest_id in self.assignee.keys():
             raise DomainError("Tracker already has owner %s for "
                                "contest %s" %
-                               (self.assignee[assignee_id], contest_id))
+                               (self.assignee.get(contest_id), contest_id))
         self.assignee[contest_id] = assignee_id
         return pe.event_store().persist(TrackerAssigned(
             aggregate_id=assignee_id,
@@ -60,7 +81,8 @@ class Tracker(AggregateRoot):
 class TrackerFactory(object):
 
     def create_tracker(self, tracker_id=None, device_id=None,
-                       device_type=None, name=None, assignee=None):
+                       device_type=None, name=None, assignee=None,
+            last_point=None):
         if not isinstance(tracker_id, TrackerID):
             tracker_id = TrackerID(device_type, device_id)
         if isinstance(device_id, str) and device_type in DEVICE_TYPES:
@@ -77,6 +99,9 @@ class TrackerFactory(object):
             tracker.assignee = assignee
         else:
             tracker.assignee = dict()
+
+        if isinstance(last_point, tuple) and len(last_point) == 6:
+            tracker.last_point = last_point
         return tracker
 
 

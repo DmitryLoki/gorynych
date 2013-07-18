@@ -1,16 +1,21 @@
+# -*- coding: utf-8 -*-
 '''
 Application Services for info context.
 '''
+import cPickle
 import simplejson as json
+import time
 
-from twisted.internet import defer
+from twisted.internet import defer, task
+from twisted.python import log
 
-from gorynych.info.domain import contest, person, race, tracker
+from gorynych.info.domain import contest, person, race, tracker, transport
 from gorynych.common.infrastructure import persistence
 from gorynych.common.domain.types import checkpoint_from_geojson
 from gorynych.common.domain.events import ContestRaceCreated
 from gorynych.common.application import EventPollingService, DBPoolService
 from gorynych.info.domain import interfaces
+from gorynych.receiver.receiver import RabbitMQService
 
 
 class BaseApplicationService(DBPoolService):
@@ -20,12 +25,14 @@ class BaseApplicationService(DBPoolService):
         return d
 
     def _change_aggregate(self, params, repo_interface, change_func):
-        id = params.get('id')
-        if not id:
+        aggregate_type = repo_interface.getName()[1:-10].lower()
+        id_ = params.get(aggregate_type + '_id')
+        if not id_:
             raise ValueError("Aggregate's id hasn't been received.")
-        del params['id']
+        if params.get('id'):
+            del params['id']
 
-        d = self._get_aggregate(id, repo_interface)
+        d = self._get_aggregate(id_, repo_interface)
         d.addCallback(change_func, params)
         d.addCallback(persistence.get_repository(repo_interface).save)
         return d
@@ -100,30 +107,8 @@ class ApplicationService(BaseApplicationService):
         @rtype:
         '''
 
-        def change(cont, params):
-            '''
-            Do actual changes in contest.
-            @param cont:
-            @type cont:
-            @param params:
-            @type params:
-            @return:
-            @rtype:
-            '''
-            if params.get('start_time') and params.get('end_time'):
-                cont.change_times(params['start_time'], params['end_time'])
-                del params['start_time']
-                del params['end_time']
-
-            for param in params.keys():
-                setattr(cont, param, params[param])
-            return cont
-
-        if params.has_key('contest_id'):
-            params['id'] = params['contest_id']
-            del params['contest_id']
         return self._change_aggregate(params, contest.IContestRepository,
-                                      change)
+                                      contest.change)
 
     def register_paraglider_on_contest(self, params):
         '''
@@ -140,6 +125,17 @@ class ApplicationService(BaseApplicationService):
             params['contest_number']))
         d.addCallback(
             persistence.get_repository(contest.IContestRepository).save)
+        return d
+
+    def add_transport_to_contest(self, params):
+        d = self.get_contest(params)
+        d.addCallback(lambda cont: cont.add_transport(params['transport_id']))
+        d.addCallback(
+            persistence.get_repository(contest.IContestRepository).save)
+        return d
+
+    def get_contest_transport(self, params):
+        d = self.get_contest(params)
         return d
 
     def get_contest_paragliders(self, params):
@@ -208,24 +204,8 @@ class ApplicationService(BaseApplicationService):
         return self._get_aggregates_list(params, person.IPersonRepository)
 
     def change_person(self, params):
-        # TODO: create changing services instead of functions in application
-        #  layer.
-        def change(pers, params):
-            new_name = dict()
-            if params.get('name'):
-                new_name['name'] = params['name']
-            if params.get('surname'):
-                new_name['surname'] = params['surname']
-            pers.name = new_name
-            if params.get('country'):
-                pers.country = params['country']
-            return pers
-
-        if params.has_key('person_id'):
-            params['id'] = params['person_id']
-            del params['person_id']
         return self._change_aggregate(params, person.IPersonRepository,
-                                      change)
+                                      person.change_person)
 
     ############## Race Service part ################
     def get_race(self, params):
@@ -239,17 +219,24 @@ class ApplicationService(BaseApplicationService):
         plist = []
         # TODO: make it thinner.
         for key in paragliders:
+            # TODO: do less db queries for transport.
             pers = yield self._get_aggregate(key, person.IPersonRepository)
             plist.append(contest.Paraglider(key, pers.name, pers.country,
                          paragliders[key]['glider'],
                          paragliders[key]['contest_number'],
                          pers.trackers.get(params['contest_id'])))
+        # TODO: do in domain model style. Think before.
+        # [(type, title, desc, tracker_id, transport_id),]
+        tr_dtos = yield self.pool.runQuery(
+            persistence.select('transport_for_contest', 'transport'),
+                                                        (str(cont.id),))
 
         factory = race.RaceFactory()
         r = factory.create_race(params['title'], params['race_type'],
                                    cont.timezone, plist,
                                    params['checkpoints'],
                                    bearing=params.get('bearing'),
+                                   transport=tr_dtos,
                                 timelimits=(cont.start_time, cont.end_time))
         # TODO: do it transactionally.
         d = persistence.get_repository(race.IRaceRepository).save(r)
@@ -327,17 +314,24 @@ class ApplicationService(BaseApplicationService):
         d.addCallback(lambda r: r.add_track_archive(params['url']))
         return d
 
+    def change_race_transport(self, params):
+        return self._change_aggregate(params, race.IRaceRepository,
+            race.change_race_transport)
+
+
     ############## Race Track's work ##################
     def get_race_tracks(self, params):
-        race_id = params['race_id']
+        group_id = params['race_id']
         ttype = params.get('type')
+        if ttype and ttype == 'online':
+            group_id = group_id + '_online'
         def filtr(rows):
             if not ttype:
                 return rows
             return filter(lambda row:row[0] == ttype, rows)
         d = self.pool.runQuery(persistence.select('tracks', 'track'),
-            (race_id,))
-        d.addCallback(filtr)
+            (group_id,))
+        # d.addCallback(filtr)
         return d
 
     ############## Tracker aggregate part ###################
@@ -359,8 +353,54 @@ class ApplicationService(BaseApplicationService):
             interfaces.ITrackerRepository)
 
     def change_tracker(self, params):
-        if params.has_key('tracker_id'):
-           params['id'] = params['tracker_id']
-           del params['tracker_id']
         return self._change_aggregate(params, interfaces.ITrackerRepository,
             tracker.change_tracker)
+
+    ############## Transport aggregate part ################
+    def create_new_transport(self, params):
+        from gorynych.info.domain.transport import TransportFactory
+        factory = TransportFactory()
+        trns = factory.create_transport(params['type'], params['title'],
+            params.get('description'))
+        d = defer.succeed(trns)
+        d.addCallback(persistence.get_repository(
+            interfaces.ITransportRepository).save)
+        return d
+
+    def get_transports(self, params=None):
+        return self._get_aggregates_list(
+            params, interfaces.ITransportRepository)
+
+    def get_transport(self, params):
+        return self._get_aggregate(params['transport_id'],
+            interfaces.ITransportRepository)
+
+    def change_transport(self, params):
+        return self._change_aggregate(params, interfaces.ITransportRepository,
+            transport.change_transport)
+
+
+class LastPointApplication(RabbitMQService):
+    def __init__(self, pool, **kw):
+        RabbitMQService.__init__(self, **kw)
+        self.pool = pool
+
+    def when_started(self):
+        d = defer.Deferred()
+        d.addCallback(self.open)
+        d.addCallback(lambda x: task.LoopingCall(self.read, x))
+        d.addCallback(lambda lc: lc.start(0.00))
+        d.callback('last_point')
+        return d
+
+    def handle_payload(self, queue_name, channel, method_frame, header_frame,
+            body):
+        data = cPickle.loads(body)
+        if not data.has_key('ts'):
+            # ts key MUST be in a data.
+            return
+        now = int(time.time())
+        return self.pool.runOperation(persistence.update('last_point',
+            'tracker'), (data['lat'], data['lon'], data['alt'], now,
+        data.get('battery'), data['h_speed'], data['imei']))
+

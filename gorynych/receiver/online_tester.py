@@ -19,7 +19,8 @@ import simplejson as json
 sys.path.append('..')
 
 
-from gorynych.receiver.receiver import UDPReceivingProtocol, ReceiverRabbitService, ReceiverService, DumbAuditLog
+from gorynych.receiver.receiver import ReceiverRabbitService, ReceiverService, DumbAuditLog
+from gorynych.receiver.protocols import UDPReceivingProtocol
 
 HOST, PORT = 'localhost', 9998
 DIR = 'test_data'
@@ -183,7 +184,7 @@ class RetreiveJSON(Resource):
 class MyElement(Element):
     a = os.path.join(os.path.dirname(__file__),'online_tester_template.xml')
 
-    loader = XMLFile(open(a))
+    #loader = XMLFile(open(a))
 
     def __init__(self, service):
         self.service = service

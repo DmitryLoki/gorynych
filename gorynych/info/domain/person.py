@@ -2,18 +2,21 @@
 Aggregate Person.
 '''
 import datetime
+import re
 
 from zope.interface.interfaces import Interface
 
 from gorynych.common.domain.model import AggregateRoot
 from gorynych.common.domain.types import Name, Country
-from gorynych.info.domain.ids import PersonID, TrackerID
+from gorynych.info.domain.ids import PersonID
 
 
 # Person can participate in contest with one of this roles.
 ROLES = frozenset(['paraglider', 'organizator'])
 
+
 class Person(AggregateRoot):
+
     def __init__(self, person_id, name, country, email, regdate):
         super(Person, self).__init__()
         self.id = person_id
@@ -24,6 +27,8 @@ class Person(AggregateRoot):
         # contid:tracker_id
         self.trackers = dict()
         self._contests = dict()
+        # data_type:value
+        self._person_data = dict()
 
     @property
     def country(self):
@@ -32,6 +37,18 @@ class Person(AggregateRoot):
     @country.setter
     def country(self, value):
         self._country = Country(value)
+
+    @property
+    def phone(self):
+        return self._person_data.get('phone')
+
+    @phone.setter
+    def phone(self, value):
+        if re.match(r'^\+\d+', value):
+            self._person_data['phone'] = value
+        else:
+            raise ValueError("Incorrect phone %s, I'm waiting for phone like"
+                             " this: +3123456789")
 
     @property
     def name(self):
@@ -61,6 +78,7 @@ class Person(AggregateRoot):
         return self._contests.keys()
 
     def dont_participate_in_contest(self, contest_id):
+        # TODO: check if this method used.
         try:
             del self._contests[contest_id]
         except KeyError:
@@ -69,7 +87,7 @@ class Person(AggregateRoot):
     def __eq__(self, other):
         return self.id == other.id and (
             self.name.full() == other.name.full()) and (
-            self.email == other.email)
+                self.email == other.email)
 
     def apply_TrackerAssigned(self, ev):
         tr, cont = ev.payload
@@ -81,9 +99,11 @@ class Person(AggregateRoot):
 
 
 class PersonFactory(object):
+    # Person can hold additional data of those types.
+    person_data_types = ['phone']
 
     def create_person(self, name, surname, country, email, year=None,
-                      month=None, day=None, person_id=None):
+            month=None, day=None, person_id=None, **person_data):
         '''
         Create an instance of Person aggregate.
         @param name:
@@ -102,15 +122,20 @@ class PersonFactory(object):
         elif not isinstance(person_id, PersonID):
             person_id = PersonID.fromstring(person_id)
         person = Person(person_id,
-                        Name(name, surname),
-                        Country(country),
-                        email,
-                        datetime.date.today())
+            Name(name, surname),
+            Country(country),
+            email,
+            datetime.date.today())
+        for data_type in self.person_data_types:
+            if person_data.get(data_type) and hasattr(person, data_type):
+                setattr(person, data_type, person_data[data_type])
+
         return person
 
 
 # TODO: move interfaces into domain.interfaces.
 class IPersonRepository(Interface):
+
     def get_by_id(id):
         '''
         Return a person with id.
@@ -120,7 +145,7 @@ class IPersonRepository(Interface):
         @rtype: Person
         '''
 
-    def save(person):  # @NoSelf
+    def save(person):
         '''
         Persist person.
         @param person:
@@ -133,3 +158,20 @@ class IPersonRepository(Interface):
         '''
         Return list of a person
         '''
+
+
+def change_person(person, params):
+    new_name = dict()
+    if params.get('name'):
+        new_name['name'] = params['name']
+    if params.get('surname'):
+        new_name['surname'] = params['surname']
+    person.name = new_name
+    if params.get('country'):
+        person.country = params['country']
+
+    # other secondary params
+    for key in ['phone', 'udid']:
+        if key in params and hasattr(person, key):
+            setattr(person, key, params[key])
+    return person

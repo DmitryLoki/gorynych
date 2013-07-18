@@ -26,13 +26,17 @@ def create_contest(title='Contest with paragliders'):
     return r, title
 
 
-def create_persons(reg_date=None, email=None, name=None):
+def create_persons(reg_date=None, email=None, name=None, phone=None, udid=None):
     if not email:
         email = 'vasya@example.com'+ str(random.randint(1, 1000000))
     if not name:
         name='Vasylyi'
     params = dict(name=name, surname='Doe', country='SS',
         email=email, reg_date=reg_date)
+    if phone:
+        params.update({'phone': phone})
+    if udid:
+        params.update({'udid': udid})
     r = requests.post(URL + '/person', data=params)
     return r, email
 
@@ -78,6 +82,16 @@ def register_paraglider(pers_id, cont_id):
     return r, cn
 
 
+def create_transport(ttype=None, title=None, description=None):
+    if not ttype:
+        ttype='bus'
+    if not title:
+        title='Some bus.'
+    params = dict(type=ttype, title=title, description=description)
+    r = requests.post(URL + '/transport', data=params)
+    return r
+
+
 class RESTAPITest(unittest.TestCase):
     '''
     REST API must be started and running before tests.
@@ -108,23 +122,38 @@ class ContestRESTAPITest(unittest.TestCase):
 
     def test_3_change_contest(self):
         try:
-            r = requests.get(self.url)
-            cont_id = r.json()[0]["id"]
+            c_, t_ = create_contest()
+            cont_id = c_.json()["id"]
+            print cont_id
         except:
-            raise unittest.SkipTest("Can't get contest id is needed for this "
-                                 "test.")
+            raise unittest.SkipTest(
+                "Can't get contest id which is needed for this test.")
         title = '  besT Contest changed' + str(random.randint(1, 1000)) + '  '
         params = json.dumps(dict(title=title,
             start_time=11, end_time=15, place='Paris', country='mc',
-            coords='42.3,11.3', timezone='Europe/Paris'))
-        r2 = requests.put('/'.join((URL, 'contest', cont_id)), data=params)
+            coords='42.6,11.3', timezone='Europe/Paris', retrieve_id='45'))
+        r2 = requests.put('/'.join((self.url, cont_id)), data=params)
         result = r2.json()
+        self.assertEqual(r2.status_code, 200)
         self.assertEqual(result['title'], title.strip())
         self.assertEqual(result['country'], 'MC')
+        self.assertEqual(result['coords'], [42.6, 11.3])
+        self.assertEqual(result['retrieve_id'], '45')
+
+        params = json.dumps(dict(retrieve_id='some retrieve'))
+        r3 = requests.put('/'.join((self.url, cont_id)), data=params)
+        self.assertEqual(r3.status_code, 200)
+        result = r3.json()
+        self.assertEqual(result['title'], title.strip())
+        self.assertEqual(result['country'], 'MC')
+        self.assertEqual(result['coords'], [42.6, 11.3])
+        self.assertEqual(result['retrieve_id'], 'some retrieve')
 
 
 class PersonAPITest(unittest.TestCase):
+
     url = URL + '/person/'
+
     def test_1_get_fake_person(self):
         r = requests.get(self.url+'/1-1-1-1')
         self.assertEqual(r.status_code, 404)
@@ -160,6 +189,55 @@ class PersonAPITest(unittest.TestCase):
         result = r2.json()
         self.assertEqual(result['name'], 'Juan Carlos')
         self.assertEqual(result['country'], 'ME')
+
+
+class PersonWithDataTest(unittest.TestCase):
+    url = URL + '/person/'
+
+    def setUp(self):
+        # dirty dirty hack
+        import psycopg2
+        from gorynych import OPTS
+        try:
+            self.con = psycopg2.connect(database=OPTS['dbname'],
+            user=OPTS['dbuser'], host=OPTS['dbhost'], password=OPTS[
+                'dbpassword'])
+        except Exception as e:
+            raise unittest.SkipTest("Can't connect to database: %r" % e)
+        self.cur = self.con.cursor()
+
+    def tearDown(self):
+        self.con.close()
+
+    def test_add_change_person_phone(self):
+        r, email = create_persons()
+        self.assertEqual(r.status_code, 201)
+        pid = r.json()['id']
+        params = json.dumps(dict(phone='+7123456'))
+        r = requests.put(self.url + pid, data=params)
+        self.assertEqual(r.status_code, 200)
+        self._check_phone_change(pid, '+7123456')
+
+        params = json.dumps(dict(phone='+21'))
+        r = requests.put(self.url + pid, data=params)
+        self.assertEqual(r.status_code, 200)
+        self._check_phone_change(pid, '+21')
+
+    def _check_phone_change(self, pid, phone):
+        self.cur.execute('''
+         select data_type, data_value
+         from person_data, person
+         where
+            person_id=%s
+            and person.id = person_data.id
+        ''', (pid, ))
+        data = self.cur.fetchall()
+        self.assertEqual(len(data), 1)
+
+        data = {data[0][0]:data[0][1]}
+
+        self.assertEqual(data['phone'], phone)
+        self.con.commit()
 
 
 class ParaglidersTest(unittest.TestCase):
@@ -385,6 +463,138 @@ class TrackerTest(unittest.TestCase):
         r1 = requests.post(self.url, data=params)
         self.assertEqual(r1.status_code, 201)
         self.assertEqual(r1.json()['id'], tid)
+
+
+class TestTransportAPI(unittest.TestCase):
+    url = URL + '/transport'
+    def test_create(self):
+        r = create_transport(ttype='bus', title='Yellow bus',
+            description='Cool yellow bus with condition')
+        self.assertEqual(r.status_code, 201)
+        self.assertDictContainsSubset({'title': 'Yellow bus', 'type': 'bus',
+            'description': 'Cool yellow bus with condition'}, r.json())
+
+    def test_get_list(self):
+        try:
+            r = create_transport(ttype='car', title='Good car',
+                description='car')
+            tid = r.json()['id']
+        except Exception:
+            raise unittest.SkipTest("Can't create transport.")
+        if not tid:
+            raise unittest.SkipTest("Transport id needed for test.")
+
+        r = requests.get(self.url)
+        self.assertEqual(r.status_code, 200)
+        result = r.json()
+        self.assertIsInstance(result, list)
+        self.assertGreaterEqual(len(result), 1)
+        ids = []
+        for t in result:
+            ids.append(t['id'])
+        self.assertIn(tid, ids)
+
+    def test_get_transport(self):
+        try:
+            r = create_transport(ttype='car', title='Good car',
+                description='card')
+            tid = r.json()['id']
+        except Exception:
+            raise unittest.SkipTest("Can't create transport.")
+        if not tid:
+            raise unittest.SkipTest("Transport id needed for test.")
+
+        r = requests.get('/'.join((self.url, tid)))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['id'], tid)
+        self.assertDictContainsSubset({'title': 'Good car',
+            'description':'Card', 'type':'car'}, r.json())
+
+    def test_change_transport(self):
+        try:
+            r = create_transport(ttype='car', title='Good car',
+                description='car')
+            tid = r.json()['id']
+        except Exception:
+            raise unittest.SkipTest("Can't create transport.")
+        if not tid:
+            raise unittest.SkipTest("Transport id needed for test.")
+
+        # change it
+        params = json.dumps(dict(type='bus', title='A bus.',
+            description='New description.'))
+        r = requests.put('/'.join((self.url, tid)), data=params)
+        self.assertEqual(r.status_code, 200)
+        self.assertDictContainsSubset({'type':'bus', 'title':'A bus.',
+            'description':'New description.','id':tid}, r.json())
+
+        # get it from API
+        r = requests.get('/'.join((self.url, tid)))
+        self.assertEqual(r.status_code, 200)
+        self.assertDictContainsSubset({'type':'bus', 'title':'A bus.',
+            'description':'New description.','id':tid}, r.json())
+
+
+class ContestTransportTest(unittest.TestCase):
+    url = URL + '/contest'
+
+    def setUp(self):
+        try:
+            c_, t_ = create_contest(title='Contest with transport')
+            tr_ = create_transport()
+        except:
+            raise unittest.SkipTest("I need contest for test")
+        self.c_id = c_.json()['id']
+        self.tr_id = tr_.json()['id']
+
+    def tearDown(self):
+        del self.c_id
+        del self.tr_id
+
+    def test_add_transport_to_contest(self):
+        r = requests.post('/'.join((self.url, self.c_id, 'transport')),
+            data=dict(transport_id=self.tr_id))
+        self.assertEqual(r.status_code, 201)
+        self.assertIn(self.tr_id, r.json())
+
+        # GET /contest/{id}/transport
+        r = requests.get('/'.join((self.url, self.c_id, 'transport')))
+        self.assertEqual(r.status_code, 200)
+        self.assertGreaterEqual(len(r.json()), 1)
+        self.assertIsInstance(r.json(), list)
+
+    def test_get_race_transport(self):
+        try:
+            # Create paraglider for contest.
+            p_, e = create_persons()
+            p_id = p_.json()['id']
+            i, cn = register_paraglider(p_id, self.c_id)
+            # Append transport to contest.
+            r = requests.post('/'.join((self.url, self.c_id, 'transport')),
+                data=dict(transport_id=self.tr_id))
+            # Create tracker and assign it to transport.
+            params = dict(device_id=random.randint(1, 1000),
+                device_type='tr203')
+            r = requests.post('/'.join((URL, 'tracker')), data=params)
+            tid = r.json()['id']
+            params = json.dumps(dict(assignee=str(self.tr_id),
+                contest_id='cont'))
+            r = requests.put('/'.join((URL, 'tracker', tid)), data=params)
+            # Create race.
+            race_id = create_race(self.c_id).json()['id']
+        except Exception as error:
+            raise unittest.SkipTest("Something went wrong and I need race "
+                                    "for test: %r" % error)
+
+        r = requests.get('/'.join((self.url, self.c_id, 'race', race_id,
+                        'transport')))
+        self.assertEqual(r.status_code, 200)
+        res = r.json()
+        self.assertIsInstance(res, list)
+        self.assertEqual(len(res), 1)
+        self.assertEqual(tid, res[0]['tracker'])
+        self.assertEqual(self.tr_id, res[0]['id'])
+
 
 
 if __name__ == '__main__':

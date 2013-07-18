@@ -53,6 +53,12 @@ CREATE TABLE TRACKS_GROUP(
 SELECT track_id, id from track where track_id=%s;
 
 
+-- Select all_track
+SELECT
+  TRACK_ID, TRACK_ID, ID
+FROM TRACK
+
+
 -- Select tracks
 SELECT
   track_type.name,
@@ -65,7 +71,8 @@ FROM
   track
 WHERE
   tracks_group.track_id = track.id AND
-  tracks_group.group_id = %s;
+  tracks_group.group_id = %s AND
+  track.track_type = track_type.id;
 
 
 -- Select track_n_label

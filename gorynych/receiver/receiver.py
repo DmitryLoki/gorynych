@@ -2,13 +2,12 @@
 Thinkless copy/paste.
 I hope it works.
 '''
+
 __author__ = 'Boris Tsema'
 import time
-from operator import xor
 import cPickle
 import collections
 
-from twisted.protocols import basic
 from twisted.internet import protocol, task, defer, reactor
 from twisted.application.service import Service
 from twisted.python import log
@@ -16,11 +15,10 @@ from twisted.python import log
 from pika.connection import ConnectionParameters
 from pika.adapters.twisted_connection import TwistedProtocolConnection
 
-################### Network part ###############################################
-class ReceivingProtocol(basic.LineReceiver):
+from gorynych.receiver.parsers import GlobalSatTR203, TeltonikaGH3000UDP
+from gorynych.receiver.protocols import ReceivingProtocol
 
-    def lineReceived(self, data):
-        self.factory.service.handle_message(data, proto='TCP')
+################### Network part ##########################################
 
 class ReceivingFactory(protocol.ServerFactory):
 
@@ -30,15 +28,7 @@ class ReceivingFactory(protocol.ServerFactory):
         self.service = service
 
 
-class UDPReceivingProtocol(protocol.DatagramProtocol):
-
-    def __init__(self, service):
-        self.service = service
-
-    def datagramReceived(self, datagram, addr):
-        self.service.handle_message(datagram, proto='UDP', client=addr)
-
-###################### Different receivers #####################################
+###################### Different receivers ################################
 
 class FileReceiver:
     '''This class just write a message to file.'''
@@ -279,85 +269,13 @@ class ReceiverRabbitService(RabbitMQService):
         return cPickle.dumps(data, protocol=2)
 
 
-class GlobalSatTR203(object):
-
-    def __init__(self):
-        self.format = dict(type = 0, imei = 1, lat = 10, lon = 9, alt = 11,
-            h_speed = 12, battery = 16)
-        self.convert = dict(type = str, imei = str, lat = self.latitude,
-            lon = self.longitude, alt = int, h_speed = self.speed,
-            battery = str)
-
-    def speed(self, speed):
-        return round(float(speed) * 1.609, 1)
-
-    def latitude(self, lat):
-        """
-        Convert gps coordinates from GlobalSat tr203 to decimal degrees format.
-        """
-        DD_lat = lat[1:3]
-        MM_lat = lat[3:5]
-        SSSS_lat = float(lat[5:])*60
-        if lat[:1] == "N":
-            sign = ''
-        else:
-            sign = '-'
-        return float(sign + str(int(DD_lat) + float(MM_lat)/60 +
-                                SSSS_lat/3600)[:9])
-
-    def longitude(self, lon):
-        """
-        Convert gps coordinates from GlobalSat tr203 to decimal degrees format.
-        """
-        DD_lon = lon[1:4]
-        MM_lon = lon[4:6]
-        SSSS_lon = float(lon[6:])*60
-        if lon[:1] == "E":
-            sign = ''
-        else:
-            sign = '-'
-        return float(sign + str(int(DD_lon) + float(MM_lon)/60 +
-                                SSSS_lon/3600)[:9])
-
-    def check_checksum(self, msg):
-        """Check checksum of obtained msg."""
-        try:
-            msg = str(msg)
-            nmea = map(ord, msg[:msg.index('*')])
-            check = reduce(xor, nmea)
-            received_checksum = msg[msg.index('*')+1:msg.index('!')]
-            if check == int(received_checksum, 16):
-                return msg
-            else:
-                raise ValueError("Incorrect checksum")
-        except Exception as e:
-            raise ValueError(str(e))
-
-    def parse(self, msg):
-        arr = msg.split('*')[0].split(',')
-        if arr[0] == 'GSr':
-            result = dict()
-            for key in self.format.keys():
-                result[key] = self.convert[key](arr[self.format[key]])
-            result['ts'] = int(time.mktime(
-                time.strptime(''.join((arr[7], arr[8])),'%d%m%y%H%M%S')))
-            return result
-
-
 class ReceiverService(Service):
-
-    cache_expiration = 300
+    parsers = dict(tr203=GlobalSatTR203(), telt_gh3000=TeltonikaGH3000UDP())
 
     def __init__(self, sender, audit_log):
-        '''
-        _uid_cache: {imei: (uid, update_time)}
-        '''
         self.sender = sender
         self.audit_log = audit_log
         self.tr203 = GlobalSatTR203()
-        self._uid_cache = dict()
-        cache_cleaner = task.LoopingCall(self._cache_sweeper)
-        cache_cleaner.start(self.cache_expiration, now=False)
         ##### checker
         self.messages = dict()
         self.coords = dict()
@@ -369,44 +287,43 @@ class ReceiverService(Service):
         Send a message further.
         '''
         receiving_time = time.time()
-        d = defer.maybeDeferred(self.tr203.check_checksum, msg)
+        device_type = kw.get('device_type', 'tr203')
+        d = defer.succeed(
+                self.parsers[device_type].check_message_correctness(msg))
         d.addCallbacks(self.audit_log.log_msg,
             self.audit_log.log_err,
             callbackArgs=[],
             callbackKeywords={'time':receiving_time,
-                'proto': kw.get('proto', 'Unknown')},
+                'proto': kw.get('proto', 'Unknown'),
+                'device': kw.get('device_type', 'Unknown')},
             errbackArgs=[],
             errbackKeywords={'data': msg, 'time': receiving_time,
-                'proto': kw.get('proto', 'Unknown')})
+                'proto': kw.get('proto', 'Unknown'),
+                'device':kw.get('device_type', 'Unknown')})
+        def handle_list(message):
+            d2 = defer.Deferred()
+            if isinstance(message, list):
+                for item in message:
+                    d2.addCallback(lambda _: self.sender.write(item))
+            else:
+                d2.addCallback(lambda _: self.sender.write(message))
+
+            d2.callback('go!')
+            return d2
         if self.sender.running:
-            d.addCallback(self.tr203.parse)
-            d.addCallback(self._imei_pilot_filter)
-            d.addCallback(self.sender.write)
+            d.addCallback(self.parsers[device_type].parse)
+            d.addCallback(handle_list)
+            # d.addCallback(self._save_coords_for_checker)
         else:
             log.msg("Received but not sent: %s" % msg)
         d.addErrback(log.err)
+        return d
 
-    def _imei_pilot_filter(self, parsed):
-        '''
-        Take parsed message from parser and change tracker_id to pilot uid.
-        '''
-        #if parsed['imei'] in self._uid_cache.keys():
-        #parsed['uid'] = self._uid_cache[parsed['imei']]
-        #else:
-        #parsed['uid'] = parsed['imei']
-        ###### checker
+    def _save_coords_for_checker(self, parsed):
         self.messages[parsed['imei']] = int(time.time())
         self.coords[parsed['imei']] = (parsed['lat'], parsed['lon'],
         parsed['alt'], parsed['h_speed'], int(time.time()) )
-        #        del parsed['imei']
         return parsed
-
-    def _cache_sweeper(self):
-        '''Clear _uid_cache.'''
-        allowed_time = int(time.time()) - self.cache_expiration
-        for key in self._uid_cache.keys():
-            if self._uid_cache[key][1] < allowed_time:
-                del self._uid_cache[key]
 
 
 class AuditLog:
@@ -453,7 +370,7 @@ class AuditFileLog(AuditLog):
 
     def _write_log(self, log_message):
         fd = open(self.name, 'a')
-        fd.write(''.join((str(log_message), '\r\n')))
+        fd.write(''.join((bytes(log_message), '\r\n')))
         fd.close()
 
 

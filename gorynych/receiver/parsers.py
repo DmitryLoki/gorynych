@@ -15,6 +15,10 @@ FORMAT = {
     'battery': 'battery charge left (percentage)'
 }
 
+MIN_SATTELITE_NUMBER = 2
+MAXIMUM_HDOP = 8
+
+
 class IParseMessage(Interface):
 
     '''
@@ -110,7 +114,8 @@ class GlobalSatTR203(object):
         gsr = arr[0] == 'GSr'
         satellites_number = int(arr[14])
         hdop = float(arr[15])
-        return gsr and satellites_number > 2 and hdop < 8
+        return gsr and satellites_number > MIN_SATTELITE_NUMBER and (
+            hdop < MAXIMUM_HDOP)
 
 
 @implementer(IParseMessage)

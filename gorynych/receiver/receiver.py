@@ -316,6 +316,7 @@ class ReceiverService(Service):
             # d.addCallback(self._save_coords_for_checker)
         else:
             log.msg("Received but not sent: %s" % msg)
+        d.addErrback(self._handle_error)
         d.addErrback(log.err)
         return d
 
@@ -324,6 +325,10 @@ class ReceiverService(Service):
         self.coords[parsed['imei']] = (parsed['lat'], parsed['lon'],
         parsed['alt'], parsed['h_speed'], int(time.time()) )
         return parsed
+
+    def _handle_error(self, failure):
+        failure.trap(EOFError)
+        log.err(failure)
 
 
 class AuditLog:
@@ -353,6 +358,7 @@ class AuditLog:
         kwargs['err'] = failure.getErrorMessage()
         formatted_msg = self._format(**kwargs)
         self._write_log(formatted_msg)
+        raise EOFError()
 
     def log_msg(self, msg, **kw):
         kwargs = kw

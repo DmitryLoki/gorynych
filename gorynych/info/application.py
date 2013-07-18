@@ -346,7 +346,7 @@ class ApplicationService(BaseApplicationService):
         return d
 
     def get_trackers(self, params=None):
-        return self._get_aggregates_list(params, interfaces.ITrackerRepository)
+        return self.pool.runQuery(persistence.select('trackers', 'tracker'))
 
     def get_tracker(self, params):
         return self._get_aggregate(params['tracker_id'],

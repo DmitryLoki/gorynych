@@ -355,11 +355,18 @@ class TrackerResourceCollection(APIResource):
             result['last_point'] = json.dumps(t.last_point)
             return result
 
-    def read_GET(self, tracker_list, p=None):
-        if tracker_list:
+    def read_GET(self, rows, p=None):
+        if rows:
             result = []
-            for t in tracker_list:
-                result.append(self.read_POST(t))
+            for row in rows:
+                try:
+                    tid, name, did, dtype, lat, lon, alt, ts, bt, sp = row
+                    result.append(
+                        dict(device_id=did, name=name, device_type=dtype,
+                            id=tid, last_point=json.dumps(
+                                [lat, lon, alt, ts, bt, sp])))
+                except Exception:
+                    pass
             return result
 
 

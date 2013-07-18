@@ -65,6 +65,15 @@ SELECT
   TRACKER_ID, NAME, ID
 FROM TRACKER;
 
+-- Select trackers
+SELECT
+ t.tracker_id, t.name, t.device_id, t.device_type, tl.lat, tl.lon, tl.alt,
+tl.timestamp, tl.battery, tl.speed
+FROM
+  tracker t, tracker_last_point tl
+WHERE
+  t.id=tl.id;
+
 -- Select last_point
 SELECT LAT, LON, ALT, TIMESTAMP, BATTERY, SPEED
 FROM TRACKER_LAST_POINT WHERE ID=%s;

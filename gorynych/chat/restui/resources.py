@@ -74,22 +74,6 @@ class ChatResource(resource.Resource):
 
     def render_GET(self, request):
         args = request.args
-        modified_since = request.getHeader(b'if-modified-since')
-        if modified_since:
-            first_part = modified_since.split(b';', 1)[0]
-            try:
-                modified_since = stringToDatetime(first_part)
-            except ValueError:
-                modified_since = None
-
-        def set_header(msglist):
-
-            if msglist and not args.has_key('from_time'):
-                ts = msglist[-1].timestamp
-                request.setLastModified(ts)
-                request.setHeader('Content-Type', 'application/json')
-            return msglist
-
         def _format(msglist):
             result = []
             if msglist:
@@ -101,9 +85,8 @@ class ChatResource(resource.Resource):
             return bytes(json.dumps(result))
 
         if args.has_key('from_time'):
-            modified_since = args['from_time'][0]
-        d = self.service.get_messages(self.chatroom, modified_since)
-        d.addCallback(set_header)
+            from_time = args['from_time'][0]
+        d = self.service.get_messages(self.chatroom, from_time)
         d.addCallback(_format)
         d.addCallback(request.write)
         d.addCallback(lambda _: request.finish())

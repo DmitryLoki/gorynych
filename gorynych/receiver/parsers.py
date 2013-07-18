@@ -87,30 +87,31 @@ class GlobalSatTR203(object):
                                 SSSS_lon / 3600)[:9])
 
     def check_message_correctness(self, msg):
-        """Check checksum of obtained msg."""
         try:
+            # Check checksum of obtained message.
             msg = str(msg)
             nmea = map(ord, msg[:msg.index('*')])
             check = reduce(xor, nmea)
             received_checksum = msg[msg.index('*') + 1:msg.index('!')]
-            if check == int(received_checksum, 16):
-                return msg
-            else:
+            if not check == int(received_checksum, 16):
                 raise ValueError("Incorrect checksum")
+            # Check message quality.
+            if not self._message_is_good(msg):
+                raise ValueError("Bad message.")
         except Exception as e:
             raise ValueError(str(e))
 
     def parse(self, msg):
         arr = msg.split('*')[0].split(',')
-        if self._message_is_good(arr):
-            result = dict()
-            for key in self.format.keys():
-                result[key] = self.convert[key](arr[self.format[key]])
-            result['ts'] = int(time.mktime(
-                time.strptime(''.join((arr[7], arr[8])), '%d%m%y%H%M%S')))
-            return result
+        result = dict()
+        for key in self.format.keys():
+            result[key] = self.convert[key](arr[self.format[key]])
+        result['ts'] = int(time.mktime(
+            time.strptime(''.join((arr[7], arr[8])), '%d%m%y%H%M%S')))
+        return result
 
-    def _message_is_good(self, arr):
+    def _message_is_good(self, msg):
+        arr = msg.split('*')[0].split(',')
         gsr = arr[0] == 'GSr'
         satellites_number = int(arr[14])
         hdop = float(arr[15])

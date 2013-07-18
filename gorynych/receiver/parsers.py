@@ -220,53 +220,62 @@ class TeltonikaGH3000UDP(object):
                     cursor2 = cursor2 + step
             return gpsdata
 
+        record_counter = 0  # incrementing at each record pass, no matter successful or not
+        # required to prevent endless loops on bad data
+
         cursor = 0
-        while cursor < len(data):
-            # each loop pass is reading one record
-            # it always starts with 4 bytes of time
-            record = {
-                'imei': imei,
-                'ts': self.parse_time(data[cursor: cursor + 4]),
-            }
+        while cursor < len(data) and record_counter <= self.num_of_data:
+            try:
+                # each loop pass is reading one record
+                # it always starts with 4 bytes of time
+                record = {
+                    'imei': imei,
+                    'ts': self.parse_time(data[cursor: cursor + 4]),
+                }
 
-            # then global mask
-            gmask = self.bitlify(data[cursor + 4])
-            # move cursor
-            cursor = cursor + 5
-            # then looking at global mask we'll find whats ahead
-            for idx, bit in enumerate(gmask[::-1]):
-                if bit == '1':
-                    # read the next segment. we are particulary interested in
-                    # gps
-                    if idx == 0:  # gps
-                        gps_mask = self.bitlify(data[cursor])
-                        gps_len = 0
-                        for i, bit in enumerate(gps_mask[::-1]):
-                            if bit == '1':
-                                gps_len += gps_mask_map[i][0]
-                        gpsdata = read_gps(
-                            data[cursor + 1: cursor + gps_len + 1], gps_mask)
-                        record.update(gpsdata)
-                        cursor = cursor + gps_len + 1
-                    else:  # some other element. screw it for now, lets only find its length
-                        # read the next field, it'll tell you how many key-value
-                        # pairs in the segment
-                        quantity = ord(data[cursor])
+                # then global mask
+                gmask = self.bitlify(data[cursor + 4])
+                # move cursor
+                cursor = cursor + 5
+                # then looking at global mask we'll find whats ahead
+                for idx, bit in enumerate(gmask[::-1]):
+                    if bit == '1':
+                        # read the next segment. we are particulary interested in
+                        # gps
+                        if idx == 0:  # gps
+                            gps_mask = self.bitlify(data[cursor])
+                            gps_len = 0
+                            for i, bit in enumerate(gps_mask[::-1]):
+                                if bit == '1':
+                                    gps_len += gps_mask_map[i][0]
+                            gpsdata = read_gps(
+                                data[cursor + 1: cursor + gps_len + 1], gps_mask)
+                            record.update(gpsdata)
+                            cursor = cursor + gps_len + 1
+                        else:  # some other element. screw it for now, lets only find its length
+                            # read the next field, it'll tell you how many key-value
+                            # pairs in the segment
+                            quantity = ord(data[cursor])
 
-                        iocursor = cursor + 1
-                        for io_element in xrange(quantity):
-                            io_id = data[iocursor]
+                            iocursor = cursor + 1
+                            for io_element in xrange(quantity):
+                                io_id = data[iocursor]
 
-                            # check if it's a battery
-                            if io_id == '01'.decode('hex'):
-                                record['battery'] = ord(data[iocursor + io_map[io_id]])
+                                # check if it's a battery
+                                if io_id == '01'.decode('hex'):
+                                    record['battery'] = ord(data[iocursor + io_map[io_id]])
 
-                            iocursor += io_map[io_id] + 1
+                                iocursor += io_map[io_id] + 1
 
-                        cursor = iocursor
-                        # now skip this element
+                            cursor = iocursor
+                            # now skip this element
 
-            if  set(self.format.keys()).issubset(set(record.keys())):
-                records.append(record)
+                if  set(self.format.keys()).issubset(set(record.keys())):
+                    records.append(record)
+                record_counter += 1
+
+            except:
+                record_counter += 1
+                continue
 
         return records

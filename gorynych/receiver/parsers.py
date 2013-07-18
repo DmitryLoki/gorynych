@@ -98,13 +98,19 @@ class GlobalSatTR203(object):
 
     def parse(self, msg):
         arr = msg.split('*')[0].split(',')
-        if arr[0] == 'GSr':
+        if self._message_is_good(arr):
             result = dict()
             for key in self.format.keys():
                 result[key] = self.convert[key](arr[self.format[key]])
             result['ts'] = int(time.mktime(
                 time.strptime(''.join((arr[7], arr[8])), '%d%m%y%H%M%S')))
             return result
+
+    def _message_is_good(self, arr):
+        gsr = arr[0] == 'GSr'
+        satellites_number = int(arr[14])
+        hdop = float(arr[15])
+        return gsr and satellites_number > 2 and hdop < 8
 
 
 @implementer(IParseMessage)

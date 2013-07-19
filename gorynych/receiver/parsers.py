@@ -100,6 +100,7 @@ class GlobalSatTR203(object):
                 raise ValueError("Bad message.")
         except Exception as e:
             raise ValueError(str(e))
+        return msg
 
     def parse(self, msg):
         arr = msg.split('*')[0].split(',')

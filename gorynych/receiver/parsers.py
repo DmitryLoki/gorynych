@@ -16,7 +16,7 @@ FORMAT = {
 }
 
 MIN_SATTELITE_NUMBER = 2
-MAXIMUM_HDOP = 8
+MAXIMUM_HDOP = 10
 
 
 class IParseMessage(Interface):

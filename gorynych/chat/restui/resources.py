@@ -84,6 +84,7 @@ class ChatResource(resource.Resource):
                         'sender': msg.sender, 'id': msg.id})
             return bytes(json.dumps(result))
 
+        from_time = None
         if args.has_key('from_time'):
             from_time = args['from_time'][0]
         d = self.service.get_messages(self.chatroom, from_time)

@@ -19,6 +19,12 @@ def choose_offline_parser(trackname):
     if trackname.endswith('.igc'): return IGCTrackParser
 
 
+def create_uniq_hstack(array1, array2):
+    result = np.sort(np.hstack((array1, array2)), order='timestamp')
+    _, idxs = np.unique(result, return_index=True)
+    return result[idxs]
+
+
 class IGCTrackParser(object):
     '''
     Domain service which parse .igc tracks.
@@ -311,8 +317,8 @@ class ParaglidingTrackCorrector(object):
         return ynew
 
 
-def vspeed_calculator(alt, times):
-    result = np.ediff1d(alt, to_begin=1) / np.ediff1d(times, to_begin=1)
+def vspeed_calculator(alt, times, to_begin=1.):
+    result = np.ediff1d(alt, to_begin=to_begin) / np.ediff1d(times, to_begin=1)
     np.around(result, decimals=2, out=result)
     return result
 
@@ -505,40 +511,27 @@ class OnlineTrashAdapter(object):
         result['g_speed'] = data['h_speed']
         return result
 
-    def process(self, data, stime, etime, trackstate):
+    def process(self, data, trck):
         '''
         На выходе получили самые ранние пришедшие точки (те, которые раньше
         чем за store_second.
         @param data: 1-length array
         @type data: np.ndarray
-        @param stime:
-        @type stime:
-        @param etime:
-        @type etime:
-        @param trackstate:
-        @type trackstate: TrackState
+        @type trck: gorynych.processor.domain.track.Track
         @return: массив, единичной или больше длины.
         @rtype: np.ndarray
         '''
-        if data['timestamp'] < stime:
+        if len(data) == 0:
             return None, []
-        if data['timestamp'] in trackstate._buffer['timestamp']:
-            return None, []
-        trackstate._buffer = np.hstack((trackstate._buffer, data))
-        # Select points for return.
-        buf = trackstate._buffer
-        now = int(time.time())
-        s = np.min(buf['timestamp'])
-        if now - s < self.store_second:
-            return None, []
-        idxs = np.where(buf['timestamp'] < now - self.store_second)
-        result = buf[idxs]
-        trackstate._buffer = np.delete(trackstate._buffer, idxs)
-        result = np.sort(result, order='timestamp')
-        result['v_speed'] = vspeed_calculator(result['alt'], result['timestamp'])
-        result['g_speed'] = result['g_speed'] / 3.6
-        return result, []
+        if len(trck.processed)>0:
+            first_v_speed = trck.processed[-1]['v_speed']
+        else:
+            first_v_speed = 1.0
+        data['v_speed'] = vspeed_calculator(data['alt'],
+            data['timestamp'], to_begin=first_v_speed)
+        data['g_speed'] = data['g_speed'] / 3.6
+        return data, []
 
-    def correct(self, b):
+    def correct(self, trck):
         return []
 

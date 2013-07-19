@@ -145,7 +145,6 @@ class TrackState(ValueObject):
 
 class Track(AggregateRoot):
 
-    flush_time = 60 # unused?
     dtype = DTYPE
 
     def __init__(self, id, events=None):
@@ -156,7 +155,14 @@ class Track(AggregateRoot):
         self._task = None
         self._type = None
         self.changes = []
+        # New processed points.
         self.points = np.empty(0, dtype=self.dtype)
+        # Buffer for appended to track data.
+        self.buffer = np.empty(0, dtype=self.dtype)
+        # Processed points holded for future processing.
+        self.processed = np.empty(0, dtype=self.dtype)
+        # track data can be introduced as
+        # np.hstack((processed, points, buffer))
 
     def apply(self, ev):
         if isinstance(ev, list):
@@ -167,21 +173,22 @@ class Track(AggregateRoot):
             self._state.mutate(ev)
             self.changes.append(ev)
 
-    def process_data(self, data):
-        # Here TrackType read data and return it in good common format.
-        data = self.type.read(data)
-        # Now TrackType correct points and calculate smth if needed.
-        points, evs = self.type.process(data,
-            self.task.start_time, self.task.end_time, self._state)
+    def append_data(self, data):
+        self.buffer = services.create_uniq_hstack(
+                                    self.buffer, self.type.read(data))
+
+    def process_data(self):
+        points, evs = self.type.process(self.buffer, self)
         self.apply(evs)
         if points is None:
             return
+        self.buffer = np.empty(0, dtype=self.dtype)
         evs = services.ParagliderSkyEarth(self._state).state_work(points)
         self.apply(evs)
         # Task process points and emit new events if occur.
         points, ev_list = self.task.process(points, self._state, self.id)
         self.apply(ev_list)
-        self.points = np.hstack((self.points, points))
+        self.points = services.create_uniq_hstack(self.points, points)
         # Look for state after processing and do all correctness.
         evlist = self.type.correct(self)
         self.apply(evlist)
@@ -204,6 +211,8 @@ class Track(AggregateRoot):
 
     def reset(self):
         self.changes=[]
+        self.processed = services.create_uniq_hstack(self.processed,
+            self.points)[-100:]
         self.points = np.empty(0, dtype=self.dtype)
 
 
@@ -253,9 +262,14 @@ class RaceToGoal(object):
             nextchp = self.checkpoints[lastchp + 1]
         else:
             # Last point taken but we still have data.
-            for p in points:
-                p['distance'] = 200
-            return points, []
+            if taskstate.last_distance:
+                for p in points:
+                    p['distance'] = taskstate.last_distance
+                return points, []
+            else:
+                for p in points:
+                    p['distance'] = 200
+                return points, []
         if taskstate.state == 'landed':
             if taskstate.last_distance:
                 for p in points:

@@ -22,15 +22,14 @@ class A:
     def process_data(self, data):
         pass
 
+    def append_data(self, data):
+        pass
+
 ADD_TRACK_TO_GROUP = """
     INSERT INTO TRACKS_GROUP VALUES (%s,
         (SELECT ID FROM TRACK WHERE TRACK_ID=%s), %s);
 """
 
-IMEI_LIST = """
-    SELECT t.device_id, ta.assignee_id FROM tracker t, tracker_assignees.t
-    WHERE t.id = ta.id;
-"""
 
 class ProcessorService(EventPollingService):
     '''
@@ -221,7 +220,9 @@ class OnlineTrashService(RabbitMQService):
         # {race_id:{track_id:Track}}
         self.tracks = defaultdict(dict)
         self.saver = task.LoopingCall(self.persist)
-        self.saver.start(5, False)
+        self.saver.start(30, False)
+        self.processor = task.LoopingCall(self.process)
+        self.processor.start(60, False)
         # device_id:(race_id, contest_number, time)
         self.devices = dict()
 
@@ -259,7 +260,8 @@ class OnlineTrashService(RabbitMQService):
         now = int(time.time())
         d = self._get_race_by_tracker(data['imei'], now)
         d.addCallback(self._get_track, data['imei'])
-        d.addCallback(lambda tr: tr.process_data(data))
+        d.addCallback(lambda tr: tr.append_data(data))
+        return d
 
     def _get_track(self, rid, device_id):
         if not rid:
@@ -274,10 +276,6 @@ class OnlineTrashService(RabbitMQService):
         else:
             d = self.pool.runQuery(pe.select('track_n_label', 'track'),
                 (rid, cnumber))
-            # Результат запроса — существующий в гонке contest number для
-            # существующего трека. Трек может быть, может не быть,
-            # его надо создать или
-            # вернуть.
             d.addCallback(self._restore_or_create_track, rid, device_id, cnumber)
             return d
 
@@ -320,9 +318,22 @@ class OnlineTrashService(RabbitMQService):
         log.msg("Restored or created track for device", device_id)
         defer.returnValue(result)
 
+    def process(self):
+        '''
+        Process tracks.
+        @return:
+        @rtype:
+        '''
+        for rid in self.tracks.keys():
+            for key in self.tracks[rid].keys():
+                try:
+                    self.tracks[rid][key].process_data()
+                except Exception as e:
+                    log.err("%r" % e)
+        return
+
     @defer.inlineCallbacks
     def persist(self):
-        #log.msg("Start persist")
         for rid in self.tracks.keys():
             for key in self.tracks[rid].keys():
                 yield self.repo.save(self.tracks[rid][key])

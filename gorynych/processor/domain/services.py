@@ -137,7 +137,9 @@ class FileParserAdapter(object):
             raise Exception("Error while parsing file: %r , %s" % (e, data))
         return parsed_track
 
-    def process(self, data, stime, etime, taskstate):
+    def process(self, data, trck):
+        stime = trck.task.start_time
+        etime = trck.task.end_time
         corrector = OfflineCorrectorService()
         try:
             track = corrector.correct_track(data, stime, etime)

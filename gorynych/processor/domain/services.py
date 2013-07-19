@@ -21,7 +21,7 @@ def choose_offline_parser(trackname):
 
 def create_uniq_hstack(array1, array2):
     result = np.sort(np.hstack((array1, array2)), order='timestamp')
-    _, idxs = np.unique(result, return_index=True)
+    _, idxs = np.unique(result['timestamp'], return_index=True)
     return result[idxs]
 
 

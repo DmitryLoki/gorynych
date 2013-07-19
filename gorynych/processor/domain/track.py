@@ -192,6 +192,7 @@ class Track(AggregateRoot):
         # Look for state after processing and do all correctness.
         evlist = self.type.correct(self)
         self.apply(evlist)
+        self.changes = services.clean_events(self.changes)
 
     @property
     def state(self):

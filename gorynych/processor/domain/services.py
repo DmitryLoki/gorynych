@@ -25,6 +25,25 @@ def create_uniq_hstack(array1, array2):
     return result[idxs]
 
 
+def clean_events(evs):
+    _speed = 0
+    speed_event = None
+    result = []
+    while evs:
+        ev = evs.pop()
+        if ev.name == 'TrackSlowedDown':
+            _speed -= 1
+            speed_event = ev
+        elif ev.name == 'TrackSpeedExceeded':
+            _speed += 1
+            speed_event = ev
+        else:
+            result.append(ev)
+    if _speed:
+        result.append(speed_event)
+    return result
+
+
 class IGCTrackParser(object):
     '''
     Domain service which parse .igc tracks.
@@ -533,5 +552,12 @@ class OnlineTrashAdapter(object):
         return data, []
 
     def correct(self, trck):
+        '''
+
+        @param trck:
+        @type trck: gorynych.processor.domain.track.Track
+        @return:
+        @rtype:
+        '''
         return []
 

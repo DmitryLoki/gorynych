@@ -483,7 +483,6 @@ class ParagliderSkyEarth(object):
                     result.append(self._track_landed(data))
         return result
 
-
     def _speed_exceed(self, data):
         self._bf = data['timestamp']
         self._bs = None

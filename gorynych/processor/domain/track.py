@@ -176,6 +176,8 @@ class Track(AggregateRoot):
     def append_data(self, data):
         self.buffer = services.create_uniq_hstack(
                                     self.buffer, self.type.read(data))
+        self.buffer = self.buffer[
+            np.where(self.buffer['timestamp'] >=self.task.start_time)]
 
     def process_data(self):
         points, evs = self.type.process(self.buffer, self)

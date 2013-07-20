@@ -185,7 +185,8 @@ class TrackVisualizationService(Service):
 
         for row in snaps:
             timestamp, snapshot, contest_number = row
-            result[timestamp][contest_number]['state'] = snapshot
+            if result[timestamp].has_key(contest_number):
+                result[timestamp][contest_number]['state'] = snapshot
 
         return result
 

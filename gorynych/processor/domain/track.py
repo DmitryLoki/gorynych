@@ -176,6 +176,8 @@ class Track(AggregateRoot):
     def append_data(self, data):
         self.buffer = services.create_uniq_hstack(
                                     self.buffer, self.type.read(data))
+        self.buffer = self.buffer[
+            np.where(self.buffer['timestamp'] >=self.task.start_time)]
 
     def process_data(self):
         points, evs = self.type.process(self.buffer, self)
@@ -183,8 +185,8 @@ class Track(AggregateRoot):
         if points is None:
             return
         self.buffer = np.empty(0, dtype=self.dtype)
-        evs = services.ParagliderSkyEarth(self._state).state_work(points)
-        self.apply(evs)
+        #evs = services.ParagliderSkyEarth(self._state).state_work(points)
+        #self.apply(evs)
         # Task process points and emit new events if occur.
         points, ev_list = self.task.process(points, self._state, self.id)
         self.apply(ev_list)

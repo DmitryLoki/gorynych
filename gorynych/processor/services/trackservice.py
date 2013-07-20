@@ -149,7 +149,8 @@ class TrackService(EventPollingService):
         t = track.Track(track_id, [tc])
         t.changes.append(tc)
         try:
-            t.process_data(trackfile)
+            t.append_data(trackfile)
+            t.process_data()
         except Exception as e:
             ev = events.TrackWasNotParsed(race_id, aggregate_type='race')
             ev.payload = dict(contest_number=contest_number,

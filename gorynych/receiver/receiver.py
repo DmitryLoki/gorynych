@@ -16,13 +16,13 @@ from pika.connection import ConnectionParameters
 from pika.adapters.twisted_connection import TwistedProtocolConnection
 
 from gorynych.receiver.parsers import GlobalSatTR203, TeltonikaGH3000UDP
-from gorynych.receiver.protocols import ReceivingProtocol
+from gorynych.receiver.protocols import TR203ReceivingProtocol
 
 ################### Network part ##########################################
 
 class ReceivingFactory(protocol.ServerFactory):
 
-    protocol = ReceivingProtocol
+    protocol = TR203ReceivingProtocol
 
     def __init__(self, service):
         self.service = service

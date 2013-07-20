@@ -21,7 +21,7 @@ def choose_offline_parser(trackname):
 
 def create_uniq_hstack(array1, array2):
     result = np.sort(np.hstack((array1, array2)), order='timestamp')
-    _, idxs = np.unique(result, return_index=True)
+    _, idxs = np.unique(result['timestamp'], return_index=True)
     return result[idxs]
 
 
@@ -137,7 +137,9 @@ class FileParserAdapter(object):
             raise Exception("Error while parsing file: %r , %s" % (e, data))
         return parsed_track
 
-    def process(self, data, stime, etime, taskstate):
+    def process(self, data, trck):
+        stime = trck.task.start_time
+        etime = trck.task.end_time
         corrector = OfflineCorrectorService()
         try:
             track = corrector.correct_track(data, stime, etime)

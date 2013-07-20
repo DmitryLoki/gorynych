@@ -185,8 +185,8 @@ class Track(AggregateRoot):
         if points is None:
             return
         self.buffer = np.empty(0, dtype=self.dtype)
-        evs = services.ParagliderSkyEarth(self._state).state_work(points)
-        self.apply(evs)
+        #evs = services.ParagliderSkyEarth(self._state).state_work(points)
+        #self.apply(evs)
         # Task process points and emit new events if occur.
         points, ev_list = self.task.process(points, self._state, self.id)
         self.apply(ev_list)

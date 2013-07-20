@@ -1,23 +1,36 @@
 import numpy as np
 import simplejson as json
+from datetime import datetime
 
 from twisted.trial import unittest
 
 from gorynych.processor.domain import track
 from gorynych.common.domain import events
 
-test_race = json.loads('{"race_title":"Test Trackservice Task","race_type":"racetogoal","start_time":"1347704100","end_time":"1347724800","bearing":"None","checkpoints":{"type": "FeatureCollection", "features": [{"geometry": {"type": "Point", "coordinates": [43.9785, 6.48]}, "type": "Feature", "properties": {"close_time": 1347724800, "radius": 1, "name": "D01", "checkpoint_type": "to", "open_time": 1347704100}}, {"geometry": {"type": "Point", "coordinates": [43.9785, 6.48]}, "type": "Feature", "properties": {"close_time": 1347724800, "radius": 3000, "name": "D01", "checkpoint_type": "ss", "open_time": 1347707700}}, {"geometry": {"type": "Point", "coordinates": [44.3711, 6.3098]}, "type": "Feature", "properties": {"close_time": 1347724800, "radius": 21000, "name": "B46", "checkpoint_type": "ordinal", "open_time": 1347704100}}, {"geometry": {"type": "Point", "coordinates": [43.9511, 6.3708]}, "type": "Feature", "properties": {"close_time": 1347724800, "radius": 2000, "name": "B20", "checkpoint_type": "ordinal", "open_time": 1347704100}}, {"geometry": {"type": "Point", "coordinates": [44.0455, 6.3602]}, "type": "Feature", "properties": {"close_time": 1347724800, "radius": 400, "name": "B43", "checkpoint_type": "ordinal", "open_time": 1347704100}}, {"geometry": {"type": "Point", "coordinates": [43.9658, 6.5578]}, "type": "Feature", "properties": {"close_time": 1347724800, "radius": 1500, "name": "B37", "checkpoint_type": "es", "open_time": 1347704100}}, {"geometry": {"type": "Point", "coordinates": [43.9658, 6.5578]}, "type": "Feature", "properties": {"close_time": 1347724800, "radius": 1000, "name": "B37", "checkpoint_type": "goal", "open_time": 1347704100}}]}}')
+test_race = json.loads('{"contest_title":"13th FAI World Paragliding Championship","country":"Bulgaria","place":"Sopot","timeoffset":"+0300","race_title":"Task 3","race_type":"racetogoal","start_time":"1374223800","end_time":"1374249600","bearing":"None","checkpoints":{"type": "FeatureCollection", "features": [{"geometry": {"type": "Point", "coordinates": [42.687497, 24.750131]}, "type": "Feature", "properties": {"close_time": 1374238200, "radius": 400, "name": "25S145", "checkpoint_type": "to", "open_time": 1374223800}}, {"geometry": {"type": "Point", "coordinates": [42.603923, 25.019128]}, "type": "Feature", "properties": {"close_time": 1374249600, "radius": 21000, "name": "40L057", "checkpoint_type": "ss", "open_time": 1374226800}}, {"geometry": {"type": "Point", "coordinates": [42.603923, 25.019128]}, "type": "Feature", "properties": {"close_time": null, "radius": 4000, "name": "40L057", "checkpoint_type": "ordinal", "open_time": null}}, {"geometry": {"type": "Point", "coordinates": [42.502614, 24.16646]}, "type": "Feature", "properties": {"close_time": null, "radius": 32000, "name": "04L055", "checkpoint_type": "ordinal", "open_time": null}}, {"geometry": {"type": "Point", "coordinates": [42.504597, 25.026856]}, "type": "Feature", "properties": {"close_time": null, "radius": 5000, "name": "41P075", "checkpoint_type": "ordinal", "open_time": null}}, {"geometry": {"type": "Point", "coordinates": [42.659186, 24.68335]}, "type": "Feature", "properties": {"close_time": 1374249600, "radius": 2000, "name": "21L043", "checkpoint_type": "es", "open_time": 1374226800}}, {"geometry": {"type": "Point", "coordinates": [42.659186, 24.68335]}, "type": "Feature", "properties": {"close_time": 1374249600, "radius": 200, "name": "21L043", "checkpoint_type": "goal", "open_time": 1374226800}}]}}')
 
 class TestTrack(unittest.TestCase):
-    def test_init(self):
+    def setUp(self):
         tid= track.TrackID()
         e1 = events.TrackCreated(tid,
             dict(track_type='competition_aftertask', race_task=test_race))
-        t = track.Track(tid, [e1])
-        self.assertIsInstance(t, track.Track)
-        self.assertEqual(t.state['state'], 'not started')
-        self.assertEqual(t.type.type, 'competition_aftertask')
-        self.assertEqual(t.task.type, 'racetogoal')
+        self.track = track.Track(tid, [e1])
+
+    def tearDown(self):
+        del self.track
+
+    def test_init(self):
+        self.assertIsInstance(self.track, track.Track)
+        self.assertEqual(self.track.state['state'], 'not started')
+        self.assertEqual(self.track.type.type, 'competition_aftertask')
+        self.assertEqual(self.track.task.type, 'racetogoal')
+
+    def test_parse(self):
+        self.track.append_data('1.2.609.609.igc')
+        self.track.process_data()
+        for ch in self.track.changes:
+            print ch.name, datetime.fromtimestamp(ch.occured_on)
+        print len(self.track.points)
 
 
 class TestRaceToGoal(unittest.TestCase):

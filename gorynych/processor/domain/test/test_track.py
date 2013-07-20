@@ -32,6 +32,13 @@ class TestTrack(unittest.TestCase):
             print ch.name, datetime.fromtimestamp(ch.occured_on)
         print len(self.track.points)
 
+    def test_parse_1d_error(self):
+        self.track.append_data('cond.1d.3243.17.igc')
+        self.track.process_data()
+        for ch in self.track.changes:
+            print ch.name, datetime.fromtimestamp(ch.occured_on)
+        print len(self.track.points)
+
 
 class TestRaceToGoal(unittest.TestCase):
     def test_init(self):

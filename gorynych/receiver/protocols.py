@@ -34,9 +34,21 @@ class ReceivingProtocol(basic.LineReceiver):
 
 
 class TR203ReceivingProtocol(protocol.Protocol):
+
     def dataReceived(self, data):
         self.factory.service.handle_message(data, proto='TCP',
-            device_type='tr203')
+                                            device_type='tr203')
+
+
+class UDPTR203Protocol(protocol.DatagramProtocol):
+    device_type = 'tr203'
+
+    def __init__(self, service):
+        self.service = service
+
+    def datagramReceived(self, datagram, sender):
+        self.service.handle_message(datagram, proto='UDP',
+                                    device_type=self.device_type)
 
 
 class UDPTeltonikaGH3000Protocol(protocol.DatagramProtocol):
@@ -46,7 +58,7 @@ class UDPTeltonikaGH3000Protocol(protocol.DatagramProtocol):
         self.service = service
 
     def datagramReceived(self, datagram, sender):
-        self.service.handle_message(datagram, proto='UDP', client=sender,
-            device_type=self.device_type)
-        response = self.service.parsers[self.device_type].get_response()
+        response = self.service.parsers[self.device_type].get_response(datagram)
         self.transport.write(response, sender)
+        self.service.handle_message(datagram, proto='UDP', client=sender,
+                                    device_type=self.device_type)

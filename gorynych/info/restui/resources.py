@@ -120,6 +120,7 @@ class ContestRaceResource(APIResource):
             result['timeoffset'] = datetime.fromtimestamp(result[
                 'start_time'],
                 pytz.timezone(cont.timezone)).strftime('%z')
+            result['opt_dist'] = "%0.1f" % (r.optimum_distance/1000)
             return result
 
     def read_PUT(self, r, request_params=None):

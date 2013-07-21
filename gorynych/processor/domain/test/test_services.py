@@ -1,10 +1,12 @@
 import unittest
-import mock
-
-import numpy as np
 import time
 
+import numpy as np
+import mock
+from shapely.geometry import Point
+
 from gorynych.processor.domain import services
+from gorynych.common.domain.types import Checkpoint
 
 
 class TestOfflineCorrectorService(unittest.TestCase):
@@ -92,3 +94,41 @@ class TestOnlineTrashAdapter(unittest.TestCase):
         self.assertEqual(len(self.ts._buffer), 2)
 
 
+class TestOptDistCalculator(unittest.TestCase):
+    def setUp(self):
+        self.calculator = services.JavaScriptShortWay()
+
+    def test_test(self):
+        ch1 = Checkpoint('D01', Point(43.9785, 6.48), 'TO',
+            (1347711300, 1347716700), 1)
+        ch2 = Checkpoint('D01', Point(43.9785, 6.48), 'ss',
+            (1347711300, 1347716700), 3000)
+        ch3 = Checkpoint('B46', Point(44.371167, 6.309833), 'ss',
+            (1347711300, 1347716700), 21000)
+        ch4 = Checkpoint('B20', Point(43.951167, 6.370833), 'ss',
+            (1347711300, 1347716700), 2000)
+        ch5 = Checkpoint('B43', Point(44.045500, 6.360167), 'ss',
+            (1347714900, 1347732000), 400)
+        ch6 = Checkpoint('B37', Point(43.965833, 6.557833), 'es',
+            (1347714900, 1347732000), radius=1500)
+        ch7 = Checkpoint('b37', Point(43.965833, 6.557833), 'goal',
+            (1347714900, 1347732000), 1000)
+
+        chlist = [ch1, ch2, ch3, ch4, ch5, ch6, ch7]
+        # for ch in chlist:
+        #     print json.dumps(ch.__geo_interface__)
+        res = self.calculator.calculate(chlist)
+        self.assertAlmostEqual(res[1]/1000, 74.0, 0)
+
+    def test_zero_divizion_error(self):
+        # 2013 Vrsac Open Task 3
+        ch1 = Checkpoint('SV01', Point(45.12298, 21.32548), 'TO', (1,2), 400)
+        ch2 = Checkpoint('V021', Point(45.1525, 21.36667), 'SS', (1, 2), 1000)
+        ch3 = Checkpoint('SV01', Point(45.12298, 21.32548), 'TO', (1,2), 400)
+        ch4 = Checkpoint('V005', Point(45.16022, 21.37648), radius=1000)
+        ch5 = Checkpoint('V027', Point(45.01683, 21.27728), radius=400)
+        ch6 = Checkpoint('V060', Point(44.8502, 21.33993), radius=400)
+        ch7 = Checkpoint('V045', Point(44.87575, 21.35838), radius=400)
+        chlist = [ch1, ch2, ch3, ch4, ch5, ch6, ch7]
+        res = self.calculator.calculate(chlist)[1]
+        self.assertAlmostEqual(res/1000, 48.5, 0)

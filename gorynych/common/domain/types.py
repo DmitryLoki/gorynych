@@ -109,6 +109,16 @@ class Checkpoint(ValueObject):
                 "Checkpoint close_time must be after open_time."
         # Distance to something.
         self.distance = 0
+        # XXX Optimum js-distance porn
+        self.aPoint = None
+
+    @property
+    def lat(self):
+        return self.__geo_interface__['geometry']['coordinates'][0]
+
+    @property
+    def lon(self):
+        return self.__geo_interface__['geometry']['coordinates'][1]
 
     def distance_to(self, point):
         '''

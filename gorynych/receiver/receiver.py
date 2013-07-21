@@ -305,8 +305,10 @@ class ReceiverService(Service):
             if isinstance(message, list):
                 for item in message:
                     d2.addCallback(lambda _: self.sender.write(item))
+                    self._save_coords_for_checker(item)
             else:
                 d2.addCallback(lambda _: self.sender.write(message))
+                self._save_coords_for_checker(message)
 
             d2.callback('go!')
             return d2

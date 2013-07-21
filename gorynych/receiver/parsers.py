@@ -5,14 +5,15 @@ import time
 from zope.interface import Interface, implementer
 from functools import reduce
 
+from twisted.python import log
+
 FORMAT = {
     'lat': 'latitude (decimal degree)',
     'lon': 'longitude (decimal degree)',
     'alt': 'altitude (meters)',
     'h_speed': 'speed (kilometers per hour)',
     'imei': 'unique 15-digit sequence',
-    'ts': 'unix timestamp (seconds)',
-    'battery': 'battery charge left (percentage)'
+    'ts': 'unix timestamp (seconds)'
 }
 
 MIN_SATTELITE_NUMBER = 2
@@ -170,6 +171,7 @@ class TeltonikaGH3000UDP(object):
                         num_of_data))
 
     def parse(self, bytestring):
+        raw = bytestring
         self.starttime = datetime.datetime(2007, 1, 1, 0, 0)
         bytestring = bytestring[5:]
 
@@ -284,6 +286,7 @@ class TeltonikaGH3000UDP(object):
                             # now skip this element
 
                 if  set(self.format.keys()).issubset(set(record.keys())):
+                #if set(record.keys()).issubset(set(self.format.keys())):
                     records.append(record)
                 record_counter += 1
 
@@ -291,4 +294,6 @@ class TeltonikaGH3000UDP(object):
                 record_counter += 1
                 continue
 
+        if not records:
+            log.err('Unparsed message %s' % raw)
         return records

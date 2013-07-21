@@ -3,6 +3,7 @@ import simplejson as json
 from datetime import datetime
 
 from twisted.trial import unittest
+from domain.racetypes import RaceToGoal
 
 from gorynych.processor.domain import track
 from gorynych.common.domain import events
@@ -42,21 +43,21 @@ class TestTrack(unittest.TestCase):
 
 class TestRaceToGoal(unittest.TestCase):
     def test_init(self):
-        rt = track.RaceToGoal(test_race)
-        self.assertIsInstance(rt, track.RaceToGoal)
+        rt = RaceToGoal(test_race)
+        self.assertIsInstance(rt, RaceToGoal)
         self.assertEqual(rt.type, 'racetogoal')
         self.assertTupleEqual((rt.start_time, rt.end_time), (1347704100,
                                                                 1347724800))
         self.assertEqual(len(rt.checkpoints), 7)
 
     def test_calculate_path(self):
-        rt = track.RaceToGoal(test_race)
+        rt = RaceToGoal(test_race)
         rt.calculate_path()
         for p in rt.checkpoints:
             print p.distance
 
     def test_dist_to_goal(self):
-        rt = track.RaceToGoal(test_race)
+        rt = RaceToGoal(test_race)
         ts = track.TrackState([])
         c = np.ones(1, dtype=[('lat', 'f4'), ('lon', 'f4'),
             ('distance', 'i4'), ('timestamp', 'i4')])

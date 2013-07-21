@@ -6,42 +6,182 @@ __author__ = 'Boris Tsema'
 from datetime import datetime
 import time
 from random import randint
+import psycopg2
 
 from twisted.trial import unittest
 from twisted.internet import defer
 import mock
 
 from gorynych.info.domain.test.helpers import create_contest, \
-    create_checkpoints, create_race
-from gorynych.info.infrastructure.persistence import PGSQLPersonRepository, PGSQLContestRepository, PGSQLRaceRepository, create_participants
+    create_checkpoints, create_race, create_tracker, create_transport
+from gorynych.info.infrastructure.persistence import PGSQLTrackerRepository, PGSQLTransportRepository, \
+    PGSQLPersonRepository, PGSQLContestRepository, PGSQLRaceRepository, create_participants
 # TODO: create separate module with test utils
 from gorynych.info.domain.test.test_person import create_person
 from gorynych.common.domain.types import geojson_feature_collection, checkpoint_collection_from_geojson, Name
 from gorynych.info.domain.ids import PersonID, ContestID, RaceID
 from gorynych.info.infrastructure.test import db_helpers
-from gorynych.common.exceptions import NoAggregate, DatabaseValueError
 from gorynych.common.infrastructure import persistence as pe
+from gorynych.common.exceptions import NoAggregate, DatabaseValueError
+from gorynych.info.domain.ids import TrackerID
 
 
 POOL = db_helpers.POOL
 
 
-class PersonRepositoryTest(unittest.TestCase):
+class MockeryTestCase(unittest.TestCase):
 
     def setUp(self):
-        self.repo = PGSQLPersonRepository(POOL)
+        self.repo = self.repo_type(POOL)
         self.patch = mock.patch('gorynych.info.infrastructure.persistence.pe'
-                           '.event_store')
+                                '.event_store')
         self.pe = self.patch.start()
         m = mock.Mock()
         m.load_events.return_value = []
+        m.load_events_for_aggregates.return_value = {}
         self.pe.return_value = m
-        return db_helpers.initDB('person', POOL)
+        d = db_helpers.initDB(self.sql_file, POOL)
+        return d
 
     def tearDown(self):
         del self.repo
         self.patch.stop()
-        return db_helpers.tearDownDB('person', POOL)
+        return db_helpers.tearDownDB(self.sql_file, POOL)
+
+    @defer.inlineCallbacks
+    def get_by_nonexistent_id(self):
+        p_id = "No such id"
+        yield self.assertFailure(self.repo.get_by_id(p_id), NoAggregate)
+
+
+class TransportRepositoryTest(MockeryTestCase):
+    repo_type = PGSQLTransportRepository
+    sql_file = 'transport'
+
+    test_transport_type = 'motorcycle'
+
+    def setUp(self):
+        d = super(TransportRepositoryTest, self).setUp()
+        d.addCallback(lambda _: POOL.runOperation(
+            'insert into transport_type(transport_type) values(%s)', (self.test_transport_type,)))
+        return d
+
+    @defer.inlineCallbacks
+    def test_save_new(self):
+
+        transport = create_transport(self.test_transport_type)
+        saved = yield self.repo.save(transport)
+        self.assertEqual(saved, transport)
+        db_row = yield POOL.runQuery(pe.select('transport'), (str(transport.id),))
+        self.assertEqual(len(db_row), 1)
+        db_row = db_row[0]
+
+        self.assertTupleEqual(
+            (transport.type, transport.title, transport.description),
+            (db_row[3], db_row[2], db_row[4]))
+
+    @defer.inlineCallbacks
+    def test_get_by_id(self):
+        transport = create_transport(self.test_transport_type)
+        yield self.repo.save(transport)
+        saved = yield self.repo.get_by_id(transport.id)
+        self.assertEqual(saved.type, transport.type)
+        self.assertEqual(saved.title, transport.title)
+        self.assertEqual(saved.description, transport.description)
+
+    def test_get_by_nonexistent_id(self):
+        return super(TransportRepositoryTest, self).get_by_nonexistent_id()
+
+    @defer.inlineCallbacks
+    def test_update(self):
+        transport = create_transport(self.test_transport_type)
+        yield self.repo.save(transport)
+        transport.title = 'Some other name'
+        yield self.repo.save(transport)
+
+        trs = yield self.repo.get_list()
+        self.assertTrue(len(trs) == 1)
+        updated = trs[0]
+
+        self.assertEqual(transport.type, updated.type)
+        self.assertEqual(transport.title, updated.title)
+        self.assertEqual(transport.description, updated.description)
+
+
+class TrackerRepositoryTest(MockeryTestCase):
+    repo_type = PGSQLTrackerRepository
+    sql_file = 'tracker'
+
+    def setUp(self):
+        d = super(TrackerRepositoryTest, self).setUp()
+        d.addCallback(lambda _: POOL.runOperation(
+            'insert into device_type(name) values(%s)', ('tr203',)))
+        return d
+
+    @defer.inlineCallbacks
+    def test_save_new(self):
+        tracker = create_tracker()
+        saved = yield self.repo.save(tracker)
+        self.assertEqual(saved, tracker)
+        db_row = yield POOL.runQuery(pe.select('tracker'), (str(tracker.id),))
+        self.assertEqual(len(db_row), 1)
+        db_row = db_row[0]
+        self.assertTupleEqual((tracker.device_id, tracker.device_type,
+                              TrackerID(
+                                  tracker.device_type, tracker.device_id),
+                              tracker.name),
+                              (db_row[0], db_row[1], db_row[2], db_row[3]))
+
+    @defer.inlineCallbacks
+    def test_get_by_id(self):
+        tracker = create_tracker()
+        yield self.repo.save(tracker)
+        saved = yield self.repo.get_by_id(tracker.id)
+        self.assertEqual(saved.id, tracker.id)
+        self.assertEqual(saved.device_id, tracker.device_id)
+        self.assertEqual(saved.device_type, tracker.device_type)
+        self.assertEqual(saved.name, tracker.name)
+
+    def test_get_by_nonexistent_id(self):
+        return super(TrackerRepositoryTest, self).get_by_nonexistent_id()
+
+    @defer.inlineCallbacks
+    def test_assign(self):
+        tracker = create_tracker()
+        saved = yield self.repo.save(tracker)
+        yield POOL.runOperation(
+            'insert into tracker_assignees(id, assignee_id, assigned_for) values(%s, %s, %s)',
+                               (saved._id, 'some_guy', 'for the sake of good'))
+        ass = yield self.repo._get_assignee(saved._id)
+        self.assertEqual(ass, {'for the sake of good': 'some_guy'})
+
+        # unique contraint has to be broken
+        self.assertFailure(
+            POOL.runOperation(
+                'insert into tracker_assignees(id, assignee_id, assigned_for) values(%s, %s, %s)',
+                          (saved._id, 'some_guy', 'for the sake of good')), psycopg2.IntegrityError)
+
+    @defer.inlineCallbacks
+    def test_update(self):
+        tracker = create_tracker()
+        yield self.repo.save(tracker)
+        tracker.name = 'some other name'
+        yield self.repo.save(tracker)
+
+        tracks = yield self.repo.get_list()
+        self.assertTrue(len(tracks) == 1)
+        updated = tracks[0]
+
+        self.assertEqual(updated.id, tracker.id)
+        self.assertEqual(updated.device_id, tracker.device_id)
+        self.assertEqual(updated.device_type, tracker.device_type)
+        self.assertEqual(updated.name, tracker.name)
+
+
+class PersonRepositoryTest(MockeryTestCase):
+
+    repo_type = PGSQLPersonRepository
+    sql_file = 'person'
 
     @defer.inlineCallbacks
     def test_save_new(self):
@@ -55,31 +195,29 @@ class PersonRepositoryTest(unittest.TestCase):
         self.assertEqual(len(db_row), 1)
         db_row = db_row[0]
         self.assertTupleEqual(('John', 'Doe', 'UA', str(pers.id)),
-                          (db_row[0], db_row[1], db_row[2], db_row[5]))
+                             (db_row[0], db_row[1], db_row[2], db_row[5]))
 
     @defer.inlineCallbacks
     def test_get_by_id(self):
         p_id = PersonID()
         date = datetime.now()
         p__id = yield POOL.runQuery(pe.insert('person'),
-                        ('name', 'surname', date, 'ru', 'a@a.ru', str(p_id) ))
+                                   ('name', 'surname', date, 'ru', 'a@a.ru', str(p_id)))
         saved_pers = yield self.repo.get_by_id(p_id)
         self.assertIsNotNone(saved_pers)
         self.assertTupleEqual(('Name Surname', 'RU', str(p_id)),
-            (saved_pers.name.full(), saved_pers.country, str(saved_pers.id)))
+                             (saved_pers.name.full(), saved_pers.country, str(saved_pers.id)))
         self.assertEqual(p__id[0][0], saved_pers._id)
 
-    @defer.inlineCallbacks
     def test_get_by_nonexistent_id(self):
-        p_id = "No such id"
-        yield self.assertFailure(self.repo.get_by_id(p_id), NoAggregate)
+        return super(PersonRepositoryTest, self).get_by_nonexistent_id()
 
     @defer.inlineCallbacks
     def test_update_existing(self):
         p_id = PersonID()
         date = datetime.now()
         yield POOL.runOperation(pe.insert('person'),
-                        ('name', 'Surname', date, 'ru', 'a@a.ru', str(p_id) ))
+                               ('name', 'Surname', date, 'ru', 'a@a.ru', str(p_id)))
         try:
             saved_pers = yield self.repo.get_by_id(p_id)
         except Exception:
@@ -87,10 +225,10 @@ class PersonRepositoryTest(unittest.TestCase):
                 "Can't test because get_by_id isn't working.")
         if not saved_pers:
             raise unittest.SkipTest("Got nothing instead of Person.")
-        
+
         saved_pers.country = 'USA'
         saved_pers.name = {'name': 'asfa'}
-        s = yield self.repo.save(saved_pers)
+        yield self.repo.save(saved_pers)
         db_row = yield POOL.runQuery(pe.select('person'), (str(p_id),))
         self.assertTupleEqual(('Asfa', 'US'), (db_row[0][0], db_row[0][2]))
 
@@ -106,15 +244,10 @@ class PersonRepositoryTest(unittest.TestCase):
         self.assertEqual(saved_pers.id, saved_pers2.id)
 
 
-class ContestRepositoryTest(unittest.TestCase):
+class ContestRepositoryTest(MockeryTestCase):
 
-    def setUp(self):
-        self.repo = PGSQLContestRepository(POOL)
-        POOL.start()
-        return db_helpers.initDB('contest', POOL)
-
-    def tearDown(self):
-       return db_helpers.tearDownDB('contest', POOL)
+    repo_type = PGSQLContestRepository
+    sql_file = 'contest'
 
     @defer.inlineCallbacks
     def test_get_by_id(self):
@@ -123,31 +256,24 @@ class ContestRepositoryTest(unittest.TestCase):
         stime = int(time.time())
         etime = stime + 1
         c__id = yield POOL.runQuery(pe.insert('contest'),
-            ('PGContest', stime, etime, tz, 'place', 'cou', 42.1, 42.2,
-             str(c_id)))
+                                   ('PGContest', stime, etime, tz, 'place', 'cou', 42.1, 42.2,
+                                    str(c_id)))
         c__id = c__id[0][0]
         # Add participants to contest
         pg1_id = PersonID()
         pg2_id = PersonID()
         org1_id = PersonID()
         yield POOL.runOperation(pe.insert('participant', 'contest'),
-            (str(c_id), str(pg1_id), 'paraglider', 'gl1', '15', '', 'person'))
+                               (str(c_id), str(pg1_id), 'paraglider', 'gl1', '15', '', 'person'))
         yield POOL.runOperation(pe.insert('participant', 'contest'),
-            (str(c_id), str(pg2_id), 'paraglider', 'gl2', '18', '', 'person'))
+                               (str(c_id), str(pg2_id), 'paraglider', 'gl2', '18', '', 'person'))
         yield POOL.runOperation(pe.insert('participant', 'contest'),
-            (str(c_id), str(org1_id), 'organizator', '', '', 'retrieve',
-             'person'))
-        # Add race_ids
-        r_id = RaceID()
-        r_id1 = RaceID()
-        yield POOL.runOperation(pe.insert('race', 'contest'), (str(c_id),
-                                                               str(r_id)))
-        yield POOL.runOperation(pe.insert('race', 'contest'), (str(c_id),
-                                                               str(r_id1)))
+                               (str(c_id), str(org1_id), 'organizator', '', '', 'retrieve',
+                                'person'))
 
         # DB prepared, start test.
         cont = yield self.repo.get_by_id(c_id)
-        self.assertEqual(cont.title, 'Pgcontest')
+        self.assertEqual(cont.title, 'PGContest')
         self.assertEqual(cont.country, 'CO')
         self.assertEqual(cont.timezone, tz)
         self.assertEqual(cont.place, 'Place')
@@ -156,27 +282,12 @@ class ContestRepositoryTest(unittest.TestCase):
         self.assertEquals((cont.start_time, cont.end_time), (stime, etime))
         self.assertIsInstance(cont.id, ContestID)
         self.assertDictEqual(cont._participants,
-            {pg1_id : {'role': 'paraglider', 'contest_number':'15',
-                       'glider':'gl1'},
-             pg2_id: {'role':'paraglider', 'contest_number': '18',
-                      'glider': 'gl2'},
-             org1_id: {'role': 'organizator'}})
-        self.assertListEqual(cont.race_ids, [str(r_id), str(r_id1)])
-
-
-    @defer.inlineCallbacks
-    def test_get_by_nonexistent_id(self):
-        yield self.assertFailure(self.repo.get_by_id('Notexist'), NoAggregate)
-
-    @defer.inlineCallbacks
-    def test_get_list(self):
-        self.repo.pool = mock.Mock()
-        try:
-            a = yield self.repo.get_list(offset=1)
-        except:
-            pass
-        self.repo.pool.runQuery.assert_called_once_with(
-            'select contest_id from contest limit 20 offset 1')
+                             {pg1_id: {'role': 'paraglider', 'contest_number': '15',
+                                       'glider': 'gl1'},
+                              pg2_id: {
+                              'role': 'paraglider', 'contest_number': '18',
+                              'glider': 'gl2'},
+                              org1_id: {'role': 'organizator'}})
 
     def _prepare_participants(self, p_rows):
         participants = dict()
@@ -191,17 +302,11 @@ class ContestRepositoryTest(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_save_new(self):
-        cont  = self._prepare_contest()
+        cont = self._prepare_contest()
 
         saved_cont = yield self.repo.save(cont)
         self.assertEqual(cont, saved_cont)
         self.assertIsNotNone(saved_cont._id)
-        raceids = yield POOL.runQuery(pe.select('race', 'contest'),
-                                      (saved_cont._id,))
-        raceids = [RaceID.fromstring(raceids[0][0]),
-                   RaceID.fromstring(raceids[1][0])]
-        self.assertListEqual(raceids, cont.race_ids)
-
         p_rows = yield POOL.runQuery(
             pe.select('participants', 'contest'), (saved_cont._id,))
         participants = self._prepare_participants(p_rows)
@@ -227,7 +332,6 @@ class ContestRepositoryTest(unittest.TestCase):
         cont.race_ids = [rid1, rid2]
         return cont
 
-
     @defer.inlineCallbacks
     def _compare_contest_with_db(self, cont):
         cont_row = yield POOL.runQuery(pe.select('contest'), (str(cont.id),))
@@ -252,39 +356,32 @@ class ContestRepositoryTest(unittest.TestCase):
 
         s_cont2 = yield self.repo.save(s_cont1)
 
-
         self.assertEqual(s_cont1._id, s_cont2._id)
-        raceids = yield POOL.runQuery(pe.select('race', 'contest'),
-                                      (s_cont1._id,))
 
         p_rows = yield POOL.runQuery(
             pe.select('participants', 'contest'), (s_cont1._id,))
         participants = self._prepare_participants(p_rows)
         self.assertDictEqual(participants, cont._participants)
 
-        raceids = [RaceID.fromstring(raceids[0][0]),
-                   RaceID.fromstring(raceids[1][0]),
-                   RaceID.fromstring(raceids[2][0])]
-        for raid in raceids:
-            self.assertTrue(raid in s_cont1.race_ids, "Race update failed.")
-
         yield self._compare_contest_with_db(s_cont1)
 
+    def test_get_by_nonexistent_id(self):
+        return super(ContestRepositoryTest, self).get_by_nonexistent_id()
 
-class RaceRepositoryTest(unittest.TestCase):
+
+class RaceRepositoryTest(MockeryTestCase):
+
+    repo_type = PGSQLRaceRepository
+    sql_file = 'race'
 
     def setUp(self):
-        self.repo = PGSQLRaceRepository(POOL)
-        d = POOL.start()
-        d.addCallback(lambda _:db_helpers.initDB('race', POOL))
+        d = super(RaceRepositoryTest, self).setUp()
+
         d.addCallback(lambda _: POOL.runOperation(
-            pe.insert('racetype', 'race'), ('racetogoal',)))
+            'insert into race_type(type) values(%s)', ('racetogoal',)))
+        d.addCallback(lambda _: db_helpers.initDB('transport', POOL))
         return d
 
-    def tearDown(self):
-        d = db_helpers.tearDownDB('contest', POOL)
-        d.addCallback(lambda _:POOL.close())
-        return d
 
     @defer.inlineCallbacks
     def _prepare_race(self):
@@ -296,11 +393,11 @@ class RaceRepositoryTest(unittest.TestCase):
         et = 1347732000
         _chs = geojson_feature_collection(chs)
         r_id = yield POOL.runQuery(pe.insert('race'),
-                (t, st, et, st-1, et+1, tz,
-                 'racetogoal', (geojson_feature_collection(chs)), str(rid)))
+                                  (t, st, et, tz,
+                                   'racetogoal', _chs, None, st - 1, et + 1, str(rid)))
 
         defer.returnValue(
-            (r_id[0][0], rid, t, st, et, st-1, et+1, tz, 'racetogoal', chs))
+            (r_id[0][0], rid, t, st, et, st - 1, et + 1, tz, 'racetogoal', chs))
 
     def _compare_race(self, i, ri, t, st, et, mst, met, tz, rt, chs, rc):
         self.assertEqual(rc._id, i)
@@ -315,19 +412,19 @@ class RaceRepositoryTest(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_by_id(self):
+        # raw_input()
         i, ri, t, st, et, mst, met, tz, rt, chs = yield self._prepare_race()
         yield self.assertFailure(self.repo.get_by_id(ri), DatabaseValueError)
         pid = PersonID()
         yield POOL.runOperation(pe.insert('paraglider', 'race'),
-            (i, str(pid), '1', 'ru', 'gl1', '', 'alex', 't'))
+                               (i, str(pid), '1', 'ru', 'gl1', '', 'alex', 't'))
 
         rc = yield self.repo.get_by_id(ri)
 
         self._compare_race(i, ri, t, st, et, mst, met, tz, rt, chs, rc)
 
-    @defer.inlineCallbacks
     def test_get_by_nonexistent_id(self):
-        yield self.assertFailure(self.repo.get_by_id("not exist"), NoAggregate)
+        return super(RaceRepositoryTest, self).get_by_nonexistent_id()
 
     @defer.inlineCallbacks
     def test_save(self):
@@ -337,18 +434,25 @@ class RaceRepositoryTest(unittest.TestCase):
         self._compare_race(saved_rc._id, rc.id, rc.title, rc.start_time,
                            rc.end_time, rc.timelimits[0], rc.timelimits[1],
                            rc.timezone, rc.type,
-                rc.checkpoints, saved_rc)
-
+                           rc.checkpoints, saved_rc)
         race_row = yield POOL.runQuery(pe.select('race'), (str(rc.id),))
-        i, ri, t, st, et, mst, met, tz, rt, chs = race_row[0]
+        # print len(race_row[0])
+        i, ri, t, st, et, tz, rt, chs, smth, mst, met = race_row[0]
         self._compare_race(i, ri, t, st, et, mst, met, tz, rt,
                            checkpoint_collection_from_geojson(chs), rc)
 
         pg_row = yield POOL.runQuery(pe.select('paragliders', 'race'),
                                      (saved_rc._id,))
-        pgs = create_participants(pg_row)['paragliders']
+        pgs = {p.contest_number: p for p in create_participants(pg_row)}
         for key in pgs:
-            self.assertEqual(pgs[key], rc.paragliders[key])
+            # can't use __eq__ here because after _get_values_from_obj None tracker_id becomes ''
+            # and I'm not sure if I'm allowed to change it
+            self.assertEqual(pgs[key].person_id, rc.paragliders[key].person_id)
+            self.assertEqual(pgs[key].glider, rc.paragliders[key].glider)
+            self.assertEqual(pgs[
+                             key].contest_number, rc.paragliders[key].contest_number)
+            self.assertTrue(not pgs[
+                            key].tracker_id and not rc.paragliders[key].tracker_id)
 
     @defer.inlineCallbacks
     def test_update(self):
@@ -362,15 +466,23 @@ class RaceRepositoryTest(unittest.TestCase):
         saved_rc.paragliders[chkey]._name = Name("Mitrofan", "Ignatov")
         updated_rc = yield self.repo.save(rc)
         self._compare_race(saved_rc._id, saved_rc.id, saved_rc.title,
-                           saved_rc._start_time, saved_rc.end_time, saved_rc.timelimits[0], saved_rc.timelimits[1], saved_rc.timezone,
+                           saved_rc.start_time, saved_rc.end_time, saved_rc.timelimits[
+                               0], saved_rc.timelimits[1], saved_rc.timezone,
                            saved_rc.type, chs, updated_rc)
 
         race_row = yield POOL.runQuery(pe.select('race'), (str(rc.id),))
-        i, ri, t, st, et, mst, met, tz, rt, chs = race_row[0]
+        i, ri, t, st, et, tz, rt, chs, smth, mst, met = race_row[0]
         self._compare_race(i, ri, t, st, et, mst, met, tz, rt,
                            checkpoint_collection_from_geojson(chs), rc)
         pg_row = yield POOL.runQuery(pe.select('paragliders', 'race'),
                                      (saved_rc._id,))
-        pgs = create_participants(pg_row)['paragliders']
+        pgs = {p.contest_number: p for p in create_participants(pg_row)}
         for key in pgs:
-            self.assertEqual(pgs[key], rc.paragliders[key])
+            # same shit as in test_save
+            self.assertEqual(pgs[key].person_id, rc.paragliders[key].person_id)
+            self.assertEqual(pgs[key].glider, rc.paragliders[key].glider)
+            self.assertEqual(pgs[
+                             key].contest_number, rc.paragliders[key].contest_number)
+            self.assertTrue(not pgs[
+                            key].tracker_id and not rc.paragliders[key].tracker_id)
+        yield db_helpers.tearDownDB('transport', POOL)

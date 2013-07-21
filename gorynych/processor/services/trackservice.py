@@ -316,7 +316,8 @@ class OnlineTrashService(RabbitMQService):
             result.changes.append(rgt)
             yield pe.event_store().persist([tc])
         tracks[device_id] = result
-        log.msg("Restored or created track for device", device_id)
+        log.msg("Restored or created track %s for device %s" % (
+                    result.id, device_id))
         defer.returnValue(result)
 
     def process(self):

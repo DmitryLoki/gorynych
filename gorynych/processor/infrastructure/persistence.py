@@ -101,7 +101,11 @@ class TrackRepository(object):
             points = obj.points
             points['id'] = np.ones(len(points)) * dbid
             data = np_as_text(points)
-            cur.copy_expert("COPY track_data FROM STDIN ", data)
+            try:
+                cur.copy_expert("COPY track_data FROM STDIN ", data)
+            except Exception as e:
+                log.err("Exception occured on inserting points: %r" % e)
+                obj.buffer = np.empty(0, dtype=track.DTYPE)
         obj._id = dbid
         return obj
 
@@ -131,6 +135,7 @@ class TrackRepository(object):
         except Exception as e:
             log.err("Error occured while COPY data on update for track %s: "
                     "%r" % (obj._id, e))
+            obj.buffer = np.empty(0, dtype=track.DTYPE)
         return obj
 
     def _update_times(self, obj):

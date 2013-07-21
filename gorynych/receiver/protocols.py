@@ -33,6 +33,12 @@ class ReceivingProtocol(basic.LineReceiver):
         self.factory.service.handle_message(data, proto='TCP')
 
 
+class TR203ReceivingProtocol(protocol.Protocol):
+    def dataReceived(self, data):
+        self.factory.service.handle_message(data, proto='TCP',
+            device_type='tr203')
+
+
 class UDPTeltonikaGH3000Protocol(protocol.DatagramProtocol):
     device_type = 'telt_gh3000'
 

@@ -1,5 +1,5 @@
 import numpy as np
-from gorynych.common.domain import events
+from gorynych.common.domain import events, model
 from gorynych.common.domain.types import checkpoint_collection_from_geojson
 from gorynych.processor.domain.track import DTYPE
 from gorynych.processor.domain import services
@@ -10,27 +10,11 @@ class RaceToGoal(object):
     Incapsulate race parameters calculation.
     '''
     type = 'racetogoal'
-    wp_error = 300
-    def __init__(self, task):
-        chlist = task['checkpoints']
-        self.checkpoints = checkpoint_collection_from_geojson(chlist)
+
+    def __init__(self, task, checkpoints):
+        self.checkpoints = checkpoints
         self.start_time = int(task['start_time'])
         self.end_time = int(task['end_time'])
-        self.calculate_path()
-
-    def calculate_path(self):
-        '''
-        For a list of checkpoints calculate distance from concrete
-        checkpoint to the goal.
-        @return:
-        @rtype:
-        '''
-        self.checkpoints.reverse()
-        self.checkpoints[0].distance = 0
-        for idx, p in enumerate(self.checkpoints[1:]):
-            p.distance = int(p.distance_to(self.checkpoints[idx]))
-            p.distance += self.checkpoints[idx].distance
-        self.checkpoints.reverse()
 
     def process(self, points, taskstate, _id):
         '''
@@ -38,11 +22,11 @@ class RaceToGoal(object):
         @param points: array with points for some seconds (minute usually).
         @type points: C{np.array}
         @param taskstate: read-only object implementing track state.
-        @type taskstate: L{TrackState}
+        @type taskstate: gorynych.processor.domain.track.TaskState
         @return: (points, event list)
         @rtype: (np.array, list)
         '''
-        assert isinstance(points, np.ndarray), "Got %s instead of array" % \
+        assert isinstance(points, np.ndarray), "Got %s instead of ndarray" % \
                                                type(points)
         assert points.dtype == DTYPE
         eventlist = []
@@ -50,7 +34,7 @@ class RaceToGoal(object):
         if lastchp < len(self.checkpoints) - 1:
             nextchp = self.checkpoints[lastchp + 1]
         else:
-            # Last point taken but we still have data.
+            # Last point has been taken but we still have data.
             if taskstate.last_distance:
                 for p in points:
                     p['distance'] = taskstate.last_distance
@@ -69,35 +53,46 @@ class RaceToGoal(object):
                     p['distance'] = 200
                 return points, []
 
-        ended = taskstate.ended
+        calculation_ended = taskstate.ended
         for idx, p in np.ndenumerate(points):
-            dist = nextchp.distance_to((p['lat'], p['lon']))
-            if dist - nextchp.radius <= self.wp_error and not ended:
+            lat, lon = p['lat'], p['lon']
+            if nextchp.is_taken_by(lat, lon) and not calculation_ended:
                 eventlist.append(
-                    events.TrackCheckpointTaken(_id, (lastchp+1, int(dist)),
+                    events.TrackCheckpointTaken(
+                        _id,
+                        (lastchp+1, nextchp.dist_to_center),
                         occured_on=p['timestamp']))
                 if nextchp.type == 'es':
                     eventlist.append(events.TrackFinishTimeReceived(_id,
                         payload=p['timestamp']))
-                    self.wp_error = 20
                 if nextchp.type == 'goal':
                     eventlist.append(events.TrackFinished(_id,
                         occured_on=taskstate.finish_time))
-                    ended = True
-                    self.wp_error = 20
+                    calculation_ended = True
                 if nextchp.type == 'ss':
                     eventlist.append(events.TrackStarted(_id,
                         occured_on=p['timestamp']))
                 if lastchp + 1 < len(self.checkpoints) - 1:
                     nextchp = self.checkpoints[lastchp + 2]
                     lastchp += 1
-            p['distance'] = int(dist + nextchp.distance)
+            p['distance'] = nextchp.dist_to_point(lat, lon) + nextchp.distance
 
         return points, eventlist
 
 
 class CylinderCheckpointAdapter(object):
     def __init__(self, chp, opt_point, error_margin):
+        '''
+        @param chp:
+        @type chp: gorynych.common.domain.types.Checkpoint.
+        @param opt_point:
+        @type opt_point:
+        @param error_margin:
+        @type error_margin:
+        @return:
+        @rtype:
+        '''
+
         self.checkpoint = chp
         self.distance = 0
         self.error_margin = error_margin
@@ -106,14 +101,37 @@ class CylinderCheckpointAdapter(object):
         self.opt_lat, self.opt_lon = opt_point
 
     def is_taken_by(self, lat, lon):
-        dist_to_center = services.point_dist_calculator(
+        '''
+        Is point (lat, lon) inside the circle?
+        @param lat:
+        @type lat:
+        @param lon:
+        @type lon:
+        @return:
+        @rtype: boolean
+        '''
+        self.dist_to_center = services.point_dist_calculator(
             lat, lon, self.checkpoint.lat, self.checkpoint.lon)
-        return dist_to_center < (
+        return self.dist_to_center < (
             self.checkpoint.radius + self.error_margin)
 
     def dist_to_point(self, lat, lon):
-        return services.point_dist_calculator(
-            lat, lon, self.opt_lat, self.opt_lon)
+        '''
+        Return distance in meters from point with coordinates lat,
+        lon to circle optimum point.
+        @param lat:
+        @type lat: float
+        @param lon:
+        @type lon: float
+        @return:
+        @rtype: int
+        '''
+        return int(services.point_dist_calculator(
+            lat, lon, self.opt_lat, self.opt_lon))
+
+    @property
+    def type(self):
+        return self.checkpoint.type
 
 
 class RaceTypesFactory(object):

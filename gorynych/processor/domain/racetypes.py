@@ -108,8 +108,8 @@ class CylinderCheckpointAdapter(object):
         @return:
         @rtype: boolean
         '''
-        self.dist_to_center = services.point_dist_calculator(
-            lat, lon, self.checkpoint.lat, self.checkpoint.lon)
+        self.dist_to_center = int(services.point_dist_calculator(
+            lat, lon, self.checkpoint.lat, self.checkpoint.lon))
         return self.dist_to_center < (
             self.checkpoint.radius + self.error_margin)
 

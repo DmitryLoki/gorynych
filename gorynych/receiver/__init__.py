@@ -18,15 +18,19 @@ def makeService(config):
     ####### check_trackers ####
     from gorynych.receiver.online_tester import RetreiveJSON
 
+    # Set up application.
+    application = service.Application("ReceiverServer")
+    sc = service.IServiceCollection(application)
+
     # Prepare receiver.
     audit_log = AuditFileLog('audit_log')
     sender = ReceiverRabbitService(host='localhost', port=5672,
         exchange='receiver', exchange_type='fanout')
     receiver_service = ReceiverService(sender, audit_log)
+    sender.setServiceParent(sc)
+    receiver_service.setServiceParent(sc)
 
-    application = service.Application("ReceiverServer")
-    sc = service.IServiceCollection(application)
-
+    # Prepare tracker's protocols and servers.
     if not config['tracker']:
         raise SystemExit("Tracker type missed.")
 

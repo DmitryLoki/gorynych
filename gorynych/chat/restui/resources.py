@@ -3,8 +3,12 @@ from twisted.python import log
 from zope.interface import implementer
 from twisted.web import resource, server
 from twisted.web.http import stringToDatetime
-
+from jinja2 import Environment, PackageLoader
+from gorynych.common.domain.services import APIAccessor
 from gorynych.common.exceptions import AuthenticationError
+
+api = APIAccessor()
+env = Environment(loader=PackageLoader('gorynych', 'templates'))
 
 
 @implementer(resource.IResource)
@@ -57,9 +61,11 @@ class ChatroomListResource(resource.Resource):
 
     def __init__(self, service):
         self.service = service
+        self.template = env.get_template('chatroom_list.html')
 
     def render_GET(self, request):
         d = self.service.get_chatroom_list()
+        d.addCallback(lambda x: self.template.render(api_url=api.url, data=x).encode('utf-8'))
         d.addCallback(request.write)
         d.addCallback(lambda _: request.finish())
         return server.NOT_DONE_YET
@@ -71,11 +77,14 @@ class ReportResource(resource.Resource):
     def __init__(self, service, chatroom):
         self.service = service
         self.chatroom = chatroom
+        self.template = env.get_template('chat_log.html')
 
     def render_GET(self, request):
         d = self.service.get_log(self.chatroom)
+        d.addCallback(lambda x: self.template.render(data=x).encode('utf-8'))
         d.addCallback(request.write)
         d.addCallback(lambda _: request.finish())
+        d.callback('fire!')
         return server.NOT_DONE_YET
 
 

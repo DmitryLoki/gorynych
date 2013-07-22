@@ -9,45 +9,45 @@
 {% endblock %}
 
 {% block content %}
-
-<table class="table-hover">
-	<thead>
-		<tr>
-			<td>Pilot</td>
-			<td>Message type</td>
-			<td>Message</td>
-			<td>Time</td>
-			<td>Operator</td>
-			<td>System comments</td>
-		</tr>
-	</thead>
-
-  	<tbody>
-  	{% for person_id in data %}
+<div class="container-fluid">
+  <table class="table">
+  	<thead>
   		<tr>
-  			<td colspan=6 class='pilotbar'><b>{{ data[person_id]['name'] }}</b> (SMS: {{ data[person_id]['sms_count'] }})</td>
+  			<td><b>Pilot</b></td>
+  			<td><b>Message type</b></td>
+  			<td><b>Message</b></td>
+  			<td><b>Time</b></td>
+  			<td><b>Operator</b></td>
+  			<td><b>System comments</b></td>
   		</tr>
-  		{% for message in data[person_id]['messages'] %}
-  			<tr>
-  				<td></td>
-  				<td>{{ message.type }}</td>
-  				<td>{{ message.body }}</td>
-  				<td>{{ message.ts }}</td>
-  				<td>{{ message.operator }}</td>
-  				{% if message.comment_type == 'failed' %}
-  					<td bgcolor='F02B2B'>
-  				{% elif message.comment_type == 'delayed' %}
-  					<td bgcolor='FAD35C'>
-  				{% else %}
-  					<td>
-  				{% endif %}
-  						{{ message.comment }}
-  					</td>
-  			</tr>
-  		{% endfor %}
-  	
-  	{% endfor %}
-  	</tbody>
-</table>
+  	</thead>
 
+    	<tbody>
+    	{% for person_id in data %}
+    		<tr>
+    			<td colspan=6 class='pilotbar'><b>{{ data[person_id]['name'] }}</b> (SMS: {{ data[person_id]['sms_count'] }})</td>
+    		</tr>
+    		{% for message in data[person_id]['messages'] %}
+    			<tr>
+    				<td></td>
+    				<td>{{ message.direction }}</td>
+    				<td>{{ message.body }}</td>
+    				<td>{{ message.ts }}</td>
+    				<td>{{ message.operator }}</td>
+    				{% if message.comment_type == 'failed' %}
+    					<td bgcolor='F02B2B'>
+    				{% elif message.comment_type == 'delayed' %}
+    					<td bgcolor='FAD35C'>
+    				{% else %}
+    					<td>
+    				{% endif %}
+    						{{ message.comment }}
+    					</td>
+    			</tr>
+    		{% endfor %}
+    	
+    	{% endfor %}
+    	</tbody>
+  </table>
+</div>
 {% endblock %}

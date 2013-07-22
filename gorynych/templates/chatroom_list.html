@@ -9,14 +9,15 @@ Race List
 {% endblock %}
 
 {% block content %}
-
-<table class="table-hover">
-  <tbody>
-    {% for item in data %}
-      <tr>
-        <td><a href={{ api_url }}/reports/{{ item[0] }}>{{ item[1] }}</a></td>
-      </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="container-fluid">
+	<table class="table">
+	  <tbody>
+	    {% for item in data %}
+	      <tr>
+	        <td><a href={{ api_url }}/reports/{{ item[0] }}>{{ item[1] }}</a></td>
+	      </tr>
+	    {% endfor %}
+	  </tbody>
+	</table>
+</div>
 {% endblock %}

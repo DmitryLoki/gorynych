@@ -65,6 +65,14 @@ class APIAccessor(object):
         url = '/'.join((self.url, 'race', race_id))
         return self._return_page(url)
 
+    def get_chatroom(self, chatroom_id):
+        url = '/'.join((self.url, 'chatroom', chatroom_id))
+        return self._return_page(url)
+
+    def get_person(self, person_id):
+        url = '/'.join((self.url, 'person', person_id))
+        return self._return_page(url)
+
     def _return_page(self, url):
         r = requests.get(url)
         if not r.status_code == 200:

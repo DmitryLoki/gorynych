@@ -26,6 +26,11 @@ class WebChat(resource.Resource):
             return HandshakeResource(self.service)
         elif path == 'chatapi':
             return ChatAPI(self.service)
+        elif path == 'reports':
+            if len(request.postpath) == 0 or not request.postpath[0]:
+                return ChatroomListResource(self.service)
+            elif request.postpath[0]:
+                return ReportResource(self.service, request.postpath[0])
         return self
 
 
@@ -45,6 +50,33 @@ def get_message_from_request(request):
             args[key] = args[key][0]
     assert len(args) > 3, "Not enouqh parameters in request."
     return args
+
+
+class ChatroomListResource(resource.Resource):
+    isLeaf = True
+
+    def __init__(self, service):
+        self.service = service
+
+    def render_GET(self, request):
+        d = self.service.get_chatroom_list()
+        d.addCallback(request.write)
+        d.addCallback(lambda _: request.finish())
+        return server.NOT_DONE_YET
+
+
+class ReportResource(resource.Resource):
+    isLeaf = True
+
+    def __init__(self, service, chatroom):
+        self.service = service
+        self.chatroom = chatroom
+
+    def render_GET(self, request):
+        d = self.service.get_log(self.chatroom)
+        d.addCallback(request.write)
+        d.addCallback(lambda _: request.finish())
+        return server.NOT_DONE_YET
 
 
 class ChatResource(resource.Resource):

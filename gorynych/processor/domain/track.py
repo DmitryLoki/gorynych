@@ -26,14 +26,6 @@ def track_types(ttype):
     return types.get(ttype)
 
 
-def race_tasks(rtask):
-    assert isinstance(rtask, dict), "Race task must be dict."
-    tasks = dict(racetogoal=RaceToGoal)
-    res = tasks.get(rtask['race_type'])
-    if res:
-        return res(rtask)
-
-
 class TrackID(DomainIdentifier):
     '''
     trck-749e0d12574a4d4594e72488461574d0'
@@ -111,6 +103,7 @@ class TrackState(ValueObject):
         if not self.state == 'finished':
             self.state = 'finished'
             self.statechanged_at = ev.occured_on
+        self.ended = True
 
     def apply_TrackFinishTimeReceived(self, ev):
         self.finish_time = ev.payload

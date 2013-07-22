@@ -26,12 +26,62 @@ class TestTrack(unittest.TestCase):
         self.assertEqual(self.track.type.type, 'competition_aftertask')
         self.assertEqual(self.track.task.type, 'racetogoal')
 
-    def test_parse(self):
+    def test_parse_unfinished(self):
         self.track.append_data('1.2.609.609.igc')
         self.track.process_data()
         for ch in self.track.changes:
-            print ch.name, datetime.fromtimestamp(ch.occured_on)
+            print ch.name, datetime.fromtimestamp(ch.occured_on), ch.occured_on
         print len(self.track.points)
+        self._check_events(self.track.changes, finished=False,
+            checkpoints_taken=3, amount=5)
+        self._check_track_state(self.track._state, ended=True,
+            last_checkpoint=3, state='landed', last_distance=38837)
+
+    def test_parse_finished(self):
+        self.track.append_data('pwc13.task3.finished.79.igc')
+        self.track.process_data()
+        for ch in self.track.changes:
+            print ch.name, ch.payload, datetime.fromtimestamp(ch
+                .occured_on), ch.occured_on
+        print len(self.track.points)
+        print 'distance:', self.track.points[-1]['distance']
+        self._check_events(self.track.changes,
+            finish_time=1374243311,
+            finished=True, checkpoints_taken=6, amount=9)
+        self._check_track_state(self.track._state,
+            finish_time=1374243311,
+            last_checkpoint=6,
+            ended=True)
+        # 4 checkpoint taken at 16:45
+        # es (5 checkpoint) taken at 17:20
+        # track started at 12:40
+
+    def _check_events(self, event_list, **kw):
+        checkpoints_taken = 0
+        self.assertEqual(len(event_list), kw.get('amount'))
+        for ev in event_list:
+            if ev.name == 'TrackFinishTimeReceived' and kw.has_key(
+                    'finish_time'):
+                self.assertEqual(ev.payload, kw['finish_time'])
+            elif ev.name == 'TrackFinished' and not kw.has_key('finished'):
+                self.fail("Track has been finished.")
+            elif ev.name == 'TrackCheckpointTaken':
+                checkpoints_taken += 1
+        if kw.has_key('checkpoints_taken'):
+            self.assertEqual(kw['checkpoints_taken'], checkpoints_taken)
+
+    def _check_track_state(self, tstate, **kw):
+        '''
+
+        @param tstate:
+        @type tstate: L{gorynych.processor.domain.track.TrackState}
+        '''
+        self.assertEqual(tstate.last_checkpoint, kw.get('last_checkpoint', 0))
+        self.assertEqual(tstate.ended, kw.get('ended'))
+        self.assertEqual(tstate.finish_time, kw.get('finish_time'))
+        self.assertEqual(tstate.last_distance, kw.get('last_distance', 0))
+        self.assertEqual(tstate.started, kw.get('started', True))
+        self.assertEqual(tstate.state, kw.get('state', 'finished'))
 
     def test_parse_1d_error(self):
         self.track.append_data('cond.1d.3243.17.igc')
@@ -49,12 +99,6 @@ class TestRaceToGoal(unittest.TestCase):
         self.assertTupleEqual((rt.start_time, rt.end_time), (1347704100,
                                                                 1347724800))
         self.assertEqual(len(rt.checkpoints), 7)
-
-    def test_calculate_path(self):
-        rt = RaceToGoal(test_race)
-        rt.calculate_path()
-        for p in rt.checkpoints:
-            print p.distance
 
     def test_dist_to_goal(self):
         rt = RaceToGoal(test_race)

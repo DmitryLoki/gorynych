@@ -1,7 +1,6 @@
 import numpy as np
-from gorynych.common.domain import events, model
+from gorynych.common.domain import events
 from gorynych.common.domain.types import checkpoint_collection_from_geojson
-from gorynych.processor.domain.track import DTYPE
 from gorynych.processor.domain import services
 
 
@@ -28,7 +27,6 @@ class RaceToGoal(object):
         '''
         assert isinstance(points, np.ndarray), "Got %s instead of ndarray" % \
                                                type(points)
-        assert points.dtype == DTYPE
         eventlist = []
         lastchp = taskstate.last_checkpoint
         if lastchp < len(self.checkpoints) - 1:
@@ -154,11 +152,11 @@ class RaceTypesFactory(object):
         for i, ch in enumerate(checkpoints):
             if ch.geometry.geom_type == 'Point':
                 error_margin = self.error_margin[rtype].get(ch.type,
-                    'default')
+                    self.error_margin[rtype]['default'])
                 cp = CylinderCheckpointAdapter(ch, points[i], error_margin)
                 race_checkpoints.append(cp)
-        race_checkpoints = getattr(self, '_distances_for_' + rtype)(
-            race_checkpoints)
+        race_checkpoints = getattr(self, '_distances_for_' + rtask[
+            'race_type'])(race_checkpoints)
         return race(rtask, race_checkpoints)
 
     def _distances_for_racetogoal(self, race_checkpoints):

@@ -288,8 +288,8 @@ class ReceiverService(Service):
         '''
         receiving_time = time.time()
         device_type = kw.get('device_type', 'tr203')
-        d = defer.succeed(
-                self.parsers[device_type].check_message_correctness(msg))
+        d = defer.succeed(msg)
+        d.addCallback(self.parsers[device_type].check_message_correctness)
         d.addCallbacks(self.audit_log.log_msg,
             self.audit_log.log_err,
             callbackArgs=[],
@@ -315,7 +315,6 @@ class ReceiverService(Service):
         if self.sender.running:
             d.addCallback(self.parsers[device_type].parse)
             d.addCallback(handle_list)
-            # d.addCallback(self._save_coords_for_checker)
         else:
             log.msg("Received but not sent: %s" % msg)
         d.addErrback(self._handle_error)
@@ -330,7 +329,6 @@ class ReceiverService(Service):
 
     def _handle_error(self, failure):
         failure.trap(EOFError)
-        log.err(failure)
 
 
 class AuditLog:

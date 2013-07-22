@@ -39,19 +39,18 @@ def find_snapshots(data):
     @return:
     @rtype: C{list}
     '''
-    result = []
+    result = dict()
     state = data._state
-    if state.started:
-        result.append(dict(timestamp=state.start_time, snapshot='started'))
-    if state.ended:
-        result.append(dict(timestamp=state.end_time, snapshot=state.state))
+    if state.started and state.start_time:
+        result['started'] = state.start_time
+    if state.ended and state.end_time:
+        result[state.state] = state.end_time
     if state.finish_time:
-        result.append(dict(timestamp=state.finish_time, snapshot='finished'))
+        result['finished'] = state.finish_time
     if data._state.end_time:
-        result.append(dict(timestamp=int(data._state.end_time),
-            snapshot='landed'))
+        result['landed'] = data._state.end_time
     if state.start_time:
-        result.append(dict(timestamp=state.start_time, snapshot='started'))
+        result['started'] = state.start_time
     return result
 
 

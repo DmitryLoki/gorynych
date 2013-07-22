@@ -14,6 +14,9 @@ def check_device_type(msg):
 
 
 class UDPReceivingProtocol(protocol.DatagramProtocol):
+    '''
+    Unused.
+    '''
 
     def __init__(self, service):
         self.service = service
@@ -28,12 +31,18 @@ class UDPReceivingProtocol(protocol.DatagramProtocol):
 
 
 class ReceivingProtocol(basic.LineReceiver):
+    '''
+    Line receiver protocol. Used by mobile application.
+    '''
 
     def lineReceived(self, data):
         self.factory.service.handle_message(data, proto='TCP')
 
 
 class TR203ReceivingProtocol(protocol.Protocol):
+    '''
+    TCP-receiving protocol for tr203.
+    '''
 
     def dataReceived(self, data):
         self.factory.service.handle_message(data, proto='TCP',
@@ -41,6 +50,9 @@ class TR203ReceivingProtocol(protocol.Protocol):
 
 
 class UDPTR203Protocol(protocol.DatagramProtocol):
+    '''
+    UDP-receiving protocol for tr203.
+    '''
     device_type = 'tr203'
 
     def __init__(self, service):
@@ -52,6 +64,9 @@ class UDPTR203Protocol(protocol.DatagramProtocol):
 
 
 class UDPTeltonikaGH3000Protocol(protocol.DatagramProtocol):
+    '''
+    UDP receiving protocol for Teltonika GH3000.
+    '''
     device_type = 'telt_gh3000'
 
     def __init__(self, service):

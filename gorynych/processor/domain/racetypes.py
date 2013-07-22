@@ -75,7 +75,7 @@ class RaceToGoal(object):
             if dist - nextchp.radius <= self.wp_error and not ended:
                 eventlist.append(
                     events.TrackCheckpointTaken(_id, (lastchp+1, int(dist)),
-                                                    occured_on=p['timestamp']))
+                        occured_on=p['timestamp']))
                 if nextchp.type == 'es':
                     eventlist.append(events.TrackFinishTimeReceived(_id,
                         payload=p['timestamp']))
@@ -97,29 +97,66 @@ class RaceToGoal(object):
 
 
 class CylinderCheckpointAdapter(object):
-    def __init__(self, chp):
+    def __init__(self, chp, opt_point, error_margin):
         self.checkpoint = chp
-        # Distance from(to) this checkpoint.
-        self._distance = 0
-        self._dist_to_opt_point = 0
-        self._dist_to_center = 0
-        self.error_margin = 0
+        self.distance = 0
+        self.error_margin = error_margin
+        assert len(opt_point) == 2, "Optimum point parameter is wrong."
+        assert isinstance(opt_point, tuple), "Need tuple as a point."
+        self.opt_lat, self.opt_lon = opt_point
 
-    def process(self, lat, lon):
-        opt_lat = self.checkpoint.aPoint.lat
-        opt_lon = self.checkpoint.aPoint.lon
-        dist_to_opt_point = services.point_dist_calculator(
-            lat, lon, opt_lat, opt_lon)
-        self._dist_to_opt_point = dist_to_opt_point
-        self._dist_to_center = services.point_dist_calculator(
+    def is_taken_by(self, lat, lon):
+        dist_to_center = services.point_dist_calculator(
             lat, lon, self.checkpoint.lat, self.checkpoint.lon)
-
-    @property
-    def taken(self):
-        return self._dist_to_center < (
+        return dist_to_center < (
             self.checkpoint.radius + self.error_margin)
 
-    @property
-    def distance(self):
-        return self._dist_to_opt_point
+    def dist_to_point(self, lat, lon):
+        return services.point_dist_calculator(
+            lat, lon, self.opt_lat, self.opt_lon)
+
+
+class RaceTypesFactory(object):
+    races = dict(racetogoal=RaceToGoal)
+    error_margin = dict(online={'es':10, 'goal':10, 'default':1000},
+                competition_aftertask={'es':10, 'goal':10, 'default':50})
+
+    def create(self, rtype, rtask):
+        '''
+        @param rtask: dictionary with race task.
+        @param rtype: string with task type: 'online',
+        'competition_aftertask'.
+        '''
+        assert isinstance(rtask, dict), "Race task must be dict."
+        race = self.races.get(rtask.get('race_type', 'racetogoal'),
+            RaceToGoal)
+        checkpoints = checkpoint_collection_from_geojson(rtask['checkpoints'])
+        points, dist = services.JavaScriptShortWay().calculate(checkpoints)
+        race_checkpoints = []
+        for i, ch in enumerate(checkpoints):
+            if ch.geometry.geom_type == 'Point':
+                error_margin = self.error_margin[rtype].get(ch.type,
+                    'default')
+                cp = CylinderCheckpointAdapter(ch, points[i], error_margin)
+                race_checkpoints.append(cp)
+        race_checkpoints = getattr(self, '_distances_for_' + rtype)(
+            race_checkpoints)
+        return race(rtask, race_checkpoints)
+
+    def _distances_for_racetogoal(self, race_checkpoints):
+        '''
+
+        @param race_checkpoints:
+        @type race_checkpoints: list
+        @return:
+        @rtype:
+        '''
+        race_checkpoints.reverse()
+        for idx, p in enumerate(race_checkpoints[1:]):
+            dist_from_prev = p.dist_to_point(
+                race_checkpoints[idx].opt_lat, race_checkpoints[idx].opt_lon)
+            p.distance = race_checkpoints[idx].distance + dist_from_prev
+        race_checkpoints.reverse()
+        return race_checkpoints
+
 

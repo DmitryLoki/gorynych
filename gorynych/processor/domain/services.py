@@ -603,6 +603,13 @@ class JavaScriptShortWay(object):
         return result
 
     def calculate(self, data):
+        '''
+
+        @param data:
+        @type data:
+        @return: list with (lat, lon) and optimum distance
+        @rtype: (list of tuples, int)
+        '''
         if data is None or len(data) < 2:
             return list()
         data = self.__transform(data)

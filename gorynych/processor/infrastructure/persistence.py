@@ -42,15 +42,15 @@ def find_snapshots(data):
     result = dict()
     state = data._state
     if state.started and state.start_time:
-        result['started'] = state.start_time
+        result['started'] = int(state.start_time)
     if state.ended and state.end_time:
-        result[state.state] = state.end_time
+        result[state.state] = int(state.end_time)
     if state.finish_time:
-        result['finished'] = state.finish_time
+        result['finished'] = int(state.finish_time)
     if data._state.end_time:
-        result['landed'] = data._state.end_time
+        result['landed'] = int(data._state.end_time)
     if state.start_time:
-        result['started'] = state.start_time
+        result['started'] = int(state.start_time)
     return result
 
 
@@ -116,8 +116,9 @@ class TrackRepository(object):
                 yield self.pool.runOperation(INSERT_SNAPSHOT,
                             (snaps[snap], obj._id, snap))
             except Exception as e:
-                log.err("Error while inserting snapshot %r for track %s: %r" %
-                        (snaps[snap], obj._id, e))
+                log.err("Error while inserting snapshot %s:%s for track %s: "
+                        "%r" %
+                        (snap, snaps[snap], obj._id, e))
         defer.returnValue(obj)
 
     def _update(self, cur, obj):

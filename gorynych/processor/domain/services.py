@@ -3,6 +3,7 @@ __author__ = 'Boris Tsema'
 
 from calendar import timegm
 import time
+import math
 
 import scipy as sc
 from scipy import signal, interpolate
@@ -561,4 +562,203 @@ class OnlineTrashAdapter(object):
         @rtype:
         '''
         return []
+
+class Point(object):
+    def __init__(self, lat, lon, radius=0):
+        self.lat = lat
+        self.lon = lon
+        self.radius = radius
+
+
+# XXX: freelancer's short way porting.
+class JavaScriptShortWay(object):
+    EARTH_RADIUS = 6371000
+    APPROXIMATION_CYCLES = 8
+
+    def __init__(self):
+        super(JavaScriptShortWay, self).__init__()
+
+        self.METERS_IN_LAT_DEGREE = self.lonCoefficientForLat(0)
+
+    def __transform(self, data):
+        """
+        Getting rid from aPoints and all the nasty stuff.
+        """
+        result = []
+        for element in data:
+            if isinstance(element, (tuple, list)):
+                lat, lon = element
+                p = Point(lat=lat, lon=lon)
+            elif isinstance(element, np.ndarray):
+                p = Point(lat=element['lat'], lon=element['lon'])
+            elif getattr(element, 'aPoint') is not None:
+                p = element.aPoint
+            else:
+                try:
+                    p = Point(lat=element.lat, lon=element.lon)
+                except AttributeError:
+                    raise ValueError("Can't find coordinates in what's supposed to be checkpoint.")
+            p.radius = getattr(element, 'radius', 0)
+            result.append(p)
+        return result
+
+    def calculate(self, data):
+        '''
+
+        @param data:
+        @type data:
+        @return: list with (lat, lon) and optimum distance
+        @rtype: (list of tuples, int)
+        '''
+        if data is None or len(data) < 2:
+            return list()
+        data = self.__transform(data)
+        # skips for 2 points
+        for cycl in range(0, self.APPROXIMATION_CYCLES):
+            for i in range(1, len(data)-1):
+                # if data[i-1].aPoint is None:
+                #     data[i-1].aPoint = Point(lat=data[i-1].lat, lon=data[i-1].lon)
+                # if data[i+1].aPoint is None:
+                #     data[i+1].aPoint = Point(lat=data[i+1].lat, lon=data[i+1].lon)
+                data[i] = self.calculatePoint(data[i], data[i-1], data[i+1])
+
+        # so substitute zeros here
+        for d in data:
+            if not d:
+                d = Point(lat=d.lat, lon=d.lon)
+        data[0] = self.calculateEndPoint(data[0], data[1])
+        data[len(data) - 1] = self.calculateEndPoint(data[len(data)-1], data[len(data)-2])
+        out = list()
+        for i in range(0, len(data)):
+            out.append((data[i].lat, data[i].lon))
+        dist = 0
+        for i, r in enumerate(out[1:]):
+            dist += point_dist_calculator(out[i][0], out[i][1], out[i+1][0],
+                out[i+1][1])
+        return out, dist
+
+    def calculatePoint(self, curr, prev, next_):
+        p = self.calculateIntersection(curr, prev, next_)
+        if p:
+            return p
+        az = self.getHalfAzimuth(self.getAzimuth(curr, prev), self.getAzimuth(curr, next_))
+        return self.getCoordinates(curr, az)
+
+    def calculateEndPoint(self, curr, next_):
+        d = self.distanceBetween(curr.lat, curr.lon, next_.lat, next_.lon)
+        if d == 0.0:
+            return curr
+        return Point(
+            lat=curr.lat + (next_.lat - curr.lat)*curr.radius/d,
+            lon=curr.lon + (next_.lon - curr.lon)*curr.radius/d
+        )
+
+    @classmethod
+    def deg2rad(cls, deg):
+        return deg / 180.0 * math.pi
+
+    @classmethod
+    def rad2deg(cls, rad):
+        return rad / math.pi * 180.0
+
+    def getCoordinates(self, curr, az):
+        latRadius = curr.radius / self.METERS_IN_LAT_DEGREE
+        lonRadius = curr.radius / self.lonCoefficientForLat(curr.lat)
+        return Point(
+            lat=curr.lat + math.cos(self.deg2rad(az)) * latRadius,
+            lon=curr.lon + math.sin(self.deg2rad(az)) * lonRadius
+        )
+
+    def getAzimuth(self, point1, point2):
+        dLat = int(math.floor((point2.lat - point1.lat)*10000.0))
+        dlon = int(math.floor((point2.lon - point1.lon)*10000.0))
+        if dlon == 0:
+            return 0 if dLat > 0 else 180
+        if dLat == 0:
+            return 90 if dlon > 0 else 270
+
+        azimuth = self.rad2deg(math.atan((point2.lon - point1.lon) / (point2.lat - point1.lat)))
+        if dLat < 0:
+            azimuth += 180
+        elif dlon < 0:
+            azimuth += 360
+        return self.filterAzimuth(azimuth)
+
+    def getHalfAzimuth(self, azimuth1, azimuth2):
+        halfAzimuth = (azimuth1 + azimuth2) / 2
+        if math.fabs(azimuth2 - azimuth1) > 180:
+            halfAzimuth -= 180
+        return self.filterAzimuth(halfAzimuth)
+
+    def filterAzimuth(self, azimuth):
+        while azimuth < 0:
+            azimuth += 360
+        while azimuth > 360:
+            azimuth -= 360
+
+        return azimuth
+
+    @classmethod
+    def distanceBetween(cls, lat1, lon1, lat2, lon2):
+        dLat = lat2 - lat1
+        dlon = lon2 - lon1
+        dLatSin = math.sin(cls.deg2rad(dLat)/2)
+        dlonSin = math.sin(cls.deg2rad(dlon)/2)
+        dLatCos1 = math.cos(cls.deg2rad(lat1))
+        dLatCos2 = math.cos(cls.deg2rad(lat2))
+        a = dLatSin*dLatSin + dLatCos1 * dLatCos2 * dlonSin * dlonSin
+        return 2 * math.asin(math.sqrt(a)) * cls.EARTH_RADIUS
+
+    def lonCoefficientForLat(self, lat):
+        return self.distanceBetween(lat, 0, lat, 1)
+
+    def calculateIntersection(self, curr, prev, next_):
+        kLat = self.METERS_IN_LAT_DEGREE
+        klon = self.lonCoefficientForLat(curr.lat)
+        x1 = (prev.lon-curr.lon) * klon
+        y1 = (prev.lat-curr.lat) * kLat
+        x2 = (next_.lon-curr.lon) * klon
+        y2 = (next_.lat-curr.lat) * kLat
+        p = self.calculateIntersectionGeom(x1, y1, x2, y2, curr.radius)
+        if not p:
+            return None
+        return Point(
+            lat=curr.lat + p[1] / kLat,
+            lon=curr.lon + p[0] / klon
+        )
+
+    def calculateIntersectionGeom(self, x1, y1, x2, y2, r):
+        dx = x2 - x1
+        dy = y2 - y1
+        dr = math.sqrt(dx*dx + dy*dy)
+        D = (x1 * y2 - y1 * x2)
+        root = r*r*dr*dr - D*D
+        if root <= 0.0:
+            return None
+        root = math.sqrt(root)
+        s = -1 if dy < 0 else 1
+        DdY = D * dy
+        DdX = -D * dx
+        p1x = (DdY + dx * s * root) / dr / dr
+        p1y = (DdX + math.fabs(dy) * root) / dr / dr
+        p2x = (DdY - dx * s * root) / dr / dr
+        p2y = (DdX - math.fabs(dy) * root) / dr / dr
+
+        p1between = self.isBetween(x1, p1x, x2) and self.isBetween(y1, p1y, y2)
+        p2between = self.isBetween(x1, p2x, x2) and self.isBetween(y1, p2y, y2)
+
+        if p1between and p2between:
+            return [p1x, p1y] if math.pow(p1x - x1, 2) + math.pow(p1y - y1, 2) < math.pow(p2x - x1, 2) + math.pow(p2y - y1, 2) else [p2x, p2y]
+        elif p1between:
+            return [p1x, p1y]
+        elif p2between:
+            return [p2x, p2y]
+
+        return None
+
+    def isBetween(self, a, x, b):
+        return (a <= x <= b) or (b <= x <= a)
+
+
+
 

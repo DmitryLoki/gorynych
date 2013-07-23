@@ -2,9 +2,6 @@
 '''
 Track aggregate.
 '''
-from twisted.internet import defer
-from gorynych.common.exceptions import NoAggregate
-from gorynych.common.infrastructure import persistence as pe
 
 __author__ = 'Boris Tsema'
 import uuid
@@ -13,10 +10,8 @@ import numpy as np
 
 from gorynych.common.domain.model import AggregateRoot, ValueObject, DomainIdentifier
 from gorynych.info.domain.ids import namespace_uuid_validator
-from gorynych.common.domain import events
-from gorynych.common.domain.types import checkpoint_collection_from_geojson
 from gorynych.processor.domain import services
-from twisted.python import log
+from gorynych.processor.domain.racetypes import RaceTypesFactory
 
 
 DTYPE = [('id', 'i4'), ('timestamp', 'i4'), ('lat', 'f4'),
@@ -29,14 +24,6 @@ def track_types(ttype):
     types = dict(competition_aftertask=services.FileParserAdapter(DTYPE),
         online=services.OnlineTrashAdapter(DTYPE))
     return types.get(ttype)
-
-
-def race_tasks(rtask):
-    assert isinstance(rtask, dict), "Race task must be dict."
-    tasks = dict(racetogoal=RaceToGoal)
-    res = tasks.get(rtask['race_type'])
-    if res:
-        return res(rtask)
 
 
 class TrackID(DomainIdentifier):
@@ -116,6 +103,7 @@ class TrackState(ValueObject):
         if not self.state == 'finished':
             self.state = 'finished'
             self.statechanged_at = ev.occured_on
+        self.ended = True
 
     def apply_TrackFinishTimeReceived(self, ev):
         self.finish_time = ev.payload
@@ -203,7 +191,8 @@ class Track(AggregateRoot):
     @property
     def task(self):
         if not self._task:
-            self._task = race_tasks(self._state.race_task)
+            self._task = RaceTypesFactory().create(
+                self._state.track_type, self._state.race_task)
         return self._task
 
     @property
@@ -217,97 +206,4 @@ class Track(AggregateRoot):
         self.processed = services.create_uniq_hstack(self.processed,
             self.points)[-100:]
         self.points = np.empty(0, dtype=self.dtype)
-
-
-class RaceToGoal(object):
-    '''
-    Incapsulate race parameters calculation.
-    '''
-    type = 'racetogoal'
-    wp_error = 300
-    def __init__(self, task):
-        chlist = task['checkpoints']
-        self.checkpoints = checkpoint_collection_from_geojson(chlist)
-        self.start_time = int(task['start_time'])
-        self.end_time = int(task['end_time'])
-        self.calculate_path()
-
-    def calculate_path(self):
-        '''
-        For a list of checkpoints calculate distance from concrete
-        checkpoint to the goal.
-        @return:
-        @rtype:
-        '''
-        self.checkpoints.reverse()
-        self.checkpoints[0].distance = 0
-        for idx, p in enumerate(self.checkpoints[1:]):
-            p.distance = int(p.distance_to(self.checkpoints[idx]))
-            p.distance += self.checkpoints[idx].distance
-        self.checkpoints.reverse()
-
-    def process(self, points, taskstate, _id):
-        '''
-        Process points and emit events if needed.
-        @param points: array with points for some seconds (minute usually).
-        @type points: C{np.array}
-        @param taskstate: read-only object implementing track state.
-        @type taskstate: L{TrackState}
-        @return: (points, event list)
-        @rtype: (np.array, list)
-        '''
-        assert isinstance(points, np.ndarray), "Got %s instead of array" % \
-                                               type(points)
-        assert points.dtype == DTYPE
-        eventlist = []
-        lastchp = taskstate.last_checkpoint
-        if lastchp < len(self.checkpoints) - 1:
-            nextchp = self.checkpoints[lastchp + 1]
-        else:
-            # Last point taken but we still have data.
-            if taskstate.last_distance:
-                for p in points:
-                    p['distance'] = taskstate.last_distance
-                return points, []
-            else:
-                for p in points:
-                    p['distance'] = 200
-                return points, []
-        if taskstate.state == 'landed':
-            if taskstate.last_distance:
-                for p in points:
-                    p['distance'] = taskstate.last_distance
-                return points, []
-            else:
-                for p in points:
-                    p['distance'] = 200
-                return points, []
-
-        ended = taskstate.ended
-        for idx, p in np.ndenumerate(points):
-            dist = nextchp.distance_to((p['lat'], p['lon']))
-            if dist - nextchp.radius <= self.wp_error and not ended:
-                eventlist.append(
-                    events.TrackCheckpointTaken(_id, (lastchp+1, int(dist)),
-                                                    occured_on=p['timestamp']))
-                if nextchp.type == 'es':
-                    eventlist.append(events.TrackFinishTimeReceived(_id,
-                        payload=p['timestamp']))
-                    self.wp_error = 20
-                if nextchp.type == 'goal':
-                    eventlist.append(events.TrackFinished(_id,
-                        occured_on=taskstate.finish_time))
-                    ended = True
-                    self.wp_error = 20
-                if nextchp.type == 'ss':
-                    eventlist.append(events.TrackStarted(_id,
-                        occured_on=p['timestamp']))
-                if lastchp + 1 < len(self.checkpoints) - 1:
-                    nextchp = self.checkpoints[lastchp + 2]
-                    lastchp += 1
-            p['distance'] = int(dist + nextchp.distance)
-
-        return points, eventlist
-
-
 

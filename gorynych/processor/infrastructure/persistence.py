@@ -39,19 +39,18 @@ def find_snapshots(data):
     @return:
     @rtype: C{list}
     '''
-    result = []
+    result = dict()
     state = data._state
-    if state.started:
-        result.append(dict(timestamp=state.start_time, snapshot='started'))
-    if state.ended:
-        result.append(dict(timestamp=state.end_time, snapshot=state.state))
+    if state.started and state.start_time:
+        result['started'] = int(state.start_time)
+    if state.ended and state.end_time:
+        result[state.state] = int(state.end_time)
     if state.finish_time:
-        result.append(dict(timestamp=state.finish_time, snapshot='finished'))
+        result['finished'] = int(state.finish_time)
     if data._state.end_time:
-        result.append(dict(timestamp=int(data._state.end_time),
-            snapshot='landed'))
+        result['landed'] = int(data._state.end_time)
     if state.start_time:
-        result.append(dict(timestamp=state.start_time, snapshot='started'))
+        result['started'] = int(state.start_time)
     return result
 
 
@@ -115,9 +114,11 @@ class TrackRepository(object):
         for snap in snaps:
             try:
                 yield self.pool.runOperation(INSERT_SNAPSHOT,
-                            (snap['timestamp'], obj._id, snap['snapshot']))
-            except:
-                pass
+                            (snaps[snap], obj._id, snap))
+            except Exception as e:
+                log.err("Error while inserting snapshot %s:%s for track %s: "
+                        "%r" %
+                        (snap, snaps[snap], obj._id, e))
         defer.returnValue(obj)
 
     def _update(self, cur, obj):

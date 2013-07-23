@@ -10,6 +10,7 @@ import numpy as np
 
 from twisted.internet import defer
 from twisted.trial import unittest
+from domain.racetypes import RaceToGoal
 
 from gorynych.test.test_info import create_geojson_checkpoints
 from gorynych.common.domain.types import Checkpoint
@@ -210,7 +211,7 @@ class TestArchiveTrackParsing(unittest.TestCase):
 
 def process_task(task_file, points, state, _id):
     t = json.loads(open(task_file, 'r').read())
-    ttype = track.RaceToGoal(t)
+    ttype = RaceToGoal(t)
     ttype.calculate_path()
     return ttype.process(points, state, _id)
 
@@ -222,7 +223,7 @@ class TestTrackTaskProcessing(unittest.TestCase):
             # read_track('finished.67.igc'),
             1371027600, 1371049200)
         t = json.loads(open('cameli1.json', 'r').read())
-        ttype = track.RaceToGoal(t)
+        ttype = RaceToGoal(t)
         track_id = track.TrackID()
         track_state = track.TrackState(track_id, [])
         res, evs = ttype.process(points, track_state, track_id)

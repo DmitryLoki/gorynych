@@ -265,6 +265,11 @@ class Race(AggregateRoot):
                 result.append(p)
         return result
 
+    @property
+    def optimum_distance(self):
+        from gorynych.processor.domain.services import JavaScriptShortWay
+        return JavaScriptShortWay().calculate(self.checkpoints)[1]
+
 
 class TrackArchive(object):
     states = ['no archive', 'unpacked', 'parsed']

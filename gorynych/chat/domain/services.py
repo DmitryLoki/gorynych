@@ -158,7 +158,7 @@ class PrettyReportLog(object):
                     timelapse = None
                 else:
                     comment_type, timelapse = self._get_request(
-                        message, personal_log[:i])
+                        message, personal_log[:i][::-1])
                 formatted[person_id]['messages'].append(self._format_message(
                     message, comment_type, timelapse))
 
@@ -178,15 +178,15 @@ class PrettyReportLog(object):
         if message['direction'] == 'IN':
             formatted.update({
                 'operator': '',
-                'ts': datetime.datetime.fromtimestamp(message['timestamp']).strftime('%d.%m - %H:%M'),
+                'ts': datetime.datetime.fromtimestamp(message['timestamp']).strftime('%d.%m - %H:%M:%S'),
             })
         else:
+            ts = datetime.datetime.fromtimestamp(message['timestamp']).strftime('%d.%m - %H:%M:%S')
+            if timelapse:
+                ts += '\n({})'.format(timelapse)
             formatted.update({
                 'operator': message['from'],
-                'ts': '{} ({})'.format(
-                    datetime.datetime.fromtimestamp(message[
-                                                    'timestamp']).strftime('%d.%m - %H:%M'),
-                    timelapse),
+                'ts': ts
             })
         return formatted
 
@@ -204,8 +204,6 @@ class PrettyReportLog(object):
         return 'UNKNOWN: {}'.format(body)
 
     def _get_response(self, message, rest_log):
-        print 'i am', message
-        print 'thats ahead', rest_log
         if len(rest_log) < 2:
             return 'failed'
         if rest_log[1]['direction'] == 'OUT':
@@ -225,17 +223,18 @@ class PrettyReportLog(object):
 
     def _get_request(self, message, prev_log):
         if not prev_log:
-            timelapse = 0
+            return ('nothing', None)
         elif prev_log[0]['direction'] == 'OUT':
             # another response before. we've already processed it
-            timelapse = 0
-        else:
-            for i, request in enumerate(prev_log):
-                if i != len(prev_log) - 1:
-                    if prev_log[i + 1]['direction'] == 'in' and\
-                            message['timestamp'] - prev_log[i + 1]['timestamp'] > self.RESPONSE_DELAYED:
-                        continue
-                timelapse = message['timestamp'] - prev_log[i]['timestamp']
+            return ('nothing', None)
+
+        for i, request in enumerate(prev_log):
+            if i != len(prev_log) - 1:
+                if request['direction'] == 'IN' and\
+                        message['timestamp'] - request['timestamp'] > self.RESPONSE_DELAYED:
+                    continue
+            timelapse = message['timestamp'] - request['timestamp']
+            break
 
         # stringification
         comment_type = 'delayed' if timelapse > self.RESPONSE_DELAYED else 'nothing'

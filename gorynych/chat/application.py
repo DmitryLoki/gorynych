@@ -151,7 +151,6 @@ class ChatApplication(Service):
                 person_info = api.get_person(person_id)
                 if not person_info:
                     continue
-                print person_info['name']
                 log[person_id]['name'] = person_info['name']
             return log
 

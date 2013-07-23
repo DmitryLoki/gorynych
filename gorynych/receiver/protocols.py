@@ -39,13 +39,15 @@ class ReceivingProtocol(basic.LineReceiver):
         self.factory.service.handle_message(data, proto='TCP')
 
 
-class TR203ReceivingProtocol(protocol.Protocol):
+class TR203ReceivingProtocol(basic.LineOnlyReceiver):
     '''
     TCP-receiving protocol for tr203.
     '''
 
-    def dataReceived(self, data):
-        self.factory.service.handle_message(data, proto='TCP',
+    delimiter = b'!'
+
+    def lineReceived(self, line):
+        self.factory.service.handle_message(line + '!', proto='TCP',
                                             device_type='tr203')
 
 

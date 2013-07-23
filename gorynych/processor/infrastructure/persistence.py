@@ -115,8 +115,9 @@ class TrackRepository(object):
             try:
                 yield self.pool.runOperation(INSERT_SNAPSHOT,
                             (snaps[snap], obj._id, snap))
-            except:
-                pass
+            except Exception as e:
+                log.err("Error while inserting snapshot %r for track %s: %r" %
+                        (snaps[snap], obj._id, e))
         defer.returnValue(obj)
 
     def _update(self, cur, obj):

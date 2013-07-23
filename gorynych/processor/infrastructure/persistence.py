@@ -114,7 +114,7 @@ class TrackRepository(object):
         for snap in snaps:
             try:
                 yield self.pool.runOperation(INSERT_SNAPSHOT,
-                            (snap['timestamp'], obj._id, snap['snapshot']))
+                            (snaps[snap], obj._id, snap))
             except:
                 pass
         defer.returnValue(obj)

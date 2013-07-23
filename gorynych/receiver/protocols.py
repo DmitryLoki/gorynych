@@ -47,6 +47,8 @@ class TR203ReceivingProtocol(basic.LineOnlyReceiver):
     delimiter = b'!'
 
     def lineReceived(self, line):
+        if line.startswith('OK\r\n'):
+            line = line[4:]
         self.factory.service.handle_message(line + '!', proto='TCP',
                                             device_type='tr203')
 

@@ -215,6 +215,11 @@ class PrettyReportLog(object):
             else:
                 return 'delayed'
         else:
+            # looping
+            for i, next in enumerate(rest_log[1:]):
+                if next['direction'] == 'IN' and\
+                        next['timestamp'] - message['timestamp'] < self.RESPONSE_DELAYED:
+                    return self._get_response(next, rest_log[1 + i:])
             # no response right now
             return 'failed'
 

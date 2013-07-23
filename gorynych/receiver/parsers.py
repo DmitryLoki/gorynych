@@ -1,6 +1,8 @@
 from operator import xor
 import datetime
 import time
+import struct
+import traceback
 
 from zope.interface import Interface, implementer
 from functools import reduce
@@ -128,14 +130,11 @@ class TeltonikaGH3000UDP(object):
         self.format = FORMAT
 
     def bytes2coord(self, four_bytes):
-        hex_data = four_bytes.encode('hex')
-        c = int(hex_data, 16)
-        result = (c & 0x7fffff | 0x800000) * \
-            1.0 / 2 ** 23 * 2 ** ((c >> 23 & 0xff) - 127)
+        result = struct.unpack('>f', four_bytes)[0]
         return float('%.6f' % result)
 
     def get_alt(self, two_bytes):
-        return int(two_bytes.encode('hex'), 16)
+        return struct.unpack('>h', two_bytes)[0]
 
     # def get_angle(self, one_byte):
     #     return ord(one_byte) * 360. / 256.
@@ -159,6 +158,8 @@ class TeltonikaGH3000UDP(object):
         return '0' * (8 - len(bin_str[2:])) + bin_str[2:]
 
     def check_message_correctness(self, msg):
+        if not msg:
+            raise ValueError(str(self.errors))
         return msg
 
     def get_response(self, bytestring):
@@ -238,6 +239,9 @@ class TeltonikaGH3000UDP(object):
         record_counter = 0  # incrementing at each record pass, no matter successful or not
         # required to prevent endless loops on bad data
 
+        # for further logging
+        self.errors = []
+
         cursor = 0
         while cursor < len(data) and record_counter <= self.num_of_data:
             try:
@@ -292,6 +296,7 @@ class TeltonikaGH3000UDP(object):
 
             except:
                 record_counter += 1
+                self.errors.append(traceback.format_exc())
                 continue
 
         if not records:

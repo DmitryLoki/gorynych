@@ -384,6 +384,8 @@ class LastPointApplication(RabbitMQService):
     def __init__(self, pool, **kw):
         RabbitMQService.__init__(self, **kw)
         self.pool = pool
+        # imei:ts
+        self.points = dict()
 
     def when_started(self):
         d = defer.Deferred()
@@ -399,8 +401,9 @@ class LastPointApplication(RabbitMQService):
         if not data.has_key('ts'):
             # ts key MUST be in a data.
             return
-        now = int(time.time())
-        return self.pool.runOperation(persistence.update('last_point',
-            'tracker'), (data['lat'], data['lon'], data['alt'], data['ts'],
-        data.get('battery'), data['h_speed'], data['imei']))
+        if self.points.get(data['imei']) < data['ts']:
+            self.points[data['imei']] = data['ts']
+            return self.pool.runOperation(persistence.update('last_point',
+                'tracker'), (data['lat'], data['lon'], data['alt'], data['ts'],
+            data.get('battery'), data['h_speed'], data['imei']))
 

@@ -15,7 +15,7 @@ from twisted.python import log
 from pika.connection import ConnectionParameters
 from pika.adapters.twisted_connection import TwistedProtocolConnection
 
-from gorynych.receiver.parsers import GlobalSatTR203, TeltonikaGH3000UDP
+from gorynych.receiver.parsers import LogOnlyGlobalSatTR203, TeltonikaGH3000UDP
 from gorynych.receiver.protocols import TR203ReceivingProtocol
 
 ################### Network part ##########################################
@@ -270,12 +270,12 @@ class ReceiverRabbitService(RabbitMQService):
 
 
 class ReceiverService(Service):
-    parsers = dict(tr203=GlobalSatTR203(), telt_gh3000=TeltonikaGH3000UDP())
+    parsers = dict(tr203=LogOnlyGlobalSatTR203(), telt_gh3000=TeltonikaGH3000UDP())
 
     def __init__(self, sender, audit_log):
         self.sender = sender
         self.audit_log = audit_log
-        self.tr203 = GlobalSatTR203()
+        self.tr203 = LogOnlyGlobalSatTR203()
         ##### checker
         self.messages = dict()
         self.coords = dict()

@@ -159,4 +159,5 @@ class ChatApplication(Service):
         d = defer.Deferred()
         d.addCallback(lambda _: logger.format())
         d.addCallback(nameficate)
+        d.callback('fire!')
         return d

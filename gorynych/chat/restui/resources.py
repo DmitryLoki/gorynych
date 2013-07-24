@@ -84,7 +84,6 @@ class ReportResource(resource.Resource):
         d.addCallback(lambda x: self.template.render(data=x).encode('utf-8'))
         d.addCallback(request.write)
         d.addCallback(lambda _: request.finish())
-        d.callback('fire!')
         return server.NOT_DONE_YET
 
 

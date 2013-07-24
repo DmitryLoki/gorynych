@@ -104,15 +104,16 @@ class NewMessageParser(object):
 class ParsingDispatcher(object):
 
     def parse(self, message):
-        parser = OldMessageParser if message['sender'] in OldMessageParser.FORMAT.values()\
-            else NewMessageParser
-        return parser().parse(message)
+        if message['sender'] in OldMessageParser.FORMAT.values():
+            return OldMessageParser().parse(message)
+        else:
+            return NewMessageParser().parse(message)
 
 
 class PrettyReportLog(object):
     # contstants
-    RESPONSE_DELAYED = 5 * 60
-    COMMENTS = {
+    response_delayed = 5 * 60
+    comments = {
         'delayed': 'Long response detected!',
         'failed': 'No answer detected!',
         'nothing': ''
@@ -137,7 +138,7 @@ class PrettyReportLog(object):
         return persons, prepared_log
 
     def __init__(self, log):
-        self.OLD_STATUS = 'Fly'
+        self.old_status = 'Fly'
         self.persons, self.body = self._prepare(log)
 
     def format(self):
@@ -167,7 +168,7 @@ class PrettyReportLog(object):
     def _format_message(self, message, comment_type, timelapse=None):
         formatted = {
             'comment_type': comment_type,
-            'comment': self.COMMENTS[comment_type],
+            'comment': self.comments[comment_type],
             'direction': message['direction']
         }
         if message['body'][:6] == 'system':
@@ -196,7 +197,7 @@ class PrettyReportLog(object):
             return 'UNKNOWN: {}'.format(body)
         if bodyarr[1] == 'new_status':
             new_status = bodyarr[2]
-            self.OLD_STATUS = new_status
+            self.old_status = new_status
             return 'STATUS CHANGED: {} > {}'.format(old_status, new_status)
         else:
             # ...other nonexistent stuff
@@ -208,7 +209,7 @@ class PrettyReportLog(object):
             return 'failed'
         if rest_log[1]['direction'] == 'OUT':
             # got response right now
-            if rest_log[1]['timestamp'] - message['timestamp'] < self.RESPONSE_DELAYED:
+            if rest_log[1]['timestamp'] - message['timestamp'] < self.response_delayed:
                 return 'nothing'
             else:
                 return 'delayed'
@@ -216,7 +217,7 @@ class PrettyReportLog(object):
             # looping
             for i, next in enumerate(rest_log[1:]):
                 if next['direction'] == 'IN' and\
-                        next['timestamp'] - message['timestamp'] < self.RESPONSE_DELAYED:
+                        next['timestamp'] - message['timestamp'] < self.response_delayed:
                     return self._get_response(next, rest_log[1 + i:])
             # no response right now
             return 'failed'
@@ -231,13 +232,13 @@ class PrettyReportLog(object):
         for i, request in enumerate(prev_log):
             if i != len(prev_log) - 1:
                 if request['direction'] == 'IN' and\
-                        message['timestamp'] - request['timestamp'] > self.RESPONSE_DELAYED:
+                        message['timestamp'] - request['timestamp'] > self.response_delayed:
                     continue
             timelapse = message['timestamp'] - request['timestamp']
             break
 
         # stringification
-        comment_type = 'delayed' if timelapse > self.RESPONSE_DELAYED else 'nothing'
+        comment_type = 'delayed' if timelapse > self.response_delayed else 'nothing'
         if timelapse > 60:
             timelapse_str = '{}m {}s'.format(
                 timelapse / 60, timelapse % 60)

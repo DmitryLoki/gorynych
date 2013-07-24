@@ -7,7 +7,7 @@ import unittest
 
 from zope.interface.verify import verifyObject
 
-from gorynych.receiver.parsers import IParseMessage, GlobalSatTR203, \
+from gorynych.receiver.parsers import IParseMessage, LogOnlyGlobalSatTR203, \
     TeltonikaGH3000UDP
 
 
@@ -35,7 +35,7 @@ class ParserTest(unittest.TestCase):
 class GlobalSatTR203Test(ParserTest):
 
     def setUp(self):
-        self.parser = GlobalSatTR203()
+        self.parser = LogOnlyGlobalSatTR203()
 
     def test_parse(self):
         message = 'GSr,011412001274897,3,3,00,,3,090713,081527,E02445.3853,N4239.2928,546,0.09,318,8,1.3,93,284,01,0e74,0f74,12,24*60!'

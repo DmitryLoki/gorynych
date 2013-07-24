@@ -127,7 +127,7 @@ class LogOnlyGlobalSatTR203(object):
 class NewGlobalSatTR203(object):
 
     def __init__(self):
-        self.format = dict(imei=0, lon=3, lat=4, alt=5, h_speed=6, battery=9)
+        self.format = dict(type=0, imei=1, lon=4, lat=5, alt=6, h_speed=7, battery=10)
         self.convert = dict(type=str, imei=str, lat=self.latitude,
                             lon=self.longitude, alt=int, h_speed=self.speed,
                             battery=str)
@@ -169,13 +169,13 @@ class NewGlobalSatTR203(object):
         for key in self.format.keys():
             result[key] = self.convert[key](arr[self.format[key]])
         result['ts'] = int(time.mktime(
-            time.strptime(''.join((arr[1], arr[2])), '%d%m%y%H%M%S')))
+            time.strptime(''.join((arr[2], arr[3])), '%d%m%y%H%M%S')))
         return result
 
     def _message_is_good(self, msg):
         arr = msg.split('*')[0].split(',')
-        satellites_number = int(arr[7])
-        hdop = float(arr[8])
+        satellites_number = int(arr[8])
+        hdop = float(arr[9])
         return satellites_number > MIN_SATTELITE_NUMBER and (
             hdop < MAXIMUM_HDOP)
 

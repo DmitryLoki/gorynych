@@ -128,13 +128,13 @@ class GlobalSatTR203(object):
 
     def __init__(self):
         self.format = dict(type=0, imei=1, lon=5, lat=6, alt=7,
-                           h_speed=8, battery=9)
+                           h_speed=8, battery=10)
         self.convert = dict(type=str, imei=str, lat=self.latitude,
                             lon=self.longitude, alt=int, h_speed=self.speed,
                             battery=str)
 
     def speed(self, speed):
-        return round(float(speed) * 1.609, 1)
+        return float(speed)
 
     def latitude(self, lat):
         """
@@ -187,8 +187,7 @@ class GlobalSatTR203(object):
         arr = msg.split('*')[0].split(',')
         gsr = arr[0]
         fix = arr[2]
-        hdop = float(arr[15])
-        return gsr == 'GSr' and fix == 3 and hdop < MAXIMUM_HDOP
+        return gsr == 'GSr' and fix == 3
 
 
 @implementer(IParseMessage)

@@ -124,28 +124,37 @@ class LogOnlyGlobalSatTR203(object):
 
 
 @implementer(IParseMessage)
-class NewGlobalSatTR203(object):
+class GlobalSatTR203(object):
 
     def __init__(self):
-        self.format = dict(type=0, imei=1, lon=4, lat=5, alt=6, h_speed=7, battery=10)
+        self.format = dict(type=0, imei=1, lon=5, lat=6, alt=7,
+                           h_speed=8, battery=9)
         self.convert = dict(type=str, imei=str, lat=self.latitude,
                             lon=self.longitude, alt=int, h_speed=self.speed,
                             battery=str)
 
     def speed(self, speed):
-        return float(speed)
+        return round(float(speed) * 1.609, 1)
 
     def latitude(self, lat):
         """
         Convert gps coordinates from GlobalSat tr203 to decimal degrees format.
         """
-        return float(lat)
+        data = float(lat[1:])
+        if lat[0] == "N":
+            return data
+        else:
+            return -data
 
     def longitude(self, lon):
         """
         Convert gps coordinates from GlobalSat tr203 to decimal degrees format.
         """
-        return float(lon)
+        data = float(lon[1:])
+        if lon[0] == "E":
+            return data
+        else:
+            return -data
 
     def check_message_correctness(self, msg):
         try:
@@ -166,18 +175,20 @@ class NewGlobalSatTR203(object):
     def parse(self, msg):
         arr = msg.split('*')[0].split(',')
         result = dict()
+        print arr
         for key in self.format.keys():
+            print key
             result[key] = self.convert[key](arr[self.format[key]])
         result['ts'] = int(time.mktime(
-            time.strptime(''.join((arr[2], arr[3])), '%d%m%y%H%M%S')))
+            time.strptime(''.join((arr[3], arr[4])), '%d%m%y%H%M%S')))
         return result
 
     def _message_is_good(self, msg):
         arr = msg.split('*')[0].split(',')
-        satellites_number = int(arr[8])
-        hdop = float(arr[9])
-        return satellites_number > MIN_SATTELITE_NUMBER and (
-            hdop < MAXIMUM_HDOP)
+        gsr = arr[0]
+        fix = arr[2]
+        hdop = float(arr[15])
+        return gsr == 'GSr' and fix == 3 and hdop < MAXIMUM_HDOP
 
 
 @implementer(IParseMessage)

@@ -175,9 +175,7 @@ class GlobalSatTR203(object):
     def parse(self, msg):
         arr = msg.split('*')[0].split(',')
         result = dict()
-        print arr
         for key in self.format.keys():
-            print key
             result[key] = self.convert[key](arr[self.format[key]])
         result['ts'] = int(time.mktime(
             time.strptime(''.join((arr[3], arr[4])), '%d%m%y%H%M%S')))
@@ -186,7 +184,7 @@ class GlobalSatTR203(object):
     def _message_is_good(self, msg):
         arr = msg.split('*')[0].split(',')
         gsr = arr[0]
-        fix = arr[2]
+        fix = int(arr[2])
         return gsr == 'GSr' and fix == 3
 
 

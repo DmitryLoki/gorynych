@@ -184,8 +184,8 @@ class GlobalSatTR203(object):
     def _message_is_good(self, msg):
         arr = msg.split('*')[0].split(',')
         gsr = arr[0]
-        fix = int(arr[2])
-        return gsr == 'GSr' and fix == 3
+        hdop = float(arr[9])
+        return gsr == 'GSr' and hdop <= MAXIMUM_HDOP
 
 
 @implementer(IParseMessage)

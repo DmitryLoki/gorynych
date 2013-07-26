@@ -5,6 +5,9 @@ from shapely.geometry import Point
 from gorynych.common.domain.types import Checkpoint, Name
 from gorynych.info.domain import contest, race
 from gorynych.info.domain.person import PersonID
+from gorynych.info.domain.tracker import TrackerFactory
+from gorynych.info.domain.transport import TransportFactory
+from random import randint
 
 __author__ = 'Boris Tsema'
 
@@ -25,8 +28,8 @@ def create_race(cont=None):
         cont = create_contest(1, 1577822400)
     pid1 = PersonID()
     pid2 = PersonID()
-    r = factory.create_race('Test Race', 'racetogoal',
-                (cont.start_time, cont.end_time), cont.timezone)
+    r = factory.create_race('Test Race', 'racetogoal', cont.timezone, [], [],
+                timelimits=(cont.start_time, cont.end_time))
     r.paragliders['12'] = contest.Paraglider(pid1, Name('Vasya', 'Hyev'),
          'RUSSIA velikaya nasha derzhava Rossia velikaya nasha strana',
          'pizdatyi glider', '12')
@@ -52,3 +55,18 @@ def create_checkpoints():
     ch4 = Checkpoint('g10', Point(43.9658, 6.5578), 'goal',
                      (1347714900, 1347732000), 1000)
     return [ch1, ch2, ch2_ordinal, ch3, ch4]
+
+
+def create_tracker():
+    dev_type = 'tr203'
+    dev_id = '1234567890' + str(randint(1, 100500))
+    tracker = TrackerFactory().create_tracker(device_id=dev_id,
+                                              device_type=dev_type,
+                                              name='trekkie monster' + str(randint(1, 100500)))
+    return tracker
+
+
+def create_transport(transport_type):
+    return TransportFactory().create_transport(transport_type=transport_type,
+                                               title='MyFeet' + str(randint(1, 100500)),
+                                               description='Alive! Safe! Eagle!')

@@ -167,7 +167,7 @@ class GlobalSatTR203(object):
                 raise ValueError("Incorrect checksum")
             # Check message quality.
             if not self._message_is_good(msg):
-                raise ValueError("Bad GPS data or message type.")
+                raise ValueError("Bad GPS or message type.")
         except Exception as e:
             raise ValueError(str(e))
         return msg
@@ -185,7 +185,8 @@ class GlobalSatTR203(object):
         arr = msg.split('*')[0].split(',')
         gsr = arr[0]
         hdop = float(arr[9])
-        return gsr == 'GSr' and hdop <= MAXIMUM_HDOP
+        fix = arr[2]
+        return gsr == 'GSr' and hdop <= MAXIMUM_HDOP and fix == 3
 
 
 @implementer(IParseMessage)

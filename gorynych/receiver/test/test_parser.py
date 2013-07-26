@@ -38,12 +38,11 @@ class GlobalSatTR203Test(ParserTest):
         self.parser = GlobalSatTR203()
 
     def test_parse(self):
-        message = 'GSr,011412001274897,3,3,00,,3,090713,081527,E02445.3853,N4239.2928,546,0.09,318,8,1.3,93,284,01,0e74,0f74,12,24*60!'
+        message = 'GSr,011412001275167,3,250713,212244,E024.705360,N42.648187,440,0,0.8,46*7e!'
         result = self.parser.parse(message)
-        print result
         self._return_type_and_fields(result)
-        self._check_values(result, h_speed=0.1, battery='93', lon=24.756421,
-                           lat=42.65488, imei='011412001274897', alt=546)
+        self._check_values(result, h_speed=0, battery='46', lon=24.705360,
+                           lat=42.648187, imei='011412001275167', alt=440)
 
     def test_correct_checksum(self):
         message = 'GSr,011412001415649,3,3,00,,3,090713,081447,E02445.3951,N4239.2872,536,0.27,28,5,7.2,93,284,01,0e74,0f74,12,27*54!'

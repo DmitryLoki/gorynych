@@ -3,6 +3,7 @@ import simplejson as json
 
 from shapely.geometry import Point
 from gorynych.info.domain.test.helpers import create_checkpoints
+from gorynych.common.domain.services import point_dist_calculator
 
 from gorynych.common.domain import types
 
@@ -174,17 +175,21 @@ class CheckpointTest(unittest.TestCase):
         self.assertIsInstance(res, str)
 
     def test_distance_to(self):
-        point1 = {'geometry': {'type': 'Point', 'coordinates': [0.0, 1.0]},
+        coords1 = [0.0, 1.0]
+        point1 = {'geometry': {'type': 'Point', 'coordinates': coords1},
             'type': 'Feature',
             'properties': {'name': "A01", 'radius': 400,
                 'open_time': 12345, 'close_time': 123456}}
-        point2 = {'geometry': {'type': 'Point', 'coordinates': [0.0, 2.0]},
+        coords2 = [0.0, 2.0]
+        point2 = {'geometry': {'type': 'Point', 'coordinates': coords2},
             'type': 'Feature',
             'properties': {'name': "A01", 'radius': 400,
                 'open_time': 12345, 'close_time': 123456}}
         ch1 = types.Checkpoint.from_geojson(point1)
         ch2 = types.Checkpoint.from_geojson(point2)
-        self.assertEqual(int(ch1.distance_to(ch2)), 111319)
+
+        check_distance = point_dist_calculator(coords1[0], coords1[1], coords2[0], coords2[1])
+        self.assertEqual(ch1.distance_to(ch2), check_distance)
 
 
 if __name__ == '__main__':

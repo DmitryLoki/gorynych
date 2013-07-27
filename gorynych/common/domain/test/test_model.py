@@ -109,7 +109,7 @@ class DomainEventTest(unittest.TestCase):
                       aggregate_type='hello',
                       event_payload='1',
                       occured_on=ts)
-        self.assertEqual(str(ev1), json.dumps(result))
+        self.assertEqual(str(ev1), str(result))
 
     # def test_payload(self):
     #     ts = int(time.time())

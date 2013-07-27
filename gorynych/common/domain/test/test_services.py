@@ -5,7 +5,7 @@ import mock
 
 from gorynych.common.domain.services import times_from_checkpoints, bearing
 from gorynych.common.exceptions import BadCheckpoint
-from info.domain.test.helpers import create_checkpoints
+from gorynych.info.domain.test.helpers import create_checkpoints
 
 
 class TestTimesFromCheckpoints(unittest.TestCase):

@@ -1,7 +1,7 @@
 import unittest
 
 from gorynych.info.domain import transport
-from info.domain.ids import TransportID
+from gorynych.info.domain.ids import TransportID
 
 
 def create_transport(id, type='bUs   ', title='   yELlow bus',

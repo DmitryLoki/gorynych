@@ -6,23 +6,20 @@ from gorynych.info.domain.tracker import Tracker
 from gorynych.info.domain.tracker import TrackerID, TrackerFactory
 
 
-def create_tracker(id, device_id, device_type, event_publisher=None):
-    if not event_publisher:
-        event_publisher = mock.MagicMock()
-    factory = TrackerFactory(event_publisher)
-    tracker = factory.create_tracker(id, device_id, device_type)
-    return tracker
-
+def create_tracker():
+    # if not event_publisher:
+    #     event_publisher = mock.MagicMock()
+    return TrackerFactory().create_tracker(device_id='device_id', device_type=TrackerID.device_types[0])
 
 class TrackerFactoryTest(unittest.TestCase):
     def test_parameters_creation(self):
-        factory = TrackerFactory()
-        tracker = factory.create_tracker(device_id='device_id', device_type='tr203')
+        # factory = TrackerFactory()
+        tracker = create_tracker()
         self.assertIsInstance(tracker, Tracker)
         self.assertEqual(tracker.id, 'tr203-device_id')
         self.assertEqual(tracker.device_id, 'device_id')
         self.assertEqual(tracker.device_type, 'tr203')
-        self.assertEqual(tracker.assignee, None)
+        self.assertEqual(tracker.assignee, {})
         self.assertEqual(tracker.name, '')
         self.assertTrue(tracker.is_free())
 
@@ -34,7 +31,7 @@ class TrackerFactoryTest(unittest.TestCase):
         self.assertEqual(tracker.id, 'tr203-device_id')
         self.assertEqual(tracker.device_id, 'device_id')
         self.assertEqual(tracker.device_type, 'tr203')
-        self.assertEqual(tracker.assignee, None)
+        self.assertEqual(tracker.assignee, {})
         self.assertTrue(tracker.is_free())
 
 
@@ -42,8 +39,7 @@ class TrackerTest(unittest.TestCase):
 
     def setUp(self):
         self.skipTest("Tracker is not number one priority.")
-        self.id = TrackerID(2)
-        self.tracker = create_tracker(self.id, 'device_id', 'tr203')
+        self.tracker = create_tracker()
 
     def tearDown(self):
         del self.tracker

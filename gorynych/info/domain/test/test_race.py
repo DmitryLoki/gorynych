@@ -26,7 +26,7 @@ class RaceFactoryTest(unittest.TestCase):
 
         self.assertEqual(r.type, 'speedrun')
         self.assertEqual(r.checkpoints, chs)
-        self.assertEqual(r.title, 'Task 4')
+        self.assertEqual(r.title, 'task 4')
         self.assertEqual(r.timezone, 'Europe/Amsterdam')
         self.assertTupleEqual((r.start_time, r.end_time),
                               (1347711300, 1347732000))

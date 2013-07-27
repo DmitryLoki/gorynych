@@ -6,7 +6,7 @@ from gorynych.common.domain import events
 from gorynych.info.domain.test.helpers import create_contest
 from gorynych.info.domain import contest, person
 from gorynych.common.domain.types import Address, Name, Country
-from gorynych.info.domain.ids import PersonID, RaceID
+from gorynych.info.domain.ids import PersonID, RaceID, TrackerID
 
 
 class MockedPersonRepository(mock.Mock):
@@ -31,7 +31,7 @@ class ContestFactoryTest(unittest.TestCase):
     def test_contestid_successfull_contest_creation(self):
         cont = create_contest(1, 2)
         self.assertIsInstance(cont.address, Address)
-        self.assertEqual(cont.title, 'Hello World')
+        self.assertEqual(cont.title, 'Hello world')
         self.assertEqual(cont.country, 'RU')
         self.assertEqual(cont.timezone, 'Europe/Moscow')
         self.assertEqual(cont.place, 'Yrupinsk')
@@ -123,7 +123,7 @@ class ContestTest(unittest.TestCase):
     def test_change_title(self):
         cont = create_contest(1, '15')
         cont.title = '  hello moOn  '
-        self.assertEqual(cont.title, 'Hello Moon')
+        self.assertEqual(cont.title, 'hello moOn')
 
     def test_change_address(self):
         cont = create_contest(1, '15')
@@ -188,11 +188,11 @@ class ContestTestWithRegisteredParagliders(unittest.TestCase):
 class ParagliderTest(unittest.TestCase):
     def test_success_creation(self):
         p_id = PersonID()
+        t_id = TrackerID(TrackerID.device_types[0], '123456789012345')
         p = contest.Paraglider(p_id, Name('Vasya', 'Pupkin'),
-                            Country('RU'), 'Mantra 9', 15, 16)
+                            Country('RU'), 'Mantra 9', 15, t_id)
         self.assertEqual(p.person_id, p_id)
         self.assertEqual(p.glider, 'mantra')
         self.assertEqual(p.contest_number, 15)
-        # TODO: uncomment then TrackerID will be implemented.
-        # self.assertEqual(p.tracker_id, TrackerID())
+        self.assertEqual(p.tracker_id, t_id)
 

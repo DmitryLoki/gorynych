@@ -30,13 +30,13 @@ class UDPReceivingProtocol(protocol.DatagramProtocol):
                                     device_type=device_type)
 
 
-class ReceivingProtocol(basic.LineReceiver):
+class MobileReceivingProtocol(basic.LineReceiver):
     '''
     Line receiver protocol. Used by mobile application.
     '''
 
     def lineReceived(self, data):
-        self.factory.service.handle_message(data, proto='TCP')
+        self.factory.service.handle_message(data, proto='TCP', device_type='mobile')
 
 
 class TR203ReceivingProtocol(basic.LineOnlyReceiver):

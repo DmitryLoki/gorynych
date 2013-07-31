@@ -30,13 +30,27 @@ class UDPReceivingProtocol(protocol.DatagramProtocol):
                                     device_type=device_type)
 
 
-class MobileReceivingProtocol(basic.LineReceiver):
+class MobileReceivingProtocol(protocol.Protocol):
     '''
     Line receiver protocol. Used by mobile application.
     '''
+    device_type = 'mobile'
 
-    def lineReceived(self, data):
-        self.factory.service.handle_message(data, proto='TCP', device_type='mobile')
+    def dataReceived(self, data):
+        self.factory.service.handle_message(data, proto='TCP', device_type=self.device_type)
+
+
+class ProtobuffMobileProtocol(protocol.Protocol):
+    """
+    New mobile application protocol, is also used by a satellite modem.
+    """
+    device_type = 'new_mobile'
+
+    def dataReceived(self, data):
+        resp_list = self.factory.service.parsers[self.device_type].get_response(data)
+        for response in resp_list:
+            self.transport.write(response)
+        self.factory.service.handle_message(data, proto='TCP', device_type=self.device_type)
 
 
 class TR203ReceivingProtocol(basic.LineOnlyReceiver):

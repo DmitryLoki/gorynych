@@ -499,8 +499,8 @@ class PGSQLTrackerRepository(BasePGSQLRepository):
             defer.returnValue('')
 
         # something has been changed in assignees
-        to_insert = set(obj.assignee.viewitems()).difference(set(ass))
-        to_delete = set(ass).difference(set(obj.assignee.viewitems()))
+        to_insert = set(obj.assignee.viewitems()).difference(set(ass.items()))
+        to_delete = set(ass.items()).difference(set(obj.assignee.viewitems()))
 
         def update(cur):
             cur.execute(pe.update('tracker'), self._extract_sql_fields(obj))

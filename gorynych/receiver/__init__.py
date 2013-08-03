@@ -12,10 +12,11 @@ class Options(BaseOptions):
         ['webport', 'wb', 8084, None, int]
     ]
 
+
 def makeService(config):
     from gorynych.receiver.receiver import ReceiverRabbitService, ReceiverService, AuditFileLog,\
                                            TR203ReceivingFactory, MobileReceivingFactory, \
-                                           NewMobileReceivingFactory
+                                           GPRSMobileReceivingFactory, SBDMobileReceivingFactory
     from gorynych.receiver.protocols import UDPTR203Protocol, UDPTeltonikaGH3000Protocol
     ####### check_trackers ####
     from gorynych.receiver.online_tester import RetreiveJSON
@@ -58,11 +59,15 @@ def makeService(config):
 
     elif config['tracker'] == 'new_mobile':
         mob_tcp = internet.TCPServer(
-            config['port'], NewMobileReceivingFactory(receiver_service))
+            config['port'], GPRSMobileReceivingFactory(receiver_service))
+        mob_tcp.setServiceParent(sc)
+
+    elif config['tracker'] == 'new_mobile':
+        mob_tcp = internet.TCPServer(
+            config['port'], SBDMobileReceivingFactory(receiver_service))
         mob_tcp.setServiceParent(sc)
 
     root = RetreiveJSON(receiver_service)
     internet.TCPServer(config['webport'], Site(root)).setServiceParent(sc)
 
     return sc
-

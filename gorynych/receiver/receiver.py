@@ -15,8 +15,10 @@ from twisted.python import log
 from pika.connection import ConnectionParameters
 from pika.adapters.twisted_connection import TwistedProtocolConnection
 
-from gorynych.receiver.parsers import GlobalSatTR203, TeltonikaGH3000UDP, MobileTracker, NewMobileTracker
-from gorynych.receiver.protocols import TR203ReceivingProtocol, MobileReceivingProtocol, ProtobuffMobileProtocol
+from gorynych.receiver.parsers import GlobalSatTR203, TeltonikaGH3000UDP,\
+                                      MobileTracker, GPRSParser, SBDParser
+from gorynych.receiver.protocols import TR203ReceivingProtocol, MobileReceivingProtocol,\
+                                        ProtobuffMobileProtocol, IridiumSBDProtocol
 
 ################### Network part ##########################################
 
@@ -37,9 +39,17 @@ class MobileReceivingFactory(protocol.ServerFactory):
         self.service = service
 
 
-class NewMobileReceivingFactory(protocol.ServerFactory):
+class GPRSMobileReceivingFactory(protocol.ServerFactory):
 
     protocol = ProtobuffMobileProtocol
+
+    def __init__(self, service):
+        self.service = service
+
+
+class SBDMobileReceivingFactory(protocol.ServerFactory):
+
+    protocol = IridiumSBDProtocol
 
     def __init__(self, service):
         self.service = service
@@ -288,7 +298,8 @@ class ReceiverRabbitService(RabbitMQService):
 
 class ReceiverService(Service):
     parsers = dict(tr203=GlobalSatTR203(), telt_gh3000=TeltonikaGH3000UDP(),
-                   mobile=MobileTracker(), new_mobile=NewMobileTracker())
+                   mobile=MobileTracker(), new_mobile=GPRSParser(),
+                   new_mobile_sbd=SBDParser())
 
     def __init__(self, sender, audit_log):
         self.sender = sender

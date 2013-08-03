@@ -34,4 +34,4 @@ from tr203 import GlobalSatTR203
 from logonly_tr203 import LogOnlyGlobalSatTR203
 from telt_gh3000 import TeltonikaGH3000UDP
 from old_mobile import MobileTracker
-from new_mobile.parser import NewMobileTracker
+from new_mobile.parser import GPRSParser, SBDParser

@@ -67,14 +67,39 @@ class NewMobileTracker(object):
         for point in reader.unpack():
             self.points.append(point)
 
-    def parse(self, msg):
-        frames = self._split_to_frames(msg)
-        self.points = []
-        for frame in frames:
-            if frame.id not in self.handlers:
-                raise ValueError('Unknown frame id')
-            self.handlers[frame.id](frame.msg)
+    def _parse_frame(self, frame_id, frame_msg):
+        if frame_id not in self.handlers:
+            raise ValueError('Unknown frame id')
+        self.handlers[frame_id](frame_msg)
 
+    def _parse_collection(self, msg):
+        frames = self._split_to_frames(msg)
+        for frame in frames:
+            self._parse_frame(frame.id, frame.msg)
+
+    def check_message_correctness(self, msg):
+        return msg
+
+    def get_response(self, msg):
+        frames = self._split_to_frames(msg)
+        result = []
+        for frame in frames:
+            if frame.id == FrameId.PATHCHUNK:
+                reader = ChunkReader(frame.msg)
+                response = Frame(
+                    FrameId.PATHCHUNK_CONF, reader.make_response())
+                result.append(response.serialize())
+        return result
+
+
+@implementer(IParseMessage)
+class GPRSParser(NewMobileTracker):
+
+    def parse(self, msg):
+        self.points = []
+        self._parse_collection(msg)
+
+        print self.points
         # if no imei encountered, raise error
         if not self.imei:
             raise ValueError('Orphan message; no imei found')
@@ -87,15 +112,29 @@ class NewMobileTracker(object):
         del self.points
         return response
 
-    def check_message_correctness(self, msg):
-        return msg
 
-    def get_response(self, msg):
-        frames = self._split_to_frames(msg)
-        result = []
-        for frame in frames:
-            if frame.id == FrameId.PATHCHUNK:
-                reader = ChunkReader(frame.msg)
-                response = Frame(FrameId.PATHCHUNK_CONF, reader.make_response())
-                result.append(response.serialize())
-        return result
+@implementer(IParseMessage)
+class SBDParser(NewMobileTracker):
+    """
+    Method 'parse' is a little bit different: simple-packed case is allowed,
+    and message is a dict, not a string.
+    """
+
+    def parse(self, msg):
+        # if no imei encountered, raise error
+        if not msg['imei']:
+            raise ValueError('Orphan message; no imei found')
+        self.points = []
+
+        if ord(msg['data'][0]) != MAGIC_BYTE:  # simple-packed frame, no collection
+            self._parse_frame(ord(msg['data'][0]), msg['data'][1:])
+        else:
+            self._parse_collection(msg['data'])
+
+        for point in self.points:
+            point['imei'] = msg.imei
+            point['h_speed'] = 0
+
+        response = self.points
+        del self.points
+        return response

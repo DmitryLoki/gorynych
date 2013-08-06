@@ -1,1 +1,4 @@
-{"id": "$person_id", "name": "$person_name"}
+{
+	"id": "{{ person_id }}",
+	"name": "{{ person_name }}"
+}

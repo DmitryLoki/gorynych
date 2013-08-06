@@ -1,2 +1,10 @@
-{"status":"$status", "progress":{"paragliders_found":$found_contest_numbers,"parsed_tracks":$parsed_contest_numbers, "unparsed_tracks":$unparsed_tracks,
-"tracks_without_paragliders":$extra_tracks, "paragliders_without_tracks":$without_tracks}}
+{
+	"status": "{{ status }}",
+	"progress": {
+		"paragliders_found": {{ found_contest_numbers }},
+		"parsed_tracks": {{ parsed_contest_numbers }},
+		"unparsed_tracks": {{ unparsed_tracks }},
+		"tracks_without_paragliders": {{ extra_tracks }},
+		"paragliders_without_tracks": {{ without_tracks }}
+	}
+}

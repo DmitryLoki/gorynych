@@ -5,6 +5,7 @@ import os
 import re
 import simplejson as json
 from string import Template
+from jinja2 import Environment, PackageLoader
 
 import yaml
 
@@ -22,20 +23,17 @@ class BadParametersError(Exception):
 JSON_TEMPLATES_DIR = 'json_templates'
 YAML_TREE_FILE = 'resources_tree.yaml'
 
-def load_json_templates(dir):
+
+def load_json_templates():
+    env = Environment(loader=PackageLoader('gorynych.info.restui',
+                      JSON_TEMPLATES_DIR))
     result = dict()
-    files_list = filter(os.path.isfile,
-        map(lambda x: os.path.join(dir, x), os.listdir(dir)))
-    for filename in files_list:
-        # read every nonempty *.json file and put content into json_templates
-        if filename.endswith('.json') and os.stat(filename).st_size > 0:
-            result[os.path.basename(filename).split('.')[0]] =\
-                                                Template(open(filename).read())
+    for template_name in env.list_templates():
+        result[template_name.split('.')[0]] = env.get_template(template_name)
     return result
 
 
-JSON_TEMPLATES = load_json_templates(os.path.join(os.path.dirname(__file__),
-    JSON_TEMPLATES_DIR))
+JSON_TEMPLATES = load_json_templates()
 
 
 def json_renderer(template_values, template_name,
@@ -44,7 +42,10 @@ def json_renderer(template_values, template_name,
     def render(value, template):
         ''' Do actual rendering. Return string.
         '''
-        return template.safe_substitute(value)
+        for key in value:
+            if isinstance(value[key], str):
+                value[key] = unicode(value[key], 'utf-8')
+        return template.render(**value).encode('utf-8')
 
     # render empty result
     if not template_values:
@@ -59,10 +60,11 @@ def json_renderer(template_values, template_name,
 
     if isinstance(template_values, list):
         # Result will be json array.
+        # Actually wtf is this?
         result = '[' + render(template_values[0], template)
         for value in template_values[1:]:
             json_obj = render(value, template)
-            result = ','.join((result, json_obj))
+            result = ',\n'.join((result, json_obj))
         result = ''.join((result, ']'))
         return result
 

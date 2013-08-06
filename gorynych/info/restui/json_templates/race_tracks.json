@@ -1,1 +1,6 @@
-{"track_type": "$type", "id": "$track_id", "start_time": $start_time, "end_time": $end_time}
+{
+	"track_type": "{{ type }}",
+	"id": "{{ track_id }}",
+	"start_time": {{ start_time }},
+	"end_time": {{ end_time }}
+}

@@ -1,1 +1,10 @@
-{"race_title":"$race_title","race_type":"$race_type","start_time":"$start_time","end_time":"$end_time","bearing":"$bearing","checkpoints":$checkpoints}
+{
+	"race_title": "{{ race_title }}",
+	"race_type": "{{ race_type }}",
+	"start_time": "{{ start_time }}",
+	"end_time": "{{ end_time }}",
+	{% if bearing != None %}
+		"bearing":"{{ bearing }}",
+	{% endif %}
+	"checkpoints": {{ checkpoints }}
+}

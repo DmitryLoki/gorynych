@@ -1,1 +1,7 @@
-{"id": "$race_id", "type": "$race_type", "title": "$race_title", "start_time": "$race_start_time", "end_time": "$race_end_time"}
+{
+	"id": "{{ race_id }}",
+	"type": "{{ race_type }}",
+	"title": "{{ race_title }}",
+	"start_time": "{{ race_start_time }}",
+	"end_time": "{{ race_end_time }}"
+}

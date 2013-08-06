@@ -98,6 +98,46 @@ def point_dist_calculator(start_lat, start_lon, end_lat, end_lon):
     return c
 
 
+def bearing(start_lat, start_lon, end_lat, end_lon):
+    '''
+    Calculate bearing between points.
+    @param start_lat:
+    @type start_lat:
+    @param start_lon:
+    @type start_lon:
+    @param end_lat:
+    @type end_lat:
+    @param end_lon:
+    @type end_lon:
+    @return:
+    @rtype:
+    '''
+    point1 = (float(start_lat), float(start_lon))
+    point2 = (float(end_lat), float(end_lon))
+    if point1 == point2:
+        return 0
+    lat1 = point1[0] * math.pi / 180
+    lat2 = point2[0] * math.pi / 180
+    lon1 = point1[1] * math.pi / 180
+    lon2 = point2[1] * math.pi / 180
+
+    cl1, cl2 = math.cos(lat1), math.cos(lat2)
+    sl1, sl2 = math.sin(lat1), math.sin(lat2)
+    cdelta = math.cos(lon2 - lon1)
+    sdelta = math.sin(lon2 - lon1)
+
+    # bearing calculation
+    x = (cl1 * sl2) - (sl1 * cl2 * cdelta)
+    y = sdelta * cl2
+    try:
+        z = math.degrees(math.atan(y / x))
+    except ZeroDivisionError:
+        return 0
+    if x < 0:
+        z = z + 180
+    return (z + 360.) % 360.
+
+
 def times_from_checkpoints(checkpoints):
     '''
     Look for checkpoints and get race times from them.

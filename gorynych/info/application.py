@@ -4,7 +4,6 @@ Application Services for info context.
 '''
 import cPickle
 import simplejson as json
-import time
 
 from twisted.internet import defer, task
 from twisted.python import log
@@ -13,7 +12,7 @@ from gorynych.info.domain import contest, person, race, tracker, transport
 from gorynych.common.infrastructure import persistence
 from gorynych.common.domain.types import checkpoint_from_geojson
 from gorynych.common.domain.events import ContestRaceCreated
-from gorynych.common.application import EventPollingService, DBPoolService
+from gorynych.common.application import DBPoolService
 from gorynych.info.domain import interfaces
 from gorynych.receiver.receiver import RabbitMQService
 
@@ -180,17 +179,8 @@ class ApplicationService(BaseApplicationService):
     ############## Person Service part ##############
     def create_new_person(self, params):
         factory = person.PersonFactory()
-        regdate = params.get('reg_date')
-        if regdate:
-            try:
-                year, month, day = regdate.split(',')
-            except ValueError:
-                raise ValueError("Wrong regdate has been passed on pilot creation: %s" % regdate)
-        else:
-            year, month, day = None, None, None
         pers = factory.create_person(params['name'], params['surname'],
-                                     params['country'], params['email'], year,
-                                     month, day)
+                                     params['country'], params['email'])
         d = defer.succeed(pers)
         d.addCallback(persistence.get_repository(person.IPersonRepository).
         save)

@@ -7,13 +7,11 @@ from gorynych.info.domain.tracker import TrackerID, TrackerFactory
 
 
 def create_tracker():
-    # if not event_publisher:
-    #     event_publisher = mock.MagicMock()
-    return TrackerFactory().create_tracker(device_id='device_id', device_type=TrackerID.device_types[0])
+    return TrackerFactory().create_tracker(device_id='device_id',
+        device_type=TrackerID.device_types[0])
 
 class TrackerFactoryTest(unittest.TestCase):
     def test_parameters_creation(self):
-        # factory = TrackerFactory()
         tracker = create_tracker()
         self.assertIsInstance(tracker, Tracker)
         self.assertEqual(tracker.id, 'tr203-device_id')

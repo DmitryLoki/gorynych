@@ -102,8 +102,8 @@ class PersonFactory(object):
     # Person can hold additional data of those types.
     person_data_types = ['phone']
 
-    def create_person(self, name, surname, country, email, year=None,
-            month=None, day=None, person_id=None, **person_data):
+    def create_person(self, name, surname, country, email, person_id=None,
+            **person_data):
         '''
         Create an instance of Person aggregate.
         @param name:

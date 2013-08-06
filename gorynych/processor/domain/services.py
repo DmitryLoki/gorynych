@@ -370,6 +370,8 @@ class OfflineCorrectorService:
         @rtype:
         '''
         data = ma.masked_inside(track['timestamp'], stime, etime)
+        if data.mask is False:
+            raise ValueError("Track not from this task.")
         track = track.compress(data.mask)
         # Eliminate repetitive points.
         times, indices = np.unique(track['timestamp'], return_index=True)
@@ -430,6 +432,13 @@ class ParagliderSkyEarth(object):
     t_speed = 10
 
     def __init__(self, trackstate):
+        '''
+
+        @param trackstate:
+        @type trackstate: gorynych.processor.domain.track.TrackState
+        @return:
+        @rtype:
+        '''
         self._bs = trackstate.become_slow
         self._bf = trackstate.become_fast
         self._in_air = trackstate.in_air
@@ -442,8 +451,6 @@ class ParagliderSkyEarth(object):
 
         @param data:
         @type data: numpy.ndarray
-        @param trackstate:
-        @type trackstate: gorynych.processor.domain.track.TrackState
         @return:
         @rtype:
         '''

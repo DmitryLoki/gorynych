@@ -86,7 +86,13 @@ class OpenDistance(object):
     def __init__(self, task, checkpoints):
         self.checkpoints = checkpoints
         self.task = task
-        self.bearing = int(task['bearing']) if task.get('bearing') else None
+        _bearing = task.get('bearing')
+        if not _bearing or _bearing == "None":
+            self.bearing = None
+        else:
+            self.bearing = int(_bearing)
+        self.start_time = int(task['start_time'])
+        self.end_time = int(task['end_time'])
 
     def process(self, points, trackstate, _id):
         '''
@@ -120,7 +126,8 @@ class OpenDistance(object):
                             occured_on=p['timestamp']))
                     if self._checkpoint_is_last(lastchp_num + 1):
                         return self._calculate_last_leg(points,
-                            previous_leg, eventlist=eventlist, from_idx=idx)
+                            previous_leg, eventlist=eventlist,
+                            from_idx=idx[0])
                     else:
                         nextchp = self.checkpoints[lastchp_num + 2]
                         lastchp_num += 1

@@ -204,7 +204,7 @@ class CylinderCheckpointAdapter(object):
 
 
 class RaceTypesFactory(object):
-    races = dict(racetogoal=RaceToGoal)
+    races = dict(racetogoal=RaceToGoal, opendistance=OpenDistance)
     error_margin = dict(online={'es': 10, 'goal': 10, 'default': 1000},
         competition_aftertask={'es': 10, 'goal': 10, 'default': 50})
 
@@ -216,11 +216,11 @@ class RaceTypesFactory(object):
         '''
         assert isinstance(rtask, dict), "Race task must be dict."
         try:
-            race = self.races[rtask.get('race_type', 'racetogoal')]
+            race = self.races[rtask['race_type']]
         except KeyError:
             raise ValueError("No such race type %s" % rtask.get('race_type'))
         checkpoints = checkpoint_collection_from_geojson(rtask['checkpoints'])
-        points, dist = services.JavaScriptShortWay().calculate(checkpoints)
+        points, _ = services.JavaScriptShortWay().calculate(checkpoints)
         race_checkpoints = []
         for i, ch in enumerate(checkpoints):
             if ch.geometry.geom_type == 'Point':
@@ -248,4 +248,12 @@ class RaceTypesFactory(object):
         race_checkpoints.reverse()
         return race_checkpoints
 
+    def _distances_for_opendistance(self, race_checkpoints):
+        if len(race_checkpoints) == 1:
+            return race_checkpoints
+        for idx, p in enumerate(race_checkpoints[1:]):
+            dist_from_prev = p.dist_to_point(
+                race_checkpoints[idx].opt_lat, race_checkpoints[idx].opt_lon)
+            p.distance = race_checkpoints[idx].distance + dist_from_prev
+        return race_checkpoints
 

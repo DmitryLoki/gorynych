@@ -6,6 +6,7 @@ from copy import deepcopy
 import pytz
 from zope.interface.interfaces import Interface
 
+from gorynych.info.domain import race
 from gorynych.common.domain.model import AggregateRoot, ValueObject
 from gorynych.common.domain.types import Address, Country, Name
 from gorynych.common.domain.events import ParagliderRegisteredOnContest
@@ -354,3 +355,35 @@ def change(cont, params):
         setattr(cont, param, params[param])
     return cont
 
+
+def create_race_for_contest(cont, person_list,
+                            transport_list, race_params):
+    paragliders = cont.paragliders
+    persons = {p.id: p for p in person_list}
+    plist = []
+
+    for key in paragliders:
+        pers = persons[key]
+        plist.append(Paraglider(key, pers.name, pers.country,
+                     paragliders[key]['glider'],
+                     paragliders[key]['contest_number'],
+                     pers.trackers.get(cont.id)))
+
+    factory = race.RaceFactory()
+    r = factory.create_race(race_params['title'], race_params['race_type'],
+                            cont.timezone, plist,
+                            race_params['checkpoints'],
+                            bearing=race_params.get('bearing'),
+                            transport=transport_list,
+                            timelimits=(cont.start_time, cont.end_time))
+    return r
+
+
+def change_contest_participant(cont, participant_data):
+    if 'glider' in participant_data:
+        cont.change_participant_data(participant_data['person_id'],
+                                     glider=participant_data['glider'])
+    if 'contest_number' in participant_data:
+        cont.change_participant_data(participant_data['person_id'],
+                                     contest_number=participant_data['contest_number'])
+    return cont

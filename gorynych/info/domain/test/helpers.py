@@ -73,10 +73,7 @@ def create_transport(transport_type):
 
 
 def create_person(name='John', surname='Doe',
-                  country='UA', email='johndoe@example.com', reg_year=None,
-                  reg_month=None,
-                  reg_day=None, id=None):
+                  country='UA', email='johndoe@example.com', id=None):
     factory = person.PersonFactory()
-    pers = factory.create_person(name, surname, country, email, reg_year,
-                                 reg_month, reg_day, id)
+    pers = factory.create_person(name, surname, country, email, id)
     return pers

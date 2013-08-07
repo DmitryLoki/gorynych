@@ -5,6 +5,7 @@ __author__ = 'Boris Tsema'
 from collections import defaultdict
 from copy import deepcopy
 import re
+import json
 
 import pytz
 from zope.interface.interfaces import Interface
@@ -19,6 +20,7 @@ from gorynych.common.domain.events import ArchiveURLReceived, \
 from gorynych.common.infrastructure import persistence
 from gorynych.common.exceptions import TrackArchiveAlreadyExist
 from gorynych.info.domain.ids import RaceID
+from gorynych.common.domain.types import checkpoint_from_geojson
 
 PATTERN = r'https?://airtribune.com/\w+'
 #PATTERN = r'https?://localhost:8080/\w+'
@@ -344,3 +346,38 @@ class IRaceRepository(Interface):
 
 def change_race_transport(rc, params):
     return rc
+
+
+def change_race(contest_race, race_params):
+    '''
+    Change information about race in contest.
+    @param params:
+    @type params:
+    @return: Race
+    @rtype:
+    '''
+    if 'checkpoints' in race_params:
+        if isinstance(race_params['checkpoints'], (str, unicode)):
+            try:
+                ch_list = json.loads(
+                    race_params['checkpoints'])['features']
+            except Exception as e:
+                raise ValueError(
+                    "Problems with checkpoint reading: %r .Got %s, %r" %
+                                (e, type(race_params['checkpoints']),
+                                    race_params['checkpoints']))
+        elif isinstance(race_params['checkpoints'], dict):
+            ch_list = race_params['checkpoints']['features']
+        else:
+            raise ValueError(
+                "Problems with checkpoint reading: got %s, %r" %
+                (type(race_params['checkpoints']), race_params['checkpoints']))
+        checkpoints = []
+        for ch in ch_list:
+            checkpoints.append(checkpoint_from_geojson(ch))
+        contest_race.checkpoints = checkpoints
+    if 'race_title' in race_params:
+        contest_race.title = race_params['race_title']
+    if 'bearing' in race_params:
+        contest_race.bearing = race_params['bearing']
+    return contest_race

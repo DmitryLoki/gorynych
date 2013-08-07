@@ -14,7 +14,9 @@ from gorynych.common.domain.types import checkpoint_from_geojson
 from gorynych.common.domain.events import ContestRaceCreated
 from gorynych.common.application import DBPoolService
 from gorynych.info.domain import interfaces
-from gorynych.info.domain.services import ContestRaceService
+from gorynych.info.domain.contest import create_race_for_contest,\
+                                         change_contest_participant
+from gorynych.info.domain.race import change_race
 from gorynych.receiver.receiver import RabbitMQService
 
 
@@ -160,21 +162,11 @@ class ApplicationService(BaseApplicationService):
         @return:
         @rtype:
         '''
-
-        def change(cont):
-            if params.has_key('glider'):
-                cont.change_participant_data(params['person_id'],
-                                             glider=params['glider'])
-            if params.has_key('contest_number'):
-                cont.change_participant_data(params['person_id'],
-                                     contest_number=params['contest_number'])
-            return cont
-
         d = self._get_aggregate(params['contest_id'],
                                 contest.IContestRepository)
-        d.addCallback(change)
+        d.addCallback(lambda cont: change_contest_participant(cont, params))
         d.addCallback(persistence.get_repository(contest.IContestRepository)
-        .save)
+                      .save)
         return d
 
 
@@ -208,20 +200,27 @@ class ApplicationService(BaseApplicationService):
         cont = yield self._get_aggregate(params['contest_id'],
                                          contest.IContestRepository)
         person_list = []
+        # TODO: make it thinner.
         for key in cont.paragliders:
+            # TODO: do less db queries for transport.
             pers = yield self._get_aggregate(key, person.IPersonRepository)
             person_list.append(pers)
+
+        # TODO: do in domain model style. Think before.
+        # [(type, title, desc, tracker_id, transport_id),]
         transport_list = yield self.pool.runQuery(
             persistence.select('transport_for_contest', 'transport'),
                               (str(cont.id),))
         
-        new_race = ContestRaceService().create_new_race_for_contest(cont,
-                                                                    person_list,
-                                                                    transport_list,
-                                                                    params)
-        yield persistence.get_repository(race.IRaceRepository).save(new_race)
-        yield lambda _: persistence.event_store().persist(ContestRaceCreated(
-            cont.id, new_race.id))
+        new_race = create_race_for_contest(cont,
+                                           person_list,
+                                           transport_list,
+                                           params)
+        # TODO: do it transactionally.
+        d = persistence.get_repository(race.IRaceRepository).save(new_race)
+        d.addCallback(lambda _: persistence.event_store().persist(ContestRaceCreated(
+            cont.id, new_race.id)))
+        yield d
         defer.returnValue(new_race)
         
     def get_contest_races(self, params):
@@ -262,7 +261,7 @@ class ApplicationService(BaseApplicationService):
         @rtype:
         '''
         d = self.get_race(params)
-        d.addCallback(lambda r: ContestRaceService().change_contest_race(r, params))
+        d.addCallback(lambda r: change_race(r, params))
         d.addCallback(persistence.get_repository(race.IRaceRepository).save)
         return d
 
@@ -282,10 +281,10 @@ class ApplicationService(BaseApplicationService):
         ttype = params.get('type')
         if ttype and ttype == 'online':
             group_id = group_id + '_online'
-        def filtr(rows):
-            if not ttype:
-                return rows
-            return filter(lambda row:row[0] == ttype, rows)
+        # def filtr(rows):
+        #     if not ttype:
+        #         return rows
+        #     return filter(lambda row:row[0] == ttype, rows)
         d = self.pool.runQuery(persistence.select('tracks', 'track'),
             (group_id,))
         # d.addCallback(filtr)

@@ -3,7 +3,7 @@ Functions used in other tests.
 '''
 from shapely.geometry import Point
 from gorynych.common.domain.types import Checkpoint, Name
-from gorynych.info.domain import contest, race
+from gorynych.info.domain import contest, race, person
 from gorynych.info.domain.person import PersonID
 from gorynych.info.domain.tracker import TrackerFactory
 from gorynych.info.domain.transport import TransportFactory
@@ -70,3 +70,13 @@ def create_transport(transport_type):
     return TransportFactory().create_transport(transport_type=transport_type,
                                                title='MyFeet' + str(randint(1, 100500)),
                                                description='Alive! Safe! Eagle!')
+
+
+def create_person(name='John', surname='Doe',
+                  country='UA', email='johndoe@example.com', reg_year=None,
+                  reg_month=None,
+                  reg_day=None, id=None):
+    factory = person.PersonFactory()
+    pers = factory.create_person(name, surname, country, email, reg_year,
+                                 reg_month, reg_day, id)
+    return pers

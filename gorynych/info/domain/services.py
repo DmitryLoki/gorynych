@@ -21,7 +21,7 @@ class ContestRaceService(object):
             plist.append(contest.Paraglider(key, pers.name, pers.country,
                          paragliders[key]['glider'],
                          paragliders[key]['contest_number'],
-                         pers.trackers.get(race_params['contest_id'])))
+                         pers.trackers.get(cont.id)))
 
         factory = race.RaceFactory()
         r = factory.create_race(race_params['title'], race_params['race_type'],

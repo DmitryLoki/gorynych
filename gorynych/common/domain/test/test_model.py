@@ -2,7 +2,6 @@ import unittest
 import time
 import uuid
 
-import simplejson as json
 import mock
 from zope.interface.verify import verifyObject
 from zope.interface.exceptions import DoesNotImplement
@@ -110,19 +109,6 @@ class DomainEventTest(unittest.TestCase):
                       event_payload='1',
                       occured_on=ts)
         self.assertEqual(str(ev1), str(result))
-
-    # def test_payload(self):
-    #     ts = int(time.time())
-    #     ev1 = model.DomainEvent(1, 1, 'hello', ts)
-    #     self.assertIsInstance(ev1._payload_to_bytes(), bytes)
-
-        # d = dict(name='Vasya')
-        # ev1 = model.DomainEvent(1, d, d, ts)
-        # self.assertEqual(ev1._payload_to_bytes(), bytes(json.dumps(d)))
-
-        # d = TestID()
-        # ev1 = model.DomainEvent(1, d, d, ts)
-        # self.assertEqual(ev1._payload_to_bytes(), str(d))
 
 
 class AggregateRootTest(unittest.TestCase):

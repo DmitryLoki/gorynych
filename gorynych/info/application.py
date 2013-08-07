@@ -15,10 +15,12 @@ from gorynych.common.domain.types import checkpoint_from_geojson
 from gorynych.common.domain.events import ContestRaceCreated
 from gorynych.common.application import EventPollingService, DBPoolService
 from gorynych.info.domain import interfaces
+from gorynych.info.domain.services import ContestRaceService
 from gorynych.receiver.receiver import RabbitMQService
 
 
 class BaseApplicationService(DBPoolService):
+
     def _get_aggregate(self, id, repository):
         d = defer.succeed(id)
         d.addCallback(persistence.get_repository(repository).get_by_id)
@@ -214,37 +216,24 @@ class ApplicationService(BaseApplicationService):
     @defer.inlineCallbacks
     def create_new_race_for_contest(self, params):
         cont = yield self._get_aggregate(params['contest_id'],
-                                contest.IContestRepository)
-        paragliders = cont.paragliders
-        plist = []
-        # TODO: make it thinner.
-        for key in paragliders:
-            # TODO: do less db queries for transport.
+                                         contest.IContestRepository)
+        person_list = []
+        for key in cont.paragliders:
             pers = yield self._get_aggregate(key, person.IPersonRepository)
-            plist.append(contest.Paraglider(key, pers.name, pers.country,
-                         paragliders[key]['glider'],
-                         paragliders[key]['contest_number'],
-                         pers.trackers.get(params['contest_id'])))
-        # TODO: do in domain model style. Think before.
-        # [(type, title, desc, tracker_id, transport_id),]
-        tr_dtos = yield self.pool.runQuery(
+            person_list.append(pers)
+        transport_list = yield self.pool.runQuery(
             persistence.select('transport_for_contest', 'transport'),
-                                                        (str(cont.id),))
-
-        factory = race.RaceFactory()
-        r = factory.create_race(params['title'], params['race_type'],
-                                   cont.timezone, plist,
-                                   params['checkpoints'],
-                                   bearing=params.get('bearing'),
-                                   transport=tr_dtos,
-                                timelimits=(cont.start_time, cont.end_time))
-        # TODO: do it transactionally.
-        d = persistence.get_repository(race.IRaceRepository).save(r)
-        d.addCallback(lambda _:persistence.event_store().persist(ContestRaceCreated(
-            cont.id, r.id)))
-        yield d
-        defer.returnValue(r)
-
+                              (str(cont.id),))
+        
+        new_race = ContestRaceService().create_new_race_for_contest(cont,
+                                                                    person_list,
+                                                                    transport_list,
+                                                                    params)
+        yield persistence.get_repository(race.IRaceRepository).save(new_race)
+        yield lambda _: persistence.event_store().persist(ContestRaceCreated(
+            cont.id, new_race.id))
+        defer.returnValue(new_race)
+        
     def get_contest_races(self, params):
         '''
         Return list of races for contest.
@@ -282,30 +271,8 @@ class ApplicationService(BaseApplicationService):
         @return: Race
         @rtype:
         '''
-        def change(r):
-            if params.has_key('checkpoints'):
-                # TODO: make in thinner
-                if isinstance(params['checkpoints'], str):
-                    try:
-                        ch_list = json.loads(params['checkpoints'])['features']
-                    except Exception as e:
-                        raise ValueError("Problems with checkpoint reading: %r .Got %s, %r" % (e, type(params['checkpoints']), params['checkpoints']))
-                elif isinstance(params['checkpoints'], dict):
-                    ch_list = params['checkpoints']['features']
-                else:
-                    raise ValueError("Problems with checkpoint reading: got %s, %r" % (type(params['checkpoints']), params['checkpoints']))
-                checkpoints = []
-                for ch in ch_list:
-                    checkpoints.append(checkpoint_from_geojson(ch))
-                r.checkpoints = checkpoints
-            if params.has_key('race_title'):
-                r.title = params['race_title']
-            if params.has_key('bearing'):
-                r.bearing = params['bearing']
-            return r
-
         d = self.get_race(params)
-        d.addCallback(change)
+        d.addCallback(lambda r: ContestRaceService().change_contest_race(r, params))
         d.addCallback(persistence.get_repository(race.IRaceRepository).save)
         return d
 
@@ -406,4 +373,3 @@ class LastPointApplication(RabbitMQService):
             return self.pool.runOperation(persistence.update('last_point',
                 'tracker'), (data['lat'], data['lon'], data['alt'], data['ts'],
             data.get('battery'), data['h_speed'], data['imei']))
-

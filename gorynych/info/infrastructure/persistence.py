@@ -109,9 +109,6 @@ class PGSQLPersonRepository(BasePGSQLRepository):
                 data_row[1],
                 data_row[2],
                 data_row[3],
-                regdate.year,
-                regdate.month,
-                regdate.day,
                 data_row[5])
             result._id = data_row[6]
             return result

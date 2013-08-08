@@ -30,10 +30,10 @@ def create_race(cont=None):
     pid2 = PersonID()
     r = factory.create_race('Test Race', 'racetogoal', cont.timezone, [], [],
                 timelimits=(cont.start_time, cont.end_time))
-    r.paragliders['12'] = contest.Paraglider(pid1, Name('Vasya', 'Hyev'),
+    r.paragliders['12'] = race.Paraglider(pid1, Name('Vasya', 'Hyev'),
          'RUSSIA velikaya nasha derzhava Rossia velikaya nasha strana',
          'pizdatyi glider', '12')
-    r.paragliders['13'] = contest.Paraglider(pid2, Name('John', 'Doe'),
+    r.paragliders['13'] = race.Paraglider(pid2, Name('John', 'Doe'),
         'Ya nenavizhy etot ebannyi test i mena zaeblo eto pisat',
         'hyevyi glider', '13')
     r._checkpoints = create_checkpoints()

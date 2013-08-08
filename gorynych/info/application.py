@@ -164,7 +164,7 @@ class ApplicationService(BaseApplicationService):
         '''
         d = self._get_aggregate(params['contest_id'],
                                 contest.IContestRepository)
-        d.addCallback(lambda cont: change_contest_participant(cont, params))
+        d.addCallback(change_contest_participant, params)
         d.addCallback(persistence.get_repository(contest.IContestRepository)
                       .save)
         return d

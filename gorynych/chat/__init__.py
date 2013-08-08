@@ -10,6 +10,9 @@ from twisted.python import components
 from gorynych import BaseOptions
 from gorynych.chat.application import IChatService
 from gorynych.chat.restui.resources import WebChat
+from gorynych.common.infrastructure import persistence
+from gorynych.eventstore.eventstore import EventStore
+from gorynych.eventstore.store import PGSQLAppendOnlyStore
 
 class Options(BaseOptions):
     optParameters = [
@@ -27,9 +30,14 @@ def makeService(config):
         password=config['dbpassword'],
         host=config['dbhost'])
 
+    event_store = EventStore(PGSQLAppendOnlyStore(pool))
+    persistence.add_event_store(event_store)
+
     s = service.MultiService()
     r = MessageRepository(pool)
-    ca = ChatApplication(r, AuthenticationService(pool))
+    ca = ChatApplication(pool, event_store,
+                         repo=r,
+                         auth_service=AuthenticationService(pool))
     ca.setServiceParent(s)
 
     # website

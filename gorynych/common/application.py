@@ -18,7 +18,7 @@ class EventPollingService(Service):
     Start to read events from db on start.
     '''
     dont_dispatch = set(['PersonGotTrack', 'PointsAddedToTrack', 'RaceCheckpointsChanged',
-        'ContestRaceCreated', 'ParagliderRegisteredOnContest', 'TrackCheckpointTaken', 'TrackFinished',
+        'ParagliderRegisteredOnContest', 'TrackCheckpointTaken', 'TrackFinished',
         'TrackFinishTimeReceived', 'TrackStarted', 'TrackEnded', 'TrackCreated', 'TrackArchiveUnpacked', 'TrackArchiveParsed', 'TrackWasNotParsed', 'TrackerAssigned', 'TrackerUnAssigned', 'TrackInAir', 'TrackSlowedDown',
         'TrackSpeedExceeded', 'TrackLanded'])
     polling_interval = 1

@@ -3,7 +3,8 @@ import json
 __author__ = 'Boris Tsema'
 
 from zope.interface import Interface, implementer
-from twisted.application.service import Service
+from twisted.internet import defer
+from gorynych.common.application import EventPollingService
 
 from gorynych.chat.domain.model import MessageFactory
 
@@ -38,12 +39,11 @@ class IChatService(Interface):
 
 
 @implementer(IChatService)
-class ChatApplication(Service):
+class ChatApplication(EventPollingService):
     factory = MessageFactory()
 
-    def __init__(self, repo, auth_service):
+    def __init__(self, pool, event_store, repo, auth_service):
         '''
-
         @param repo:
         @type repo:
         @param auth_service:
@@ -52,6 +52,7 @@ class ChatApplication(Service):
         @return:
         @rtype:
         '''
+        EventPollingService.__init__(self, pool, event_store)
         self.repository = repo
         self.auth_service = auth_service
 
@@ -117,3 +118,14 @@ class ChatApplication(Service):
         d = self.repository.pool.runQuery(query, (phone,))
         d.addCallback(result)
         return d
+
+    @defer.inlineCallbacks
+    def process_ContestRaceCreated(self, ev):
+        race_id = ev.payload
+        query = """
+            INSERT INTO
+                chatrooms(chatroom_name)
+            VALUES(%s)
+        """
+        yield self.repository.pool.runOperation(query, (str(race_id),))
+        yield self.event_dispatched(ev.id)

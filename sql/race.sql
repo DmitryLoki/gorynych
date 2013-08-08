@@ -109,7 +109,7 @@ WHERE
 
 
 -- select transport
-select * from transport where id=%s;
+select * from race_transport where id=%s;
 
 
 -- Select race_transport

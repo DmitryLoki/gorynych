@@ -285,7 +285,7 @@ class PGSQLRaceRepository(BasePGSQLRepository):
             cur.execute("DELETE FROM race_transport WHERE id=%s AND "
                         "transport_id in %s", (obj._id, ids))
         if to_insert_tr:
-            q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s)",
+            q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s)",
                 (pitem)) for pitem in to_insert_tr)
             cur.execute("INSERT INTO race_transport VALUES " + q)
         return obj
@@ -302,8 +302,9 @@ class PGSQLRaceRepository(BasePGSQLRepository):
         bearing = ''
         if obj.type == 'opendistance':
             if obj.task.bearing is None:
-                raise ValueError("Race doesn't have a bearing.")
-            bearing = json.dumps(dict(bearing=int(obj.task.bearing)))
+                bearing = None
+            else:
+                bearing = json.dumps(dict(bearing=int(obj.task.bearing)))
         result['race'] = (obj.title, obj.start_time, obj.end_time,
         obj.timezone, obj.type,
         geojson_feature_collection(obj.checkpoints),

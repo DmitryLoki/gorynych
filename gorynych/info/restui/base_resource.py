@@ -5,7 +5,6 @@ import os
 import re
 import simplejson as json
 from string import Template
-from jinja2 import Environment, PackageLoader
 
 import yaml
 
@@ -13,6 +12,7 @@ from twisted.web import resource, server
 from twisted.internet import defer
 from twisted.python import log
 
+from gorynych.common.infrastructure.encoders import InfoJsonEncoder
 from gorynych.common.exceptions import NoAggregate, DomainError
 
 class BadParametersError(Exception):
@@ -20,60 +20,16 @@ class BadParametersError(Exception):
     Raised when bad parameters has been passed to the system.
     '''
 
-JSON_TEMPLATES_DIR = 'json_templates'
 YAML_TREE_FILE = 'resources_tree.yaml'
 
 
-def load_json_templates():
-    env = Environment(loader=PackageLoader('gorynych.info.restui',
-                      JSON_TEMPLATES_DIR))
-    result = dict()
-    for template_name in env.list_templates():
-        result[template_name.split('.')[0]] = env.get_template(template_name)
-    return result
+def json_renderer(data, template_name=None):
 
-
-JSON_TEMPLATES = load_json_templates()
-
-
-def json_renderer(template_values, template_name,
-                  templates_dict=JSON_TEMPLATES):
-
-    def render(value, template):
-        ''' Do actual rendering. Return string.
-        '''
-        for key in value:
-            if isinstance(value[key], str):
-                value[key] = unicode(value[key], 'utf-8')
-        return template.render(**value).encode('utf-8')
-
-    # render empty result
-    if not template_values:
-        return "{}"
-    if isinstance(template_values, str):
-        return template_values
-
-    # get template from a dict
-    template = templates_dict.get(template_name)
-    if not template:
-        raise ValueError("Template with such name doesn't exist.")
-
-    if isinstance(template_values, list):
-        # Result will be json array.
-        # Actually wtf is this?
-        result = '[' + render(template_values[0], template)
-        for value in template_values[1:]:
-            json_obj = render(value, template)
-            result = ',\n'.join((result, json_obj))
-        result = ''.join((result, ']'))
-        return result
-
-    elif isinstance(template_values, dict):
-        return render(template_values, template)
-    else:
-        raise TypeError("Dictionary must be passed as container for template"
-                        " values.")
-
+    try:
+        return json.dumps(data, cls=InfoJsonEncoder)
+    except TypeError as e:
+        raise TypeError('Failed to encode json response: {}'.format(e.message))
+        
 
 def resource_tree(filename=os.path.join(os.path.dirname(__file__),
                                 YAML_TREE_FILE)):

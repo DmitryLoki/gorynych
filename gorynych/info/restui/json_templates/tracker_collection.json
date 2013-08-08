@@ -1,7 +1,0 @@
-{
-	"id": "{{ id }}",
-	"name": "{{ name }}",
-	"device_id": "{{ device_id }}",
-	"device_type": "{{ device_type }}",
-	"last_point": {{ last_point }}
-}

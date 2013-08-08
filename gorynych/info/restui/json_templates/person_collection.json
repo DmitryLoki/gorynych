@@ -1,4 +1,0 @@
-{
-	"id": "{{ person_id }}",
-	"name": "{{ person_name }}"
-}

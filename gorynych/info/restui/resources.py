@@ -22,8 +22,8 @@ class ContestResourceCollection(APIResource):
 
     def read_POST(self, cont, request_params=None):
         if cont:
-            return dict(contest_title=cont.title,
-                        contest_id=cont.id,
+            return dict(title=cont.title,
+                        id=cont.id,
                         contest_country_code=cont.country,
                         contest_start_date=cont.start_time,
                         contest_end_date=cont.end_time)
@@ -32,8 +32,8 @@ class ContestResourceCollection(APIResource):
         if cont_list:
             result = []
             for cont in cont_list:
-                result.append(dict(contest_id=cont.id,
-                                   contest_title=cont.title,
+                result.append(dict(id=cont.id,
+                                   title=cont.title,
                                    contest_start_time=cont.start_time,
                                    contest_end_time=cont.end_time))
             return result
@@ -51,13 +51,13 @@ class ContestResource(APIResource):
         '''
         @type cont: gorynych.info.domain.contest.Contest
         '''
-        return dict(contest_title=cont.title,
-            contest_id=cont.id,
-            contest_country_code=cont.country,
-            contest_start_date=cont.start_time,
-            contest_end_date=cont.end_time,
-            contest_coords=json.dumps(cont.hq_coords),
-            retrieve_id=json.dumps(cont.retrieve_id))
+        return dict(title=cont.title,
+            id=cont.id,
+            country=cont.country,
+            start_time=cont.start_time,
+            end_time=cont.end_time,
+            coords=cont.hq_coords,
+            retrieve_id=cont.retrieve_id)
 
     def read_GET(self, cont, request_params=None):
         if cont:
@@ -85,21 +85,21 @@ class ContestRaceResourceCollection(APIResource):
 
     def read_POST(self, race, request_params=None):
         if race:
-            return dict(race_type=race.type,
-                        race_title=race.title,
-                        race_id=race.id,
-                        race_start_time=race.start_time,
-                        race_end_time=race.end_time)
+            return dict(type=race.type,
+                        title=race.title,
+                        id=race.id,
+                        start_time=race.start_time,
+                        end_time=race.end_time)
 
     def read_GET(self, race_list, request_params=None):
         result = []
         if race_list:
             for race in race_list:
-                result.append(dict(race_id=race.id,
-                                   race_title=race.title,
-                                   race_start_time=race.start_time,
-                                   race_end_time=race.end_time,
-                                   race_type=race.type))
+                result.append(dict(id=race.id,
+                                   title=race.title,
+                                   start_time=race.start_time,
+                                   end_time=race.end_time,
+                                   type=race.type))
         return result
 
 
@@ -120,7 +120,7 @@ class ContestRaceResource(APIResource):
             result['timeoffset'] = datetime.fromtimestamp(result[
                 'start_time'],
                 pytz.timezone(cont.timezone)).strftime('%z')
-            result['opt_dist'] = "%0.1f" % (r.optimum_distance/1000)
+            result['optdistance'] = "%0.1f" % (r.optimum_distance/1000)
             return result
 
     def read_PUT(self, r, request_params=None):
@@ -134,7 +134,7 @@ class ContestRaceResource(APIResource):
             checkpoints = {'type': 'FeatureCollection', 'features': []}
             for ch in r.checkpoints:
                 checkpoints['features'].append(ch.__geo_interface__)
-            result['checkpoints'] = json.dumps(checkpoints)
+            result['checkpoints'] = checkpoints
             return result
 
 
@@ -150,7 +150,7 @@ class ContestParagliderResourceCollection(APIResource):
         par_id = request_params.get('person_id')
         if cont and par_id and cont.paragliders:
             return dict(person_id=par_id,
-                    contest_number=cont.paragliders[par_id]['contest_number'],
+                    contest_number=str(cont.paragliders[par_id]['contest_number']),
                     glider=cont.paragliders[par_id]['glider'])
 
     def read_GET(self, p_dicts, request_params=None):
@@ -176,7 +176,7 @@ class ContestParagliderResource(APIResource):
         par_id = request_params.get('person_id')
         if cont and par_id and cont.paragliders:
             return dict(person_id=par_id,
-                    contest_number=cont.paragliders[par_id]['contest_number'],
+                    contest_number=str(cont.paragliders[par_id]['contest_number']),
                     glider=cont.paragliders[par_id]['glider'])
 
 
@@ -192,14 +192,14 @@ class PersonResourceCollection(APIResource):
         if pers_list:
             result = []
             for pers in pers_list:
-                result.append(dict(person_id=pers.id,
-                                   person_name=pers.name.full()))
+                result.append(dict(id=pers.id,
+                                   name=pers.name.full()))
             return result
 
     def read_POST(self, pers, request_params=None):
         if pers:
-            return dict(person_name=pers.name.full(),
-                        person_id=pers.id,
+            return dict(name=pers.name.full(),
+                        id=pers.id,
                         person_country=pers.country)
 
 
@@ -216,10 +216,10 @@ class PersonResource(APIResource):
             trackers = []
             for t in pers.trackers:
                 trackers.append([str(pers.trackers[t]), str(t)])
-            response = dict(person_name=pers.name.full(),
-                            person_id=pers.id,
-                            person_country=pers.country,
-                            trackers=json.dumps(trackers))
+            response = dict(name=pers.name.full(),
+                            id=pers.id,
+                            country=pers.country,
+                            trackers=trackers)
             return response
 
     def read_GET(self, pers, request_params=None):
@@ -238,7 +238,7 @@ class RaceParagliderResourceCollection(APIResource):
         if r:
             result = []
             for key in r.paragliders:
-                result.append(dict(contest_number=key,
+                result.append(dict(contest_number=str(key),
                                    glider=r.paragliders[key].glider,
                                    name=r.paragliders[key].name,
                                    person_id=r.paragliders[key].person_id,
@@ -266,7 +266,7 @@ class RaceResource(APIResource):
             checkpoints = {'type': 'FeatureCollection', 'features': []}
             for ch in r.checkpoints:
                 checkpoints['features'].append(ch.__geo_interface__)
-            result['checkpoints'] = json.dumps(checkpoints)
+            result['checkpoints'] = checkpoints
             return result
 
 
@@ -302,11 +302,11 @@ class TrackArchiveResource(APIResource):
                 else:
                     result[key] = json.dumps([])
             return dict(status=status,
-                found_contest_numbers=result['paragliders_found'],
-                parsed_contest_numbers=result['parsed_tracks'],
+                paragliders_found=result['paragliders_found'],
+                parsed_tracks=result['parsed_tracks'],
                 unparsed_tracks=result['unparsed_tracks'],
-                extra_tracks=result['extra_tracks'],
-                without_tracks=result['without_tracks']
+                tracks_without_paragliders=result['extra_tracks'],
+                paragliders_without_tracks=result['without_tracks']
             )
 
 
@@ -331,8 +331,10 @@ class RaceTracksResource(APIResource):
                     et = int(row[3])
                 else:
                     et = 'null'
-                result.append(dict(type=row[0], track_id=row[1],
-                    start_time=st, end_time=et))
+                result.append(dict(track_type=row[0],
+                                   id=row[1],
+                                   start_time=st,
+                                   end_time=et))
             return result
 
 
@@ -353,7 +355,7 @@ class TrackerResourceCollection(APIResource):
             result['name'] = t.name
             result['device_type'] = t.device_type
             result['id'] = t.id
-            result['last_point'] = json.dumps(t.last_point)
+            result['last_point'] = t.last_point
             return result
 
     def read_GET(self, rows, p=None):
@@ -363,9 +365,11 @@ class TrackerResourceCollection(APIResource):
                 try:
                     tid, name, did, dtype, lat, lon, alt, ts, bt, sp = row
                     result.append(
-                        dict(device_id=did, name=name, device_type=dtype,
-                            id=tid, last_point=json.dumps(
-                                [lat, lon, alt, ts, bt, sp])))
+                        dict(device_id=did,
+                             name=name,
+                             device_type=dtype,
+                             id=tid,
+                             last_point=[lat, lon, alt, ts, bt, sp]))
                 except Exception:
                     pass
             return result
@@ -380,8 +384,10 @@ class TrackerResource(APIResource):
 
     def read_GET(self, t, p=None):
         if t:
-            return dict(tracker_id=t.id, device_id=t.device_id, name=t.name,
-                last_point=json.dumps(t.last_point))
+            return dict(id=t.id,
+                        device_id=t.device_id,
+                        name=t.name,
+                        last_point=t.last_point)
 
     def read_PUT(self, t, p=None):
         return self.read_GET(t)
@@ -407,7 +413,7 @@ class TransportResourceCollection(APIResource):
         '''
         if t:
             result = dict()
-            result['transport_id'] = str(t.id)
+            result['id'] = str(t.id)
             result['title'] = t.title
             result['description'] = t.description
             result['type'] = t.type
@@ -423,7 +429,7 @@ class TransportResource(APIResource):
 
     def __read(self, t):
         result = dict()
-        result['transport_id'] = str(t.id)
+        result['id'] = str(t.id)
         result['title'] = t.title
         result['description'] = t.description
         result['type'] = t.type
@@ -452,11 +458,10 @@ class ContestTransportCollection(APIResource):
             result = []
             result.append(self.read_POST(t))
             return self.read_POST(t)
-            # return list(dict(transport_ids=json.dumps(map(str, t))))
 
     def read_POST(self, cont, p=None):
         if cont:
-            return dict(transport_ids=json.dumps(map(str, cont.transport)))
+            return cont.transport
 
 
 class RaceTransportCollection(APIResource):
@@ -472,7 +477,11 @@ class RaceTransportCollection(APIResource):
         @type r: gorynych.info.domain.race.Race
         '''
         if r:
-            return r.transport
+            return [dict(id=t['transport_id'],
+                         title=t['title'],
+                         description=t['description'],
+                         type=t['type'],
+                         tracker=t['tracker_id']) for t in r.transport]
 
 
 # TODO: this resource should be in processor package.

@@ -95,7 +95,9 @@ class Person(AggregateRoot):
 
     def apply_TrackerUnAssigned(self, ev):
         tr, cont = ev.payload
-        del self.trackers[cont]
+        # TODO: it's a workaround not a fix. Think more and redo.
+        if self.trackers.has_key(cont):
+            del self.trackers[cont]
 
 
 class PersonFactory(object):

@@ -8,15 +8,11 @@ import simplejson as json
 from twisted.internet import defer, task
 from twisted.python import log
 
-from gorynych.info.domain import contest, person, race, tracker, transport
+from gorynych.info.domain import contest, person, race, tracker, transport, interfaces
 from gorynych.common.infrastructure import persistence
 from gorynych.common.domain.types import checkpoint_from_geojson
 from gorynych.common.domain.events import ContestRaceCreated
 from gorynych.common.application import DBPoolService
-from gorynych.info.domain import interfaces
-from gorynych.info.domain.contest import create_race_for_contest,\
-                                         change_contest_participant
-from gorynych.info.domain.race import change_race
 from gorynych.receiver.receiver import RabbitMQService
 
 
@@ -76,7 +72,7 @@ class ApplicationService(BaseApplicationService):
                                               params['timezone'],
                                               id)
         d = defer.succeed(cont)
-        d.addCallback(persistence.get_repository(contest.IContestRepository)
+        d.addCallback(persistence.get_repository(interfaces.IContestRepository)
         .save)
         return d
 
@@ -88,7 +84,7 @@ class ApplicationService(BaseApplicationService):
         @return:
         @rtype:
         '''
-        return self._get_aggregates_list(params, contest.IContestRepository)
+        return self._get_aggregates_list(params, interfaces.IContestRepository)
 
     def get_contest(self, params):
         '''
@@ -99,7 +95,7 @@ class ApplicationService(BaseApplicationService):
         @rtype: C{Deffered}
         '''
         return self._get_aggregate(params['contest_id'],
-                                contest.IContestRepository)
+                                interfaces.IContestRepository)
 
     def change_contest(self, params):
         '''
@@ -110,7 +106,7 @@ class ApplicationService(BaseApplicationService):
         @rtype:
         '''
 
-        return self._change_aggregate(params, contest.IContestRepository,
+        return self._change_aggregate(params, interfaces.IContestRepository,
                                       contest.change)
 
     def register_paraglider_on_contest(self, params):
@@ -122,19 +118,19 @@ class ApplicationService(BaseApplicationService):
         @rtype: C{Contest}
         '''
         d = self._get_aggregate(params['contest_id'],
-                                contest.IContestRepository)
+                                interfaces.IContestRepository)
         d.addCallback(lambda cont: cont.register_paraglider(
             person.PersonID.fromstring(params['person_id']), params['glider'],
             params['contest_number']))
         d.addCallback(
-            persistence.get_repository(contest.IContestRepository).save)
+            persistence.get_repository(interfaces.IContestRepository).save)
         return d
 
     def add_transport_to_contest(self, params):
         d = self.get_contest(params)
         d.addCallback(lambda cont: cont.add_transport(params['transport_id']))
         d.addCallback(
-            persistence.get_repository(contest.IContestRepository).save)
+            persistence.get_repository(interfaces.IContestRepository).save)
         return d
 
     def get_contest_transport(self, params):
@@ -150,7 +146,7 @@ class ApplicationService(BaseApplicationService):
         @rtype:
         '''
         d = self._get_aggregate(params['contest_id'],
-                                contest.IContestRepository)
+                                interfaces.IContestRepository)
         d.addCallback(lambda cont: cont.paragliders)
         return d
 
@@ -163,9 +159,9 @@ class ApplicationService(BaseApplicationService):
         @rtype:
         '''
         d = self._get_aggregate(params['contest_id'],
-                                contest.IContestRepository)
-        d.addCallback(change_contest_participant, params)
-        d.addCallback(persistence.get_repository(contest.IContestRepository)
+                                interfaces.IContestRepository)
+        d.addCallback(contest.change_participant, params)
+        d.addCallback(persistence.get_repository(interfaces.IContestRepository)
                       .save)
         return d
 
@@ -176,34 +172,34 @@ class ApplicationService(BaseApplicationService):
         pers = factory.create_person(params['name'], params['surname'],
                                      params['country'], params['email'])
         d = defer.succeed(pers)
-        d.addCallback(persistence.get_repository(person.IPersonRepository).
+        d.addCallback(persistence.get_repository(interfaces.IPersonRepository).
         save)
         return d
 
     def get_person(self, params):
         return self._get_aggregate(params['person_id'],
-                                   person.IPersonRepository)
+                                   interfaces.IPersonRepository)
 
     def get_persons(self, params=None):
-        return self._get_aggregates_list(params, person.IPersonRepository)
+        return self._get_aggregates_list(params, interfaces.IPersonRepository)
 
     def change_person(self, params):
-        return self._change_aggregate(params, person.IPersonRepository,
+        return self._change_aggregate(params, interfaces.IPersonRepository,
                                       person.change_person)
 
     ############## Race Service part ################
     def get_race(self, params):
-        return self._get_aggregate(params['race_id'], race.IRaceRepository)
+        return self._get_aggregate(params['race_id'], interfaces.IRaceRepository)
 
     @defer.inlineCallbacks
     def create_new_race_for_contest(self, params):
         cont = yield self._get_aggregate(params['contest_id'],
-                                         contest.IContestRepository)
+                                         interfaces.IContestRepository)
         person_list = []
         # TODO: make it thinner.
         for key in cont.paragliders:
             # TODO: do less db queries for transport.
-            pers = yield self._get_aggregate(key, person.IPersonRepository)
+            pers = yield self._get_aggregate(key, interfaces.IPersonRepository)
             person_list.append(pers)
 
         # TODO: do in domain model style. Think before.
@@ -212,12 +208,12 @@ class ApplicationService(BaseApplicationService):
             persistence.select('transport_for_contest', 'transport'),
                               (str(cont.id),))
         
-        new_race = create_race_for_contest(cont,
+        new_race = race.create_race_for_contest(cont,
                                            person_list,
                                            transport_list,
                                            params)
         # TODO: do it transactionally.
-        d = persistence.get_repository(race.IRaceRepository).save(new_race)
+        d = persistence.get_repository(interfaces.IRaceRepository).save(new_race)
         d.addCallback(lambda _: persistence.event_store().persist(ContestRaceCreated(
             cont.id, new_race.id)))
         yield d
@@ -232,9 +228,9 @@ class ApplicationService(BaseApplicationService):
         @rtype:
         '''
         d = self._get_aggregate(params['contest_id'],
-                                contest.IContestRepository)
+                                interfaces.IContestRepository)
         d.addCallback(lambda cont: [self._get_aggregate(id,
-                             race.IRaceRepository) for id in cont.race_ids])
+                             interfaces.IRaceRepository) for id in cont.race_ids])
         d.addCallback(defer.gatherResults, consumeErrors=True)
         return d
 
@@ -249,7 +245,7 @@ class ApplicationService(BaseApplicationService):
         '''
         r = yield self.get_race(params)
         c = yield self._get_aggregate(params['contest_id'],
-                                      contest.IContestRepository)
+                                      interfaces.IContestRepository)
         defer.returnValue((c, r))
 
     def change_contest_race(self, params):
@@ -261,8 +257,8 @@ class ApplicationService(BaseApplicationService):
         @rtype:
         '''
         d = self.get_race(params)
-        d.addCallback(lambda r: change_race(r, params))
-        d.addCallback(persistence.get_repository(race.IRaceRepository).save)
+        d.addCallback(race.change_race, params)
+        d.addCallback(persistence.get_repository(interfaces.IRaceRepository).save)
         return d
 
     def add_track_archive(self, params):
@@ -271,7 +267,7 @@ class ApplicationService(BaseApplicationService):
         return d
 
     def change_race_transport(self, params):
-        return self._change_aggregate(params, race.IRaceRepository,
+        return self._change_aggregate(params, interfaces.IRaceRepository,
             race.change_race_transport)
 
 

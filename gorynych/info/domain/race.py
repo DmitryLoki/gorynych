@@ -363,25 +363,6 @@ class Paraglider(ValueObject):
         .glider) and (self.contest_number == other.contest_number) and (self
                                                                                        .tracker_id == other.tracker_id)
 
-class IRaceRepository(Interface):
-    def get_by_id(id):
-        '''
-
-        @param id:
-        @type id:
-        @return:
-        @rtype:
-        '''
-
-    def save(obj):
-        '''
-
-        @param obj:
-        @type obj:
-        @return:
-        @rtype:
-        '''
-
 
 def change_race_transport(rc, params):
     return rc

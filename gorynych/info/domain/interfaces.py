@@ -35,3 +35,69 @@ class ITransportRepository(Interface):
     def save(obj):
         '''
         '''
+
+
+class IPersonRepository(Interface):
+
+    def get_by_id(id):
+        '''
+        Return a person with id.
+        @param id:
+        @type id:
+        @return: a person
+        @rtype: Person
+        '''
+
+    def save(person):
+        '''
+        Persist person.
+        @param person:
+        @type person: Person
+        @return:
+        @rtype:
+        '''
+
+    def get_list(limit, offset):
+        '''
+        Return list of a person
+        '''
+
+
+class IRaceRepository(Interface):
+    def get_by_id(id):
+        '''
+
+        @param id:
+        @type id:
+        @return:
+        @rtype:
+        '''
+
+    def save(obj):
+        '''
+
+        @param obj:
+        @type obj:
+        @return:
+        @rtype:
+        '''
+
+
+class IContestRepository(Interface):
+    def get_by_id(id):
+        '''
+
+        @param id:
+        @type id:
+        @return:
+        @rtype:
+        '''
+
+    def save(obj):
+        '''
+
+        @param obj:
+        @type obj:
+        @return:
+        @rtype:
+        '''

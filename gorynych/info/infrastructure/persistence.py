@@ -8,11 +8,12 @@ from twisted.python import log
 from zope.interface import implements, implementer
 import psycopg2
 
-from gorynych.info.domain.contest import Paraglider, IContestRepository, ContestFactory
+from gorynych.info.domain.interfaces import IContestRepository, IPersonRepository, IRaceRepository
+from gorynych.info.domain.contest import ContestFactory
 from gorynych.info.domain.ids import PersonID, TransportID
-from gorynych.info.domain.race import IRaceRepository, RaceFactory
+from gorynych.info.domain.race import RaceFactory, Paraglider
 from gorynych.common.domain.types import checkpoint_collection_from_geojson, geojson_feature_collection, Name
-from gorynych.info.domain.person import IPersonRepository, PersonFactory
+from gorynych.info.domain.person import PersonFactory
 from gorynych.common.exceptions import NoAggregate, DatabaseValueError
 from gorynych.common.infrastructure import persistence as pe
 from gorynych.info.domain import interfaces

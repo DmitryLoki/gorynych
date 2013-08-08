@@ -15,26 +15,6 @@ from gorynych.info.domain.ids import ContestID, PersonID, TrackerID, TransportID
 from gorynych.common.exceptions import DomainError
 
 
-class IContestRepository(Interface):
-    def get_by_id(id):
-        '''
-
-        @param id:
-        @type id:
-        @return:
-        @rtype:
-        '''
-
-    def save(obj):
-        '''
-
-        @param obj:
-        @type obj:
-        @return:
-        @rtype:
-        '''
-
-
 class ContestFactory(object):
 
     def create_contest(self, title, start_time, end_time,

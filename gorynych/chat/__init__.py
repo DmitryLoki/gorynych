@@ -2,7 +2,6 @@
 Chat server realization for retrieve.
 '''
 from twisted.application import internet, service
-from twisted.enterprise import adbapi
 from twisted.web.resource import IResource
 from twisted.web import server
 from twisted.python import components
@@ -10,6 +9,7 @@ from twisted.python import components
 from gorynych import BaseOptions
 from gorynych.chat.application import IChatService
 from gorynych.chat.restui.resources import WebChat
+from gorynych.common.infrastructure.persistence import AbdApiReconnectingPool
 
 class Options(BaseOptions):
     optParameters = [
@@ -22,7 +22,7 @@ def makeService(config):
     from gorynych.chat.application import ChatApplication, IChatService
     from gorynych.chat.infrastructure import MessageRepository
     from gorynych.chat.domain.services import AuthenticationService
-    pool = adbapi.ConnectionPool('psycopg2', database=config['dbname'],
+    pool = AbdApiReconnectingPool('psycopg2', database=config['dbname'],
         user=config['dbuser'],
         password=config['dbpassword'],
         host=config['dbhost'])

@@ -4,8 +4,8 @@ it.
 '''
 from twisted.application import internet, service
 from twisted.web import server
-from twisted.enterprise import adbapi
 
+from gorynych.common.infrastructure.persistence import AbdApiReconnectingPool
 from gorynych import BaseOptions
 
 class Options(BaseOptions):
@@ -38,11 +38,11 @@ def makeService(config, services=None):
     if not services:
         services = service.MultiService()
 
-    pool = adbapi.ConnectionPool('psycopg2', database=config['dbname'],
-                                 user=config['dbuser'],
-                                 password=config['dbpassword'],
-                                 host=config['dbhost'], cp_max=10,
-                                 cp_reconnect=True)
+    pool = AbdApiReconnectingPool('psycopg2', database=config['dbname'],
+                                  user=config['dbuser'],
+                                  password=config['dbpassword'],
+                                  host=config['dbhost'], cp_max=10,
+                                  cp_reconnect=True)
 
     # EventStore init.
     event_store = EventStore(PGSQLAppendOnlyStore(pool))

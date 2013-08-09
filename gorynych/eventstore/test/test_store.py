@@ -7,6 +7,7 @@ from twisted.internet import defer
 from twisted.enterprise import adbapi
 
 from gorynych.eventstore import store
+from gorynych.common.infrastructure.persistence import AbdApiReconnectingPool
 from gorynych import OPTS
 
 store.EVENTS_TABLE = EVENTS_TABLE = 'test_events'
@@ -14,7 +15,7 @@ store.FUNC_NAME = FUNC_NAME = 'test_trigger'
 store.DISPATCH_TABLE = DISPATCH_TABLE = 'test_dispatch'
 store.TRIGGER_NAME = TRIGGER_NAME = 'test_to_dispatch'
 
-POOL = adbapi.ConnectionPool('psycopg2', host=OPTS['dbhost'],
+POOL = AbdApiReconnectingPool('psycopg2', host=OPTS['dbhost'],
     database=OPTS['dbname'], user=OPTS['dbuser'],
     password=OPTS['dbpassword'])
 

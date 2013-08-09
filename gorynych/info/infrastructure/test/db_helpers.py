@@ -8,8 +8,9 @@ from twisted.enterprise import adbapi
 
 from gorynych import OPTS
 from gorynych.common.infrastructure import persistence as pe
+from gorynych.common.infrastructure.persistence import AbdApiReconnectingPool
 
-POOL = adbapi.ConnectionPool('psycopg2', host=OPTS['dbhost'],
+POOL = AbdApiReconnectingPool('psycopg2', host=OPTS['dbhost'],
     database=OPTS['dbname'], user=OPTS['dbuser'],
     password=OPTS['dbpassword'])
 

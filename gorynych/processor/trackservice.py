@@ -7,6 +7,7 @@ from gorynych.processor.infrastructure.persistence import TrackRepository
 from gorynych.common.infrastructure import persistence
 from gorynych.eventstore.eventstore import EventStore
 from gorynych.eventstore.store import PGSQLAppendOnlyStore
+from gorynych.common.infrastructure.persistence import AbdApiReconnectingPool
 
 
 class Options(BaseOptions):
@@ -17,7 +18,7 @@ def makeService(config, services=None):
     if not services:
         services = service.MultiService()
 
-    pool = adbapi.ConnectionPool('psycopg2', database=config['dbname'],
+    pool = AbdApiReconnectingPool('psycopg2', database=config['dbname'],
         user=config['dbuser'],
         password=config['dbpassword'],
         host=config['dbhost'], cp_max=16)

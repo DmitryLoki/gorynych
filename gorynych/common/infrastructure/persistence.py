@@ -9,10 +9,32 @@ For retreiving repository instance client use interface class as id.
 from io import BytesIO
 import os
 import re
+import traceback
 
 from gorynych.eventstore.interfaces import IEventStore
+from twisted.enterprise import adbapi
+import psycopg2
 
 global_repository_registry = dict()
+
+
+class AbdApiReconnectingPool(adbapi.ConnectionPool):
+    """Reconnecting adbapi connection pool for psycopg2.
+
+    A psycopg2 version of this:
+    http://www.gelens.org/2009/09/13/twisted-connectionpool-revisited/
+
+    """
+    def _runInteraction(self, interaction, *args, **kw):
+        try:
+            return adbapi.ConnectionPool._runInteraction(self, interaction, *args, **kw)
+        except psycopg2.OperationalError as e:
+            if e.pgcode != '57P01':
+                raise
+            conn = self.connections.get(self.threadID())
+            self.disconnect(conn)
+            # try the interaction again
+            return adbapi.ConnectionPool._runInteraction(self, interaction, *args, **kw)
 
 
 def register_repository(interface, repository_instance):

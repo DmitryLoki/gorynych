@@ -1,5 +1,6 @@
 import math
 import numpy as np
+
 from gorynych.common.domain import events
 from gorynych.common.domain.types import checkpoint_collection_from_geojson
 from gorynych.processor.domain import services
@@ -56,12 +57,13 @@ class RaceToGoal(object):
         calculation_ended = trackstate.ended
         for idx, p in np.ndenumerate(points):
             lat, lon = p['lat'], p['lon']
-            if nextchp.is_taken_by(lat, lon) and not calculation_ended:
+            if nextchp.is_taken_by(lat, lon, p['timestamp']) and \
+                    (not calculation_ended):
                 eventlist.append(
                     events.TrackCheckpointTaken(
                         _id,
                         (lastchp + 1, nextchp.dist_to_center),
-                        occured_on=p['timestamp']))
+                        occured_on=nextchp.take_time))
                 if nextchp.type == 'es':
                     eventlist.append(events.TrackFinishTimeReceived(_id,
                         payload=p['timestamp']))
@@ -119,11 +121,11 @@ class OpenDistance(object):
             for idx, p in np.ndenumerate(points):
                 lat, lon = p['lat'], p['lon']
                 p['distance'] = previous_leg + lastchp.dist_to_point(lat, lon)
-                if nextchp.is_taken_by(lat, lon):
+                if nextchp.is_taken_by(lat, lon, p['timestamp']):
                     eventlist.append(
                         events.TrackCheckpointTaken(_id,
                             (lastchp_num + 1, nextchp.dist_to_center),
-                            occured_on=p['timestamp']))
+                            occured_on=nextchp.take_time))
                     if self._checkpoint_is_last(lastchp_num + 1):
                         return self._calculate_last_leg(points,
                             previous_leg, eventlist=eventlist,
@@ -156,6 +158,45 @@ class OpenDistance(object):
         return points, eventlist
 
 
+def taken_on_enter(self, lat, lon, on_time):
+    '''
+    Is point (lat, lon) inside the circle?
+    @param lat:
+    @type lat:
+    @param lon:
+    @type lon:
+    @return:
+    @rtype: boolean
+    '''
+    self.dist_to_center = int(point_dist_calculator(
+        lat, lon, self.checkpoint.lat, self.checkpoint.lon))
+    is_taken = self.dist_to_center < (
+        self.checkpoint.radius + self.error_margin)
+    if is_taken:
+        self.take_time = on_time
+    return is_taken
+
+
+def taken_on_exit(self, lat, lon, on_time):
+    self.dist_to_center = int(point_dist_calculator(
+        lat, lon, self.checkpoint.lat, self.checkpoint.lon))
+    is_inside = self.dist_to_center < (
+        self.checkpoint.radius + self.error_margin)
+    cylinder_just_entered = is_inside and not self._point_inside
+    point_still_in_cylinder = is_inside and self._point_inside
+    cylinder_just_exited = self._point_inside and not is_inside
+    if cylinder_just_entered:
+        self._point_inside = True
+        self.take_time = on_time
+        return False
+    if cylinder_just_exited:
+        self._point_inside = False
+        return True
+    if point_still_in_cylinder:
+        self.take_time = on_time
+        return False
+
+
 class CylinderCheckpointAdapter(object):
     def __init__(self, chp, opt_point, error_margin):
         '''
@@ -175,21 +216,11 @@ class CylinderCheckpointAdapter(object):
         assert len(opt_point) == 2, "Optimum point parameter is wrong."
         assert isinstance(opt_point, tuple), "Need tuple as a point."
         self.opt_lat, self.opt_lon = opt_point
+        # Flag shows is point inside the cylinder.
+        self._point_inside = False
 
-    def is_taken_by(self, lat, lon):
-        '''
-        Is point (lat, lon) inside the circle?
-        @param lat:
-        @type lat:
-        @param lon:
-        @type lon:
-        @return:
-        @rtype: boolean
-        '''
-        self.dist_to_center = int(point_dist_calculator(
-            lat, lon, self.checkpoint.lat, self.checkpoint.lon))
-        return self.dist_to_center < (
-            self.checkpoint.radius + self.error_margin)
+    def is_taken_by(self, lat, lon, on_time):
+        pass
 
     def dist_to_point(self, lat, lon):
         '''
@@ -234,6 +265,10 @@ class RaceTypesFactory(object):
                 error_margin = self.error_margin[rtype].get(ch.type,
                     self.error_margin[rtype]['default'])
                 cp = CylinderCheckpointAdapter(ch, points[i], error_margin)
+                if ch.checked_on == 'enter':
+                    cp.is_taken_by = taken_on_enter
+                elif ch.checked_on == 'exit':
+                    cp.is_taken_by = taken_on_exit
                 race_checkpoints.append(cp)
         race_checkpoints = getattr(self, '_distances_for_' + rtask[
             'race_type'])(race_checkpoints)

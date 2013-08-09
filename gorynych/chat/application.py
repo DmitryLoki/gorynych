@@ -3,11 +3,15 @@ import json
 __author__ = 'Boris Tsema'
 
 from zope.interface import Interface, implementer
-from twisted.internet import defer
 from gorynych.common.application import EventPollingService
 
 from gorynych.chat.domain.model import MessageFactory
 
+CREATE_CHATROOM = """
+    INSERT INTO
+        chatrooms(chatroom_name)
+    VALUES(%s)
+    """
 
 class IChatService(Interface):
     '''
@@ -76,6 +80,23 @@ class ChatApplication(EventPollingService):
     def authenticate(self, token):
         return self.auth_service.authenticate(token)
 
+    def create_chatroom(self, chatroom):
+        '''
+        Create new chatroom with name chatroom.
+        @param chatroom: Name of new chatroom.
+        @type chatroom: str
+        @return:
+        @rtype: Deferred
+        '''
+        assert isinstance(chatroom, str), "Chatroom name must be str, " \
+                                          "not %s." % type(chatroom)
+        return self.repository.pool.runOperation(CREATE_CHATROOM, (chatroom,))
+
+    def process_ContestRaceCreated(self, ev):
+        chatroom_name = str(ev.payload)
+        d = self.create_chatroom(chatroom_name)
+        d.addCallback(lambda _:self.event_dispatched(ev.id))
+        return d
 
     # Don't think too hard about next two methods: it's shit and created for
     #  speed.
@@ -119,13 +140,3 @@ class ChatApplication(EventPollingService):
         d.addCallback(result)
         return d
 
-    @defer.inlineCallbacks
-    def process_ContestRaceCreated(self, ev):
-        race_id = ev.payload
-        query = """
-            INSERT INTO
-                chatrooms(chatroom_name)
-            VALUES(%s)
-        """
-        yield self.repository.pool.runOperation(query, (str(race_id),))
-        yield self.event_dispatched(ev.id)

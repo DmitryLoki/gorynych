@@ -70,7 +70,6 @@ class EventPollingService(Service):
         if ev_id in self.in_progress:
             self.in_progress.remove(ev_id)
         ev_id = long(ev_id)
-        # log.msg("deleting dispatched event", ev_id)
         return self.pool.runOperation(EVENT_DISPATCHED, (ev_id,))
 
 

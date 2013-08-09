@@ -135,33 +135,6 @@ class PersonFactory(object):
         return person
 
 
-# TODO: move interfaces into domain.interfaces.
-class IPersonRepository(Interface):
-
-    def get_by_id(id):
-        '''
-        Return a person with id.
-        @param id:
-        @type id:
-        @return: a person
-        @rtype: Person
-        '''
-
-    def save(person):
-        '''
-        Persist person.
-        @param person:
-        @type person: Person
-        @return:
-        @rtype:
-        '''
-
-    def get_list(limit, offset):
-        '''
-        Return list of a person
-        '''
-
-
 def change_person(person, params):
     new_name = dict()
     if params.get('name'):

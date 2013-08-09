@@ -3,7 +3,7 @@ import unittest
 from zope.interface.declarations import implements
 
 from gorynych.common.infrastructure import persistence
-from gorynych.info.domain.person import IPersonRepository
+from gorynych.info.domain.interfaces import IPersonRepository
 
 
 class RepositoryClass(object):

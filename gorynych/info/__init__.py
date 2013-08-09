@@ -26,9 +26,7 @@ def makeService(config, services=None):
     from gorynych.info.application import ApplicationService, LastPointApplication
     from gorynych.info.restui import base_resource
     # import persistence staff
-    from gorynych.info.domain.contest import IContestRepository
-    from gorynych.info.domain.race import IRaceRepository
-    from gorynych.info.domain.person import IPersonRepository
+    from gorynych.info.domain.interfaces import IPersonRepository, IRaceRepository, IContestRepository
     from gorynych.info.domain import interfaces
     from gorynych.common.infrastructure import persistence
     from gorynych.eventstore.eventstore import EventStore

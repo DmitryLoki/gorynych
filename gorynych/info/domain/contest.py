@@ -6,32 +6,13 @@ from copy import deepcopy
 import pytz
 from zope.interface.interfaces import Interface
 
+from gorynych.info.domain import race
 from gorynych.common.domain.model import AggregateRoot, ValueObject
 from gorynych.common.domain.types import Address, Country, Name
 from gorynych.common.domain.events import ParagliderRegisteredOnContest
 from gorynych.common.infrastructure import persistence
 from gorynych.info.domain.ids import ContestID, PersonID, TrackerID, TransportID
 from gorynych.common.exceptions import DomainError
-
-
-class IContestRepository(Interface):
-    def get_by_id(id):
-        '''
-
-        @param id:
-        @type id:
-        @return:
-        @rtype:
-        '''
-
-    def save(obj):
-        '''
-
-        @param obj:
-        @type obj:
-        @return:
-        @rtype:
-        '''
 
 
 class ContestFactory(object):
@@ -290,46 +271,6 @@ class Contest(AggregateRoot):
             raise ValueError("Contest invariants violated.")
 
 
-class Paraglider(ValueObject):
-
-    def __init__(self, person_id, name, country, glider, contest_number,
-                 tracker_id=None):
-
-        if not isinstance(person_id, PersonID):
-            person_id = PersonID().fromstring(person_id)
-        if not isinstance(name, Name):
-            raise TypeError("Name must be an instance of Name class.")
-        if not isinstance(country, Country):
-            country = Country(country)
-        if tracker_id and not isinstance(tracker_id, TrackerID):
-            tracker_id = TrackerID.fromstring(tracker_id)
-
-        self.person_id = person_id
-        self._name = name
-        self.country = country.code()
-        self.glider = glider.strip().split(' ')[0].lower()
-        self.contest_number = contest_number
-        self.tracker_id = tracker_id
-        self._contest_track_id = None
-
-    @property
-    def name(self):
-        return self._name.short()
-
-    @property
-    def contest_track_id(self):
-        return self._contest_track_id
-
-    @contest_track_id.setter
-    def contest_track_id(self, value):
-        self._contest_track_id = str(value)
-
-    def __eq__(self, other):
-        return self.person_id == other.person_id and (self.glider == other
-        .glider) and (self.contest_number == other.contest_number) and (self
-                                                                                       .tracker_id == other.tracker_id)
-
-
 def change(cont, params):
     '''
     Do changes in contest.
@@ -354,3 +295,12 @@ def change(cont, params):
         setattr(cont, param, params[param])
     return cont
 
+
+def change_participant(cont, participant_data):
+    if 'glider' in participant_data:
+        cont.change_participant_data(participant_data['person_id'],
+                                     glider=participant_data['glider'])
+    if 'contest_number' in participant_data:
+        cont.change_participant_data(participant_data['person_id'],
+                                     contest_number=participant_data['contest_number'])
+    return cont

@@ -5,10 +5,9 @@ import cPickle
 
 from zope.interface import implements
 
-from gorynych.info.domain.contest import IContestRepository
-from gorynych.info.domain.race import IRaceRepository
-from gorynych.info.domain.person import IPersonRepository
+from gorynych.info.domain.interfaces import IContestRepository, IRaceRepository, IPersonRepository
 from gorynych.common.exceptions import NoAggregate
+
 
 class BaseRepository(object):
 

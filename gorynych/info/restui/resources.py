@@ -1,6 +1,10 @@
 import simplejson as json
-import pytz
+import time
 from datetime import datetime
+
+import pytz
+from twisted.web import resource
+
 from gorynych.info.restui.base_resource import APIResource
 from gorynych.common.domain import types
 
@@ -487,3 +491,16 @@ class TracksResource(APIResource):
         if trs:
             return json.dumps(trs)
 
+
+# TODO: find better place for it.
+class TimeResource(resource.Resource):
+    '''
+    Return current time for different synchronizing servers.
+    '''
+    isLeaf = True
+
+    def render_GET(self, request):
+        if 'unixtime' in request.postpath:
+            return str(int(time.time()))
+        else:
+            return ''

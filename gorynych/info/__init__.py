@@ -32,6 +32,8 @@ def makeService(config, services=None):
     from gorynych.eventstore.eventstore import EventStore
     from gorynych.eventstore.store import PGSQLAppendOnlyStore
     from gorynych.info.infrastructure.persistence import PGSQLContestRepository, PGSQLPersonRepository, PGSQLRaceRepository, PGSQLTrackerRepository, PGSQLTransportRepository
+    # Time sinchronization. TODO: find better place for it.
+    from gorynych.info.restui.resources import TimeResource
 
     if not services:
         services = service.MultiService()
@@ -69,7 +71,9 @@ def makeService(config, services=None):
 
     # REST API init
     api_tree = base_resource.resource_tree()
-    site_factory = server.Site(base_resource.APIResource(api_tree, app_service))
+    api_resource = base_resource.APIResource(api_tree, app_service)
+    api_resource.putChild('time', TimeResource())
+    site_factory = server.Site(api_resource)
 
     internet.TCPServer(config['webport'], site_factory,
                        interface='localhost').setServiceParent(services)

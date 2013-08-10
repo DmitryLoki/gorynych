@@ -26,7 +26,6 @@ def makeService(config, services=None):
     from gorynych.info.application import ApplicationService, LastPointApplication
     from gorynych.info.restui import base_resource
     # import persistence staff
-    from gorynych.info.domain.interfaces import IPersonRepository, IRaceRepository, IContestRepository
     from gorynych.info.domain import interfaces
     from gorynych.common.infrastructure import persistence
     from gorynych.eventstore.eventstore import EventStore
@@ -58,11 +57,11 @@ def makeService(config, services=None):
     last_point.setServiceParent(services)
 
     # Repositories init.
-    persistence.register_repository(IContestRepository,
+    persistence.register_repository(interfaces.IContestRepository,
                                     PGSQLContestRepository(pool) )
-    persistence.register_repository(IRaceRepository,
+    persistence.register_repository(interfaces.IRaceRepository,
                                     PGSQLRaceRepository(pool))
-    persistence.register_repository(IPersonRepository,
+    persistence.register_repository(interfaces.IPersonRepository,
                                     PGSQLPersonRepository(pool))
     persistence.register_repository(interfaces.ITrackerRepository,
         PGSQLTrackerRepository(pool))

@@ -5,7 +5,7 @@ from twisted.trial import unittest
 
 from gorynych.common.domain import events as evs
 from gorynych.common.domain.types import Name, checkpoint_from_geojson
-from gorynych.info.domain import race, contest
+from gorynych.info.domain import race
 from gorynych.common.exceptions import TrackArchiveAlreadyExist
 from gorynych.info.domain.ids import RaceID, PersonID, TrackerID
 from gorynych.info.domain.test.helpers import create_contest, create_checkpoints,\
@@ -181,14 +181,20 @@ class TrackArchiveTest(unittest.TestCase):
     def test_creation_from_events(self):
         r = RaceID()
         e1 = evs.ArchiveURLReceived(r, 'http://airtribune.com/hello')
-        e2 = evs.TrackArchiveUnpacked(r, ([{'contest_number': '1'}], 2, 3))
-        e3 = evs.RaceGotTrack(r, {'contest_number': '1'})
+        e2 = evs.TrackArchiveUnpacked(r, ([{'contest_number': '1'}],
+                 ['path/to/unpacked/track.igc'], ['2']))
+        e3 = evs.RaceGotTrack(r, {'contest_number': '1', 'track_type':
+            'competition_aftertask'})
         e4 = evs.TrackArchiveParsed(r, 1)
         for i in itertools.permutations([e1, e2, e3, e4]):
             t = race.TrackArchive(i)
             self.assertEqual(t.state, 'parsed')
             self.assertSetEqual(t.progress['paragliders_found'], set('1'))
             self.assertSetEqual(t.progress['parsed_tracks'], set('1'))
+            self.assertSetEqual(t.progress['extra_tracks'],
+                set(['track.igc']))
+            self.assertSetEqual(t.progress['without_tracks'], set('2'))
+
 
     def test_state_changing(self):
         t = race.TrackArchive([])

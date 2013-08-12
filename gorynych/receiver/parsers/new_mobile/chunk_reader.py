@@ -16,6 +16,7 @@ class ChunkReader(object):
         self.chunk = pathchunk_pb2.PathCunk()
         self.chunk.ParseFromString(raw)
         self.format = ['lat', 'lon', 'ts', 'alt']
+        self.precision = 6  # number of digits after decimal point for lat and lon
         # if self.pathChunk.HasField('index'):
         #     self.index = self.chunk.index
         # else:
@@ -67,9 +68,11 @@ class ChunkReader(object):
                         elif field == getattr(point, PointProto.LAT):
                             lat = self.base_lat + \
                                 point.packed[i] / angle_divisor
+                            lat = round(lat, self.precision)
                         elif field == getattr(point, PointProto.LON):
                             lon = self.base_lon + \
                                 point.packed[i] / angle_divisor
+                            lon = round(lon, self.precision)
                         elif field == getattr(point, PointProto.ALT):
                             alt = self.base_alt + point.packed[i]
                         i += 1

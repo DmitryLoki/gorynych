@@ -54,6 +54,29 @@ class SBDMobileReceivingFactory(protocol.ServerFactory):
     def __init__(self, service):
         self.service = service
 
+from twisted.web.resource import Resource
+
+
+class HttpTR203Resource(Resource):
+    isLeaf = True
+    device_type = 'tr203'
+
+    def __init__(self, service):
+        Resource.__init__(self)
+        self.service = service
+
+    def _handle(self, msg):
+        self.service.handle_message(msg, proto='TCP',
+                                    device_type=self.device_type)
+
+    def render_GET(self, msg):
+        print msg.args
+        return self._handle(msg.content.read())
+
+    def render_POST(self, msg):
+        print msg.args
+        return self._handle(msg.content.read())
+
 
 ###################### Different receivers ################################
 

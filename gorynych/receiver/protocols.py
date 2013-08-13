@@ -5,6 +5,8 @@ from struct import Struct
 
 from twisted.internet import protocol
 from twisted.protocols import basic
+from twisted.python import log
+from twisted.web.resource import Resource
 
 
 def check_device_type(msg):
@@ -147,3 +149,25 @@ class IridiumSBDProtocol(protocol.Protocol):
         msg = self._unpack_sbd(data)
         self.factory.service.handle_message(
             msg, proto='TCP', device_type=self.device_type)
+
+
+class HttpTR203Resource(Resource):
+    isLeaf = True
+    device_type = 'tr203'
+
+    def __init__(self, service):
+        Resource.__init__(self)
+        self.service = service
+
+    def _handle(self, msg):
+        self.service.handle_message(msg, proto='HTTP',
+                                    device_type=self.device_type)
+        return 'OK'
+
+    def render_GET(self, msg):
+        log.msg('GET: {}, args: {}'.format(msg, msg.args))
+        return self._handle(msg.content.read())
+
+    def render_POST(self, msg):
+        log.msg('POST: {}, args: {}'.format(msg, msg.args))
+        return self._handle(msg.content.read())

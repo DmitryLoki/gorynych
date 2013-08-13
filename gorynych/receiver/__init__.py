@@ -16,9 +16,8 @@ class Options(BaseOptions):
 def makeService(config):
     from gorynych.receiver.receiver import ReceiverRabbitService, ReceiverService, AuditFileLog,\
                                            TR203ReceivingFactory, MobileReceivingFactory, \
-                                           GPRSMobileReceivingFactory, SBDMobileReceivingFactory, \
-                                           HttpTR203Resource
-    from gorynych.receiver.protocols import UDPTR203Protocol, UDPTeltonikaGH3000Protocol
+                                           GPRSMobileReceivingFactory, SBDMobileReceivingFactory
+    from gorynych.receiver.protocols import UDPTR203Protocol, UDPTeltonikaGH3000Protocol, HttpTR203Resource
     ####### check_trackers ####
     from gorynych.receiver.online_tester import RetreiveJSON
 

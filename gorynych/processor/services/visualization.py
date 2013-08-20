@@ -6,6 +6,8 @@ import math
 
 from twisted.internet import defer
 from twisted.python import log
+from gorynych.common.infrastructure import persistence
+from gorynych.info.domain import race
 
 __author__ = 'Boris Tsema'
 
@@ -27,6 +29,26 @@ SELECT_DATA = """
       t.id = tg.track_id AND
       tg.group_id = %s AND
       t.timestamp BETWEEN %s AND %s
+    GROUP BY
+      t.timestamp
+    ORDER BY
+      t.timestamp;
+    """
+
+SELECT_DATA_BY_PERSON = """
+    SELECT
+      t.timestamp,
+      string_agg(
+        concat_ws(',', tg.track_label, t.lat::text, t.lon::text, t.alt::text, t.v_speed::text, t.g_speed::text, t.distance::text),
+      ';')
+    FROM
+      track_data t,
+      tracks_group tg
+    WHERE
+      t.id = tg.track_id AND
+      tg.group_id = %s AND
+      t.timestamp BETWEEN %s AND %s AND
+      tg.track_label in %s
     GROUP BY
       t.timestamp
     ORDER BY
@@ -138,6 +160,31 @@ class TrackVisualizationService(Service):
             start_data = self.prepare_start_data(hdata, hsnaps)
             result['start'] = start_data
             log.msg("start positions requested in %0.3f" % (ts2-ts1))
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def get_complete_tracks(self, params):
+        result = dict()
+        race_id = params['group_id']
+        pilots = params['pilots'].split(',')
+
+        repo = persistence.get_repository(race.IRaceRepository)
+        selected_race = yield repo.get_by_id(race_id)
+        start_time, end_time = selected_race.timelimits
+
+        selected_paragliders = dict()
+        for contest_number, paraglider in selected_race.paragliders.iteritems():
+            if paraglider.person_id in pilots:
+                selected_paragliders[contest_number] = paraglider.person_id
+
+        tracks = yield self.pool.runQuery(SELECT_DATA_BY_PERSON, (str(selected_race.id), start_time,
+                                                  end_time, tuple(selected_paragliders.keys())))
+        for ts, data in tracks:
+            contest_id, lat, lon = data.split(',')[:3]
+            if contest_id not in result:
+                result[contest_id] = []
+            result[contest_id].append(dict(lat=lat, lon=lon,
+                                           ts=ts))
         defer.returnValue(result)
 
     def prepare_start_data(self, hdata, hsnaps):

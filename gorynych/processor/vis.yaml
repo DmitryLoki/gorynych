@@ -15,3 +15,15 @@ group:
     *race_index:
       leaf: TracksResource
       package: *processor
+
+group:
+  leaf: Placeholder
+  package: *info
+  tree:
+    *race_index:
+      leaf: Placeholder
+      package: *info
+      tree:
+        complete:
+          leaf: CompleteTracksResource
+          package: *processor

@@ -35,7 +35,21 @@ SELECT_DATA = """
       t.timestamp;
     """
 
-SELECT_DATA_BY_PERSON = """
+SELECT_DATA_SNAPSHOTS = """
+    SELECT
+      s.timestamp,
+      s.snapshot,
+      tg.track_label
+    FROM
+      track_snapshot s,
+      tracks_group tg
+    WHERE
+      s.id = tg.track_id AND
+      tg.group_id = %s AND
+      s.timestamp BETWEEN %s AND %s;
+    """
+
+SELECT_DATA_BY_LABEL = """
     SELECT
       t.timestamp,
       string_agg(
@@ -55,7 +69,7 @@ SELECT_DATA_BY_PERSON = """
       t.timestamp;
     """
 
-SELECT_DATA_SNAPSHOTS = """
+SELECT_DATA_SNAPSHOTS_BY_LABEL = """
     SELECT
       s.timestamp,
       s.snapshot,
@@ -66,7 +80,8 @@ SELECT_DATA_SNAPSHOTS = """
     WHERE
       s.id = tg.track_id AND
       tg.group_id = %s AND
-      s.timestamp BETWEEN %s AND %s;
+      s.timestamp BETWEEN %s AND %s AND
+      tg.track_label in %s;
     """
 
 GET_HEADERS_DATA = """
@@ -142,11 +157,24 @@ class TrackVisualizationService(Service):
         from_time = int(params['from_time'])
         to_time = int(params['to_time'])
         start_positions = params.get('start_positions')
+        track_labels = params.get('track_labels', '')
+        print 'labels', track_labels
         t1 = time.time()
-        tracks = yield self.pool.runQuery(SELECT_DATA, (race_id, from_time,
-                                                  to_time))
-        snaps = yield self.pool.runQuery(SELECT_DATA_SNAPSHOTS,
-                                    (race_id, from_time, to_time))
+
+        if track_labels:
+            track_labels = track_labels.split(',')
+            tracks = yield self.pool.runQuery(SELECT_DATA_BY_LABEL, (race_id, from_time,
+                                                      to_time, tuple(track_labels)))
+            snaps = yield self.pool.runQuery(SELECT_DATA_SNAPSHOTS_BY_LABEL,
+                                        (race_id, from_time, to_time, tuple(track_labels)))
+            print tracks
+
+        else:
+            tracks = yield self.pool.runQuery(SELECT_DATA, (race_id, from_time,
+                                                      to_time))
+            snaps = yield self.pool.runQuery(SELECT_DATA_SNAPSHOTS,
+                                        (race_id, from_time, to_time))
+            
         t2 = time.time()
         result['timeline'] = self.prepare_result(tracks, snaps)
         log.msg("data requested in %0.3f" % (t2-t1))
@@ -160,31 +188,6 @@ class TrackVisualizationService(Service):
             start_data = self.prepare_start_data(hdata, hsnaps)
             result['start'] = start_data
             log.msg("start positions requested in %0.3f" % (ts2-ts1))
-        defer.returnValue(result)
-
-    @defer.inlineCallbacks
-    def get_complete_tracks(self, params):
-        result = dict()
-        race_id = params['group_id']
-        pilots = params['pilots'].split(',')
-
-        repo = persistence.get_repository(race.IRaceRepository)
-        selected_race = yield repo.get_by_id(race_id)
-        start_time, end_time = selected_race.timelimits
-
-        selected_paragliders = dict()
-        for contest_number, paraglider in selected_race.paragliders.iteritems():
-            if paraglider.person_id in pilots:
-                selected_paragliders[contest_number] = paraglider.person_id
-
-        tracks = yield self.pool.runQuery(SELECT_DATA_BY_PERSON, (str(selected_race.id), start_time,
-                                                  end_time, tuple(selected_paragliders.keys())))
-        for ts, data in tracks:
-            contest_id, lat, lon = data.split(',')[:3]
-            if contest_id not in result:
-                result[contest_id] = []
-            result[contest_id].append(dict(lat=lat, lon=lon,
-                                           ts=ts))
         defer.returnValue(result)
 
     def prepare_start_data(self, hdata, hsnaps):

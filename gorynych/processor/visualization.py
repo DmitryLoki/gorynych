@@ -8,11 +8,6 @@ from gorynych import BaseOptions
 from gorynych.processor.services.visualization import TrackVisualizationService
 # TODO: remove this dependency
 from gorynych.info.restui import base_resource
-from gorynych.info.domain.race import IRaceRepository
-from gorynych.info.infrastructure.persistence import PGSQLRaceRepository
-from gorynych.common.infrastructure import persistence
-from gorynych.eventstore.store import PGSQLAppendOnlyStore
-from gorynych.eventstore.eventstore import EventStore
 
 
 class Options(BaseOptions):
@@ -30,14 +25,8 @@ def makeService(config, services=None):
                                      user=config['dbuser'],
                                      password=config['dbpassword'],
                                      min=config['poolthreads'])
-    vis_service = TrackVisualizationService(pool)
+    vis_service = TrackVisualizationService(pool)   
     vis_service.setServiceParent(services)
-
-    event_store = EventStore(PGSQLAppendOnlyStore(pool))
-    persistence.add_event_store(event_store)
-
-    persistence.register_repository(IRaceRepository,
-                                    PGSQLRaceRepository(pool))
 
     # Web-interface init
     yamlfile = os.path.join(os.path.dirname(__file__), 'vis.yaml')

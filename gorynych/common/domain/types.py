@@ -85,7 +85,8 @@ class Checkpoint(ValueObject):
     Checkpoint object is a GeoJSON Feature. It exposes python geo interface as
     described here: L{https://gist.github.com/sgillies/2217756}
     '''
-    def __init__(self, name, geometry, ch_type=None, times=None, radius=None):
+    def __init__(self, name, geometry, ch_type=None, times=None,
+            radius=None, checked_on='enter'):
         if ch_type:
             self.type = ch_type.strip().lower()
         else:
@@ -107,6 +108,9 @@ class Checkpoint(ValueObject):
         if self.open_time and self.close_time:
             assert int(self.close_time) > int(self.open_time), \
                 "Checkpoint close_time must be after open_time."
+        if not checked_on == 'enter':
+            checked_on = 'exit'
+        self.checked_on = checked_on
         # Distance to something.
         self.distance = 0
         # XXX Optimum js-distance porn
@@ -153,6 +157,7 @@ class Checkpoint(ValueObject):
             result['properties']['radius'] = self.radius
         result['properties']['open_time'] = self.open_time
         result['properties']['close_time'] = self.close_time
+        result['properties']['checked_on'] = self.checked_on
         result['geometry'] = self.geometry.__geo_interface__
         return result
 
@@ -168,7 +173,6 @@ class Checkpoint(ValueObject):
         Create Checkpoints intsance from GeoJSON string or dict.
         @param value: string or dict which looks like correct GeoJSON thing:
         http://geojson.org/geojson-spec.html#examples
-        @param type: C{str} or C{dict}
         '''
         if isinstance(value, str):
             value = json.loads(value)
@@ -195,8 +199,9 @@ def checkpoint_from_geojson(geodict):
     close_time = geodict['properties'].get('close_time')
     radius = geodict['properties'].get('radius')
     geometry = geodict['geometry']
+    checked_on = geodict['properties'].get('checked_on', 'enter')
     return Checkpoint(name, geometry, ch_type,
-                      (open_time, close_time), radius)
+                      (open_time, close_time), radius, checked_on)
 
 def checkpoint_collection_from_geojson(data):
     if not isinstance(data, dict):

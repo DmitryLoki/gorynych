@@ -24,18 +24,16 @@ class ContestResourceCollection(APIResource):
         if cont:
             return dict(title=cont.title,
                         id=cont.id,
-                        contest_country_code=cont.country,
-                        contest_start_date=cont.start_time,
-                        contest_end_date=cont.end_time)
+                        country=cont.country,
+                        start_time=cont.start_time,
+                        end_time=cont.end_time)
 
     def read_GET(self, cont_list, request_params=None):
         if cont_list:
             result = []
             for cont in cont_list:
                 result.append(dict(id=cont.id,
-                                   title=cont.title,
-                                   contest_start_time=cont.start_time,
-                                   contest_end_time=cont.end_time))
+                                   title=cont.title))
             return result
 
 
@@ -83,23 +81,22 @@ class ContestRaceResourceCollection(APIResource):
                 args['checkpoints'][i] = types.checkpoint_from_geojson(item)
         return args
 
+    def __read(self, race):
+        return dict(type=race.type,
+            title=race.title,
+            id=race.id,
+            start_time=race.start_time,
+            end_time=race.end_time)
+
     def read_POST(self, race, request_params=None):
         if race:
-            return dict(type=race.type,
-                        title=race.title,
-                        id=race.id,
-                        start_time=race.start_time,
-                        end_time=race.end_time)
+            return self.__read(race)
 
     def read_GET(self, race_list, request_params=None):
         result = []
         if race_list:
             for race in race_list:
-                result.append(dict(id=race.id,
-                                   title=race.title,
-                                   start_time=race.start_time,
-                                   end_time=race.end_time,
-                                   type=race.type))
+                result.append(self.__read(race))
         return result
 
 
@@ -113,7 +110,7 @@ class ContestRaceResource(APIResource):
 
     def read_GET(self, (cont, r), request_params=None):
         if cont and r:
-            result = self.read_PUT(r)
+            result = self.__read_race(r)
             result['contest_title'] = cont.title
             result['country'] = pytz.country_names[cont.country]
             result['place'] = cont.place
@@ -123,19 +120,23 @@ class ContestRaceResource(APIResource):
             result['optdistance'] = "%0.1f" % (r.optimum_distance/1000)
             return result
 
+    def __read_race(self, r):
+        result = dict()
+        result['race_title'] = r.title
+        result['race_type'] = r.type
+        result['start_time'] = r.start_time
+        result['end_time'] = r.end_time
+        if r.bearing:
+            result['bearing'] = r.bearing
+        checkpoints = {'type': 'FeatureCollection', 'features': []}
+        for ch in r.checkpoints:
+            checkpoints['features'].append(ch.__geo_interface__)
+        result['checkpoints'] = checkpoints
+        return result
+
     def read_PUT(self, r, request_params=None):
         if r:
-            result = dict()
-            result['race_title'] = r.title
-            result['race_type'] = r.type
-            result['start_time'] = r.start_time
-            result['end_time'] = r.end_time
-            result['bearing'] = r.bearing
-            checkpoints = {'type': 'FeatureCollection', 'features': []}
-            for ch in r.checkpoints:
-                checkpoints['features'].append(ch.__geo_interface__)
-            result['checkpoints'] = checkpoints
-            return result
+            return self.__read_race(r)
 
 
 class ContestParagliderResourceCollection(APIResource):
@@ -170,7 +171,7 @@ class ContestParagliderResource(APIResource):
     /contest/{id}/paraglider/{id}
     '''
     service_command = dict(PUT='change_paraglider')
-    name = 'contest_paraglider_collection'
+    name = 'contest_paraglider'
 
     def read_PUT(self, cont, request_params):
         par_id = request_params.get('person_id')
@@ -192,15 +193,15 @@ class PersonResourceCollection(APIResource):
         if pers_list:
             result = []
             for pers in pers_list:
-                result.append(dict(id=pers.id,
-                                   name=pers.name.full()))
+                result.append(self.__read(pers))
             return result
+
+    def __read(self, pers):
+        return dict(name=pers.name.full(), id=pers.id)
 
     def read_POST(self, pers, request_params=None):
         if pers:
-            return dict(name=pers.name.full(),
-                        id=pers.id,
-                        person_country=pers.country)
+            return self.__read(pers)
 
 
 class PersonResource(APIResource):
@@ -211,19 +212,26 @@ class PersonResource(APIResource):
                            PUT='change_person')
     name = 'person'
 
+    def __read(self, pers):
+        trackers = []
+        for t in pers.trackers:
+            trackers.append([str(pers.trackers[t]), str(t)])
+        response = dict(name=pers.name.full(),
+            id=pers.id,
+            country=pers.country,
+            trackers=trackers)
+        return response
+
     def read_PUT(self, pers, request_params=None):
         if pers:
-            trackers = []
-            for t in pers.trackers:
-                trackers.append([str(pers.trackers[t]), str(t)])
             response = dict(name=pers.name.full(),
-                            id=pers.id,
-                            country=pers.country,
-                            trackers=trackers)
+                id=pers.id,
+                country=pers.country)
             return response
 
     def read_GET(self, pers, request_params=None):
-        return self.read_PUT(pers)
+        if pers:
+            return self.__read(pers)
 
 
 class RaceParagliderResourceCollection(APIResource):
@@ -262,7 +270,8 @@ class RaceResource(APIResource):
             result['race_type'] = r.type
             result['start_time'] = r.start_time
             result['end_time'] = r.end_time
-            result['bearing'] = r.bearing
+            if r.bearing:
+                result['bearing'] = r.bearing
             checkpoints = {'type': 'FeatureCollection', 'features': []}
             for ch in r.checkpoints:
                 checkpoints['features'].append(ch.__geo_interface__)
@@ -301,13 +310,13 @@ class TrackArchiveResource(APIResource):
                     result[key] = json.dumps(list(ta.progress[key]))
                 else:
                     result[key] = json.dumps([])
-            return dict(status=status,
-                paragliders_found=result['paragliders_found'],
-                parsed_tracks=result['parsed_tracks'],
-                unparsed_tracks=result['unparsed_tracks'],
-                tracks_without_paragliders=result['extra_tracks'],
-                paragliders_without_tracks=result['without_tracks']
-            )
+            progress = dict()
+            progress['parsed_tracks'] = result['parsed_tracks']
+            progress['unparsed_tracks'] = result['unparsed_tracks']
+            progress['tracks_without_paragliders'] = result['extra_tracks']
+            progress['paragliders_without_tracks']=result['without_tracks']
+            progress['paragliders_found']=result['paragliders_found']
+            return dict(status=status, progress=progress)
 
 
 class RaceTracksResource(APIResource):
@@ -326,11 +335,11 @@ class RaceTracksResource(APIResource):
                 if row[2]:
                     st = int(row[2])
                 else:
-                    st = 'null'
+                    st = None
                 if row[3]:
                     et = int(row[3])
                 else:
-                    et = 'null'
+                    et = None
                 result.append(dict(track_type=row[0],
                                    id=row[1],
                                    start_time=st,
@@ -355,7 +364,6 @@ class TrackerResourceCollection(APIResource):
             result['name'] = t.name
             result['device_type'] = t.device_type
             result['id'] = t.id
-            result['last_point'] = t.last_point
             return result
 
     def read_GET(self, rows, p=None):
@@ -455,8 +463,6 @@ class ContestTransportCollection(APIResource):
 
     def read_GET(self, t, p=None):
         if t:
-            result = []
-            result.append(self.read_POST(t))
             return self.read_POST(t)
 
     def read_POST(self, cont, p=None):

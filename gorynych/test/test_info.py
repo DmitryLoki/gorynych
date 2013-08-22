@@ -174,6 +174,7 @@ class PersonAPITest(unittest.TestCase):
 
     def test_3_get_person(self):
         r = requests.get(self.url)
+        print r.text
         p_id = r.json()[0]['id']
         r2 = requests.get(self.url + p_id)
         self.assertEqual(r2.status_code, 200)
@@ -181,6 +182,7 @@ class PersonAPITest(unittest.TestCase):
 
     def test_3_change_person(self):
         r = requests.get(self.url)
+        print r.json()
         p_id = r.json()[0]['id']
         params = json.dumps(dict(name="Juan", surname="CarlOs",
             country="MEXICO!"))
@@ -306,19 +308,18 @@ class ContestRaceTest(unittest.TestCase):
         self.assertEqual(r.status_code, 201)
         self.assertDictContainsSubset({'type':'opendistance',
                                        'title':'Task 8',
-                                       'start_time': '1347711300',
-                                       'end_time': '1347732000'
+                                       'start_time': 1347711300,
+                                       'end_time': 1347732000
                                        }, result)
         r = requests.get('/'.join((URL, 'contest', self.c_id, 'race',
             result['id'])))
         self.assertEqual(r.status_code, 200)
         result = r.json()
         self.assertEqual(result['race_type'], 'opendistance')
-        self.assertEqual(result['bearing'], '12')
-        self.assertEqual(result['start_time'], '1347711300')
-        self.assertEqual(result['end_time'], '1347732000')
+        self.assertEqual(result['bearing'], 12)
+        self.assertEqual(result['start_time'], 1347711300)
+        self.assertEqual(result['end_time'], 1347732000)
         self.assertEqual(result['race_title'], 'Task 8')
-        self.assertEqual(result['bearing'], '12')
         self.assertEqual(result['checkpoints'], json.loads(chs))
 
     def test_get_race_list(self):
@@ -336,8 +337,8 @@ class ContestRaceTest(unittest.TestCase):
         self.assertIsInstance(r.json(), list)
         self.assertDictContainsSubset({'type':'racetogoal',
                                        'title':'Task 8',
-                                       'start_time': '1347711300',
-                                       'end_time': '1347732000'}, r.json()[0])
+                                       'start_time': 1347711300,
+                                       'end_time': 1347732000}, r.json()[0])
 
     def test_change_race(self):
         try:
@@ -356,9 +357,10 @@ class ContestRaceTest(unittest.TestCase):
             .dumps({'type': 'FeatureCollection', 'features': new_ch_list}))
         r = requests.put('/'.join((URL, 'contest', self.c_id, 'race', race_id)),
                          data=json.dumps(params))
+        print r.text
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()['race_title'], u'Changed race')
-        self.assertEqual(r.json()['bearing'], '8')
+        self.assertEqual(r.json()['bearing'], 8)
         self.assertEqual(r.json()['checkpoints']['features'],
                          json.loads(json.dumps(new_ch_list)))
 
@@ -594,6 +596,7 @@ class ContestTransportTest(unittest.TestCase):
 
         r = requests.get('/'.join((self.url, self.c_id, 'race', race_id,
                         'transport')))
+        print r.text
         self.assertEqual(r.status_code, 200)
         res = r.json()
         self.assertIsInstance(res, list)

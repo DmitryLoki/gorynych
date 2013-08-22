@@ -1,4 +1,6 @@
 import math
+import types
+
 import numpy as np
 
 from gorynych.common.domain import events
@@ -209,9 +211,12 @@ def taken_on_exit(self, lat, lon, on_time):
 
 
 class CylinderCheckpointAdapter(object):
+    '''
+    Adapter for cylinder checkpoints.
+    '''
     def __init__(self, chp, opt_point, error_margin):
         '''
-        @param chp:
+        @param chp: checkpoint which to adapt.
         @type chp: gorynych.common.domain.types.Checkpoint.
         @param opt_point: lat, lon of optimum point on Cylinder.
         @type opt_point: tuple
@@ -259,6 +264,7 @@ class RaceTypesFactory(object):
     def create(self, rtype, rtask):
         '''
         @param rtask: dictionary with race task.
+        @type rtask: dict
         @param rtype: string with task type: 'online',
         'competition_aftertask'.
         '''
@@ -276,9 +282,11 @@ class RaceTypesFactory(object):
                     self.error_margin[rtype]['default'])
                 cp = CylinderCheckpointAdapter(ch, points[i], error_margin)
                 if ch.checked_on == 'enter':
-                    cp.is_taken_by = taken_on_enter
+                    cp.is_taken_by = types.MethodType(taken_on_enter, cp,
+                        CylinderCheckpointAdapter)
                 elif ch.checked_on == 'exit':
-                    cp.is_taken_by = taken_on_exit
+                    cp.is_taken_by = types.MethodType(taken_on_exit, cp,
+                        CylinderCheckpointAdapter)
                 race_checkpoints.append(cp)
         race_checkpoints = getattr(self, '_distances_for_' + rtask[
             'race_type'])(race_checkpoints)

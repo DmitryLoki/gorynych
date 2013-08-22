@@ -80,5 +80,30 @@ class TestTakenOnEnter(unittest.TestCase):
         self.assertEqual(self.adapter.take_time, 15)
 
 
+class TestRaceTypesFactoryCreate(unittest.TestCase):
+    def setUp(self):
+        factory = racetypes.RaceTypesFactory()
+        self.checkpoint_factory = mock.patch(
+            'gorynych.processor.domain'
+            '.racetypes.checkpoint_collection_from_geojson')
+        self.checkpoint_factory.start()
+        self.services = mock.patch(
+            'gorynych.processor.domain.services.JavaScriptShortWay')
+        self.services.start()
+        self.factory = factory
+
+    def tearDown(self):
+        self.checkpoint_factory.stop()
+        self.services.stop()
+
+    def test_no_race_type(self):
+        rtask = dict(rac_type='racetogoal')
+        self.assertRaises(ValueError, self.factory.create, 'online', rtask)
+
+    def test_no_race(self):
+        rtask = dict(race_type='unknown')
+        self.assertRaises(ValueError, self.factory.create, 'online', rtask)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -426,7 +426,6 @@ class ParametersFromRequestTest(unittest.TestCase):
         self.assertDictEqual(self.api.parameters_from_request(self.req),
             {'contest_id': '1234', 'race_id': '12', 'c':['ru', 'de'], 'id': '1'})
 
-
     def test_duplicated_parameters_from_args_and_url(self):
         self.req.uri = '/contest/1234/race/12/paraglider/'
         self.req.args = {'c': ['ru', 'de'], 'id': ['1'], 'race_id': ['12']}
@@ -449,37 +448,32 @@ class ParametersFromRequestTest(unittest.TestCase):
 
 
 class JsonRendererTest(unittest.TestCase):
-    def setUp(self):
-        from string import Template
-        self.template = {'contest': Template(
-            '{"id": "$contest_id", "name": "$contest_name"}')}
-
     def test_base_rendering(self):
-        self.assertEqual(json_renderer({'contest_id': 'hello',
-                        'contest_name': 'greeter'}, 'contest', self.template),
-            '{"id": "hello", "name": "greeter"}')
-        self.assertRaises(TypeError, json_renderer, 1, 'contest')
-        self.assertRaises(ValueError, json_renderer, {'a':1}, 'higs')
+        self.assertEqual(
+            json_renderer({'contest_id': 'hello', 'contest_name': 'greeter'}),
+                        '{"contest_id": "hello", "contest_name": "greeter"}')
 
     def test_list_rendering(self):
         import json
         test_list = [{'contest_id': 1, 'contest_name': 'one'},
                 {'contest_id': '2', 'contest_name': 'two'}]
-        result = json.loads(json_renderer(test_list, 'contest',
-            self.template))
+        result = json.loads(json_renderer(test_list))
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 2)
         self.assertIsInstance(result[0], dict)
-        self.assertEqual(result[0]['id'], '1')
-        self.assertEqual(result[1]['id'], '2')
-
-    def test_real_person_rendering(self):
-        result = json_renderer({'person_id': '1', 'person_name': 'John'},
-            'person_collection')
-        self.assertEqual(result, '{"id": "1", "name": "John"}')
+        self.assertDictEqual(result[0],{'contest_id': 1, 'contest_name':
+            'one'})
+        self.assertEqual(result[1]['contest_id'], '2')
 
     def test_render_empty_response(self):
-        self.assertEqual(json_renderer(None, 'haha'), '{}')
+        self.assertEqual(json_renderer(None, 'haha'), 'null')
+
+    def test_person_id_renderer(self):
+        from gorynych.info.domain.ids import PersonID
+        pid = PersonID()
+        result = json_renderer({'pid': pid})
+        self.assertEqual(result, '{"pid": "' + str(pid) + '"}')
+
 
 
 class YAMLTreeGenerationTest(unittest.TestCase):
@@ -492,6 +486,3 @@ class YAMLTreeGenerationTest(unittest.TestCase):
         ps = getattr(tree['person']['package'], tree['person']['leaf'])
         self.assertEqual(ps.__name__, 'PersonResourceCollection')
 
-
-if __name__ == '__main__':
-    unittest.main()

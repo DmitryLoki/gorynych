@@ -4,7 +4,6 @@ Resources for RESTful API.
 import os
 import re
 import simplejson as json
-from string import Template
 
 import yaml
 
@@ -12,7 +11,7 @@ from twisted.web import resource, server
 from twisted.internet import defer
 from twisted.python import log
 
-from gorynych.common.infrastructure.encoders import InfoJsonEncoder
+from gorynych.common.infrastructure.encoders import DomainJsonEncoder
 from gorynych.common.exceptions import NoAggregate, DomainError
 
 class BadParametersError(Exception):
@@ -24,9 +23,8 @@ YAML_TREE_FILE = 'resources_tree.yaml'
 
 
 def json_renderer(data, template_name=None):
-
     try:
-        return json.dumps(data, cls=InfoJsonEncoder)
+        return json.dumps(data, cls=DomainJsonEncoder)
     except TypeError as e:
         raise TypeError('Failed to encode json response: {}'.format(e.message))
         

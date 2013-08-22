@@ -211,4 +211,4 @@ def parse_result(data):
         res[key] = formats[key](res[key])
     return dict(dist=res['dist'],
                 spds=[res['gspd'], res['vspd']],
-                crds=[res['lon'], res['lat'], res['alt']])
+                crds=[res['lat'], res['lon'], res['alt']])

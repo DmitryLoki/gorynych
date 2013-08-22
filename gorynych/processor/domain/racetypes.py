@@ -162,9 +162,9 @@ def taken_on_enter(self, lat, lon, on_time):
     '''
     Is point (lat, lon) inside the circle?
     @param lat:
-    @type lat:
+    @type lat: float
     @param lon:
-    @type lon:
+    @type lon: float
     @return:
     @rtype: boolean
     '''
@@ -178,6 +178,17 @@ def taken_on_enter(self, lat, lon, on_time):
 
 
 def taken_on_exit(self, lat, lon, on_time):
+    '''
+    Point taken then on a cylinder leave.
+    @param lat:
+    @type lat: float
+    @param lon:
+    @type lon: float
+    @param on_time:
+    @type on_time: int
+    @return: is cylinder has been taken?
+    @rtype: boolean
+    '''
     self.dist_to_center = int(point_dist_calculator(
         lat, lon, self.checkpoint.lat, self.checkpoint.lon))
     is_inside = self.dist_to_center < (
@@ -202,14 +213,13 @@ class CylinderCheckpointAdapter(object):
         '''
         @param chp:
         @type chp: gorynych.common.domain.types.Checkpoint.
-        @param opt_point:
-        @type opt_point:
-        @param error_margin:
-        @type error_margin:
+        @param opt_point: lat, lon of optimum point on Cylinder.
+        @type opt_point: tuple
+        @param error_margin: acceptable buffer where cylinder can be taken.
+        @type error_margin: int
         @return:
         @rtype:
         '''
-
         self.checkpoint = chp
         self.distance = 0
         self.error_margin = error_margin

@@ -25,7 +25,7 @@ def makeService(config, services=None):
                                      user=config['dbuser'],
                                      password=config['dbpassword'],
                                      min=config['poolthreads'])
-    vis_service = TrackVisualizationService(pool)   
+    vis_service = TrackVisualizationService(pool)
     vis_service.setServiceParent(services)
 
     # Web-interface init

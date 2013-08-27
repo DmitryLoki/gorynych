@@ -14,15 +14,3 @@ class TracksResource(APIResource):
     def read_GET(self, trs, params=None):
         if trs:
             return json.dumps(trs)
-
-
-class CompleteTracksResource(APIResource):
-    """
-    /track/group/{id}/complete/pilots={id1},{id2},{id3}...
-    """
-    service_command = dict(GET='get_complete_tracks')
-    isLeaf = True
-
-    def read_GET(self, data, params=None):
-        if data:
-            return json.dumps(data)

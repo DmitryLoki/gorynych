@@ -1,8 +1,7 @@
-import simplejson as json
-
 from gorynych.info.restui.base_resource import APIResource
 
 
+# TODO: do this without subclassing APIResource?
 class TracksResource(APIResource):
     '''
     /group/{id}/tracks
@@ -13,4 +12,4 @@ class TracksResource(APIResource):
 
     def read_GET(self, trs, params=None):
         if trs:
-            return json.dumps(trs)
+            return trs

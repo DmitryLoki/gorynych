@@ -3,17 +3,16 @@ This application service return tracks data to visualisation.
 '''
 import time
 import math
+from collections import defaultdict
 
+from twisted.application.service import Service
 from twisted.internet import defer
 from twisted.python import log
 
 __author__ = 'Boris Tsema'
 
-from collections import defaultdict
 
-from twisted.application.service import Service
-
-
+# Select track data.
 SELECT_DATA = """
     SELECT
       t.timestamp,
@@ -33,6 +32,7 @@ SELECT_DATA = """
       t.timestamp;
     """
 
+# Select track state.
 SELECT_DATA_SNAPSHOTS = """
     SELECT
       s.timestamp,
@@ -47,6 +47,44 @@ SELECT_DATA_SNAPSHOTS = """
       s.timestamp BETWEEN %s AND %s;
     """
 
+# Select track data just for some tracks.
+SELECT_DATA_BY_LABEL = """
+    SELECT
+      t.timestamp,
+      string_agg(
+        concat_ws(',', tg.track_label, t.lat::text, t.lon::text, t.alt::text, t.v_speed::text, t.g_speed::text, t.distance::text),
+      ';')
+    FROM
+      track_data t,
+      tracks_group tg
+    WHERE
+      t.id = tg.track_id AND
+      tg.group_id = %s AND
+      t.timestamp BETWEEN %s AND %s AND
+      tg.track_label in %s
+    GROUP BY
+      t.timestamp
+    ORDER BY
+      t.timestamp;
+    """
+
+# Select track state changes for some tracks.
+SELECT_DATA_SNAPSHOTS_BY_LABEL = """
+    SELECT
+      s.timestamp,
+      s.snapshot,
+      tg.track_label
+    FROM
+      track_snapshot s,
+      tracks_group tg
+    WHERE
+      s.id = tg.track_id AND
+      tg.group_id = %s AND
+      s.timestamp BETWEEN %s AND %s AND
+      tg.track_label in %s;
+    """
+
+# Select last track point in the past for every track.
 GET_HEADERS_DATA = """
     WITH tdata AS (
             SELECT
@@ -71,6 +109,7 @@ GET_HEADERS_DATA = """
       tg.track_id = t.id;
   """
 
+# Select last state in the past for every track.
 GET_HEADERS_SNAPSHOTS = """
     WITH
       snaps AS (
@@ -98,7 +137,7 @@ GET_HEADERS_SNAPSHOTS = """
     """
 
 class TrackVisualizationService(Service):
-    # don't show pilots earlier then time - track_gap. In seconds
+    # Don't show pilots earlier then time - track_gap. In seconds
     track_gap = 15000
 
     def __init__(self, pool):
@@ -115,25 +154,47 @@ class TrackVisualizationService(Service):
 
     @defer.inlineCallbacks
     def get_track_data(self, params):
+        '''
+        Return dict with track data according to specified protocol.
+        @param params: request parameters, consist of group_id (domain id of
+         tracks group), from_time (unixtime) to_time (unixtime),
+         start_positions (show of not last track's position in the past),
+         track_labels (return result only for tracks with specified labels).
+        @type params: dict
+        @return:
+        @rtype: dict
+        '''
+        # TODO: pass keyword arguments into function instead of dictionary.
         result = dict()
-        race_id = params['group_id']
+        group_id = params['group_id']
         from_time = int(params['from_time'])
         to_time = int(params['to_time'])
         start_positions = params.get('start_positions')
+        track_labels = params.get('track_labels', '')
         t1 = time.time()
-        tracks = yield self.pool.runQuery(SELECT_DATA, (race_id, from_time,
-                                                  to_time))
-        snaps = yield self.pool.runQuery(SELECT_DATA_SNAPSHOTS,
-                                    (race_id, from_time, to_time))
+
+        if track_labels:
+            track_labels = track_labels.split(',')
+            tracks = yield self.pool.runQuery(SELECT_DATA_BY_LABEL, (group_id, from_time,
+                                                      to_time, tuple(track_labels)))
+            snaps = yield self.pool.runQuery(SELECT_DATA_SNAPSHOTS_BY_LABEL,
+                                        (group_id, from_time, to_time, tuple(track_labels)))
+
+        else:
+            tracks = yield self.pool.runQuery(SELECT_DATA, (group_id, from_time,
+                                                      to_time))
+            snaps = yield self.pool.runQuery(SELECT_DATA_SNAPSHOTS,
+                                        (group_id, from_time, to_time))
+            
         t2 = time.time()
         result['timeline'] = self.prepare_result(tracks, snaps)
         log.msg("data requested in %0.3f" % (t2-t1))
         if start_positions:
             ts1 = time.time()
-            hdata = yield self.pool.runQuery(GET_HEADERS_DATA, (race_id,
+            hdata = yield self.pool.runQuery(GET_HEADERS_DATA, (group_id,
                                 from_time - self.track_gap, from_time))
             hsnaps = yield self.pool.runQuery(GET_HEADERS_SNAPSHOTS,
-                                              (race_id, from_time))
+                                              (group_id, from_time))
             ts2 = time.time()
             start_data = self.prepare_start_data(hdata, hsnaps)
             result['start'] = start_data
@@ -151,6 +212,7 @@ class TrackVisualizationService(Service):
         'state':'finished', 'statechanged_at': 2134} - that's not true
         @rtype:
         '''
+        # TODO: make this method static.
         result = defaultdict(dict)
         # Add last coords and speeds to result.
         for row in hdata:
@@ -177,6 +239,8 @@ class TrackVisualizationService(Service):
         @return:{timestamp:{'contnumber':[lat,lon...], },}
         @rtype:
         '''
+        # TODO: does this method need to be part of interface or it can be
+        # static ?
         result = defaultdict(dict)
         for row in tracks:
             for data in row[1].split(';'):

@@ -3,15 +3,13 @@ This application service return tracks data to visualisation.
 '''
 import time
 import math
+from collections import defaultdict
 
+from twisted.application.service import Service
 from twisted.internet import defer
 from twisted.python import log
 
 __author__ = 'Boris Tsema'
-
-from collections import defaultdict
-
-from twisted.application.service import Service
 
 
 # Select track data.
@@ -214,6 +212,7 @@ class TrackVisualizationService(Service):
         'state':'finished', 'statechanged_at': 2134} - that's not true
         @rtype:
         '''
+        # TODO: make this method static.
         result = defaultdict(dict)
         # Add last coords and speeds to result.
         for row in hdata:
@@ -240,6 +239,8 @@ class TrackVisualizationService(Service):
         @return:{timestamp:{'contnumber':[lat,lon...], },}
         @rtype:
         '''
+        # TODO: does this method need to be part of interface or it can be
+        # static ?
         result = defaultdict(dict)
         for row in tracks:
             for data in row[1].split(';'):

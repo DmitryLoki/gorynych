@@ -2,13 +2,16 @@ import math
 import types
 
 import numpy as np
+from zope.interface import implementer
 
 from gorynych.common.domain import events
 from gorynych.common.domain.types import checkpoint_collection_from_geojson
-from gorynych.processor.domain import services
 from gorynych.common.domain.services import point_dist_calculator, bearing
+from gorynych.processor.domain import services
+from gorynych.processor.interfaces import IRaceType
 
-# TODO: create IRaceType.
+
+@implementer(IRaceType)
 class RaceToGoal(object):
     '''
     Incapsulate race parameters calculation.
@@ -84,6 +87,7 @@ class RaceToGoal(object):
         return points, eventlist
 
 
+@implementer(IRaceType)
 class OpenDistance(object):
     type = 'opendistance'
 

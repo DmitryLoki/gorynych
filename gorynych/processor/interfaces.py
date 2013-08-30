@@ -1,5 +1,6 @@
-__author__ = 'Boris Tsema'
-
+'''
+Interfaces for context processor.
+'''
 from zope.interface import Interface, Attribute
 
 class ITrackType(Interface):
@@ -41,4 +42,36 @@ class ITrackType(Interface):
         @type obj: C{gorynych.processor.domain.track.Track}
         @return: list of occured events.
         @rtype: C{list}
+        '''
+
+
+class IRaceType(Interface):
+    '''
+    I am a type of race task like Open Distance or Race to Goal.
+    '''
+
+    type = Attribute("A C{str} with name race name in lowercase and without "
+                     "any delimiters.")
+
+    start_time = Attribute("An C{int} with unixtime of moment from which "
+                           "a race activity became an object of our interest.")
+    end_time = Attribute("An C{int} with unixtime of moment then race "
+                         "stopped.")
+
+    def process(points, trackstate, aggregate_id):
+        '''
+        I process taken points and calculate what is necessary.
+        @param points: points for processing. Usually array of points for
+        some interval. It can be a whole track or just a part of it (in
+        livetrack mode).
+        @type points: C{numpy.ndarray} with dtype=L{gorynych.processor.domain.track.DTYPE}.
+        @param trackstate: read-only object which implement track state.
+        @type trackstate: L{gorynych.processor.domain.track.TrackState}.
+        @param aggregate_id: id of Track aggregate for which calculations
+        are performed.
+        @type aggregate_id: subclass of DomainIdentifier.
+        @return: tuple of length two. Tuple consist of processed
+        points with array full information about them and list of DomainEvents
+        which occur while processing.
+        @rtype: (numpy.ndarray, list)
         '''

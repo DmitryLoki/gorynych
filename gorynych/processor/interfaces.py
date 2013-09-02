@@ -71,7 +71,7 @@ class IRaceType(Interface):
         are performed.
         @type aggregate_id: subclass of DomainIdentifier.
         @return: tuple of length two. Tuple consist of processed
-        points with array full information about them and list of DomainEvents
-        which occur while processing.
+        points array with full information about those points and list of
+        DomainEvents which occur while processing.
         @rtype: (numpy.ndarray, list)
         '''

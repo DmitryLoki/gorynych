@@ -14,6 +14,9 @@ from gorynych.info.domain.test.helpers import create_checkpoints
 from gorynych.info.application import ApplicationService
 from gorynych.common.domain.types import Checkpoint
 
+from gorynych.receiver.receiver import FakeRabbitMQService
+from gorynych.info.application import LastPointApplication
+
 
 class GoodRepository():
     store = dict()
@@ -354,4 +357,12 @@ class ContestParagliderRaceTest(unittest.TestCase):
         race2 = self.repository.get_by_id(races[1].id)
 
 
+class TestLastPointApplicationRabbitMQService(unittest.TestCase):
+    def setUp(self):
+        self.sender = FakeRabbitMQService(LastPointApplication)
 
+    def test_message_transfer(self):
+        message = "Hi! I'm a message!"
+        self.sender.write(message)
+        received = self.sender.read(message)
+        self.assertEquals(received, message)

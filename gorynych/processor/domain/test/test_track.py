@@ -3,7 +3,7 @@ import simplejson as json
 from datetime import datetime
 
 from twisted.trial import unittest
-from domain.racetypes import RaceToGoal
+from gorynych.processor.domain.racetypes import RaceToGoal, RaceTypesFactory
 
 from gorynych.processor.domain import track
 from gorynych.common.domain import events
@@ -116,6 +116,30 @@ class TestRaceToGoal(unittest.TestCase):
     def test_dist_to_goal(self):
         rt = RaceToGoal(test_race)
         ts = track.TrackState([])
+        c = np.ones(1, dtype=[('lat', 'f4'), ('lon', 'f4'),
+            ('distance', 'i4'), ('timestamp', 'i4')])
+        c[0]['lat'] = 43.9658
+        c[0]['lon'] =  6.5578
+        a, b = rt.process(c, ts, 15)
+        self.assertTrue(a[0]['distance'] > 120000)
+
+
+class TestSpeedrun(unittest.TestCase):
+    def setUp(self):
+        self.factory = RaceTypesFactory()
+        self.test_race = test_race
+        self.test_race['race_type'] = 'speedrun'
+
+    def test_init(self):
+        rt = self.factory.create('online', self.test_race)
+        self.assertEqual(rt.type, 'speedrun')
+        self.assertTupleEqual((rt.start_time, rt.end_time), (1374223800,
+                                                                1374249600))
+        self.assertEqual(len(rt.checkpoints), 7)
+
+    def test_dist_to_goal(self):
+        rt = self.factory.create('online', self.test_race)
+        ts = track.TrackState(track.TrackID(), [])
         c = np.ones(1, dtype=[('lat', 'f4'), ('lon', 'f4'),
             ('distance', 'i4'), ('timestamp', 'i4')])
         c[0]['lat'] = 43.9658

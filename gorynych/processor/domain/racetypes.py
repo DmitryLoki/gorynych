@@ -88,6 +88,11 @@ class RaceToGoal(object):
 
 
 @implementer(IRaceType)
+class SpeedRun(RaceToGoal):
+    type = 'speedrun'
+
+
+@implementer(IRaceType)
 class OpenDistance(object):
     type = 'opendistance'
 
@@ -261,7 +266,7 @@ class CylinderCheckpointAdapter(object):
 
 
 class RaceTypesFactory(object):
-    races = dict(racetogoal=RaceToGoal, opendistance=OpenDistance)
+    races = dict(racetogoal=RaceToGoal, opendistance=OpenDistance, speedrun=SpeedRun)
     error_margin = dict(online={'es': 10, 'goal': 10, 'default': 1000},
         competition_aftertask={'es': 10, 'goal': 10, 'default': 50})
 
@@ -321,3 +326,5 @@ class RaceTypesFactory(object):
             p.distance = race_checkpoints[idx].distance + dist_from_prev
         return race_checkpoints
 
+    def _distances_for_speedrun(self, race_checkpoints):
+        return self._distances_for_racetogoal(race_checkpoints)

@@ -88,6 +88,79 @@ class RaceToGoal(object):
 
 
 @implementer(IRaceType)
+class SpeedRun(object):
+    type = 'speedrun'
+
+    def __init__(self, task, checkpoints):
+        self.checkpoints = checkpoints
+        self.start_time = int(task['start_time'])
+        self.end_time = int(task['end_time'])
+
+    def process(self, points, trackstate, _id):
+        '''
+        Process points and emit events if needed.
+        @param points: array with points for some seconds (minute usually).
+        @type points: C{np.array}
+        @param trackstate: read-only object implementing track state.
+        @type trackstate: gorynych.processor.domain.track.TrackState
+        @return: (points, event list)
+        @rtype: (np.array, list)
+        '''
+        assert isinstance(points, np.ndarray), "Got %s instead of ndarray" % \
+                                               type(points)
+        eventlist = []
+        lastchp = trackstate.last_checkpoint
+        if lastchp < len(self.checkpoints) - 1:
+            nextchp = self.checkpoints[lastchp + 1]
+        else:
+            # Last point has been taken but we still have data.
+            if trackstate.last_distance:
+                for p in points:
+                    p['distance'] = trackstate.last_distance
+                return points, []
+            else:
+                for p in points:
+                    p['distance'] = 200
+                return points, []
+        if trackstate.state == 'landed':
+            if trackstate.last_distance:
+                for p in points:
+                    p['distance'] = trackstate.last_distance
+                return points, []
+            else:
+                for p in points:
+                    p['distance'] = 200
+                return points, []
+
+        calculation_ended = trackstate.ended
+        for idx, p in np.ndenumerate(points):
+            lat, lon = p['lat'], p['lon']
+            if nextchp.is_taken_by(lat, lon, p['timestamp']) and \
+                    (not calculation_ended):
+                eventlist.append(
+                    events.TrackCheckpointTaken(
+                        _id,
+                        (lastchp + 1, nextchp.dist_to_center),
+                        occured_on=nextchp.take_time))
+                if nextchp.type == 'es':
+                    eventlist.append(events.TrackFinishTimeReceived(_id,
+                        payload=p['timestamp']))
+                if nextchp.type == 'goal':
+                    eventlist.append(events.TrackFinished(_id,
+                        occured_on=trackstate.finish_time))
+                    calculation_ended = True
+                if nextchp.type == 'ss':
+                    eventlist.append(events.TrackStarted(_id,
+                        occured_on=p['timestamp']))
+                if lastchp + 1 < len(self.checkpoints) - 1:
+                    nextchp = self.checkpoints[lastchp + 2]
+                    lastchp += 1
+            p['distance'] = nextchp.dist_to_point(lat, lon) + nextchp.distance
+
+        return points, eventlist
+
+
+@implementer(IRaceType)
 class OpenDistance(object):
     type = 'opendistance'
 
@@ -261,7 +334,7 @@ class CylinderCheckpointAdapter(object):
 
 
 class RaceTypesFactory(object):
-    races = dict(racetogoal=RaceToGoal, opendistance=OpenDistance)
+    races = dict(racetogoal=RaceToGoal, opendistance=OpenDistance, speedrun=SpeedRun)
     error_margin = dict(online={'es': 10, 'goal': 10, 'default': 1000},
         competition_aftertask={'es': 10, 'goal': 10, 'default': 50})
 
@@ -321,3 +394,11 @@ class RaceTypesFactory(object):
             p.distance = race_checkpoints[idx].distance + dist_from_prev
         return race_checkpoints
 
+    def _distances_for_speedrun(self, race_checkpoints):
+        if len(race_checkpoints) == 1:
+            return race_checkpoints
+        for idx, p in enumerate(race_checkpoints[1:]):
+            dist_from_prev = p.dist_to_point(
+                race_checkpoints[idx].opt_lat, race_checkpoints[idx].opt_lon)
+            p.distance = race_checkpoints[idx].distance + dist_from_prev
+        return race_checkpoints

@@ -13,16 +13,18 @@ class TestOfflineCorrectorService(unittest.TestCase):
     def setUp(self):
         self.dtype = [('id', 'i4'), ('timestamp', 'i4'), ('lon', 'f4')]
         self.oc = services.OfflineCorrectorService()
-
-    def test_clean_timestamp(self):
         shape = 15
         ar = np.empty(shape, dtype=self.dtype)
         ar['id'] = np.arange(10, shape+10)
         ar['timestamp'] = np.arange(10, shape+10)
         ar['lon'] = np.ones(shape)
-        ar['timestamp'][4] = ar['timestamp'][3]
-        ar['timestamp'][6] = ar['timestamp'][5]-1
-        result = self.oc._clean_timestamps(ar, 11, 20)
+        self.ar = ar
+
+    def tearDown(self):
+        del self.ar
+
+    def test_clean_timestamp(self):
+        result = self.oc._clean_timestamps(self.ar, 11, 20)
         self.assertIsInstance(result, np.ndarray)
         self.assertTupleEqual((result.ndim, result.shape), (1, (9,)))
         expected = range(11, 21)

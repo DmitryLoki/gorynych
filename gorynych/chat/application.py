@@ -3,10 +3,15 @@ import json
 __author__ = 'Boris Tsema'
 
 from zope.interface import Interface, implementer
-from twisted.application.service import Service
+from gorynych.common.application import EventPollingService
 
 from gorynych.chat.domain.model import MessageFactory
 
+CREATE_CHATROOM = """
+    INSERT INTO
+        chatrooms(chatroom_name)
+    VALUES(%s)
+    """
 
 class IChatService(Interface):
     '''
@@ -38,12 +43,11 @@ class IChatService(Interface):
 
 
 @implementer(IChatService)
-class ChatApplication(Service):
+class ChatApplication(EventPollingService):
     factory = MessageFactory()
 
-    def __init__(self, repo, auth_service):
+    def __init__(self, pool, event_store, repo, auth_service):
         '''
-
         @param repo:
         @type repo:
         @param auth_service:
@@ -52,6 +56,7 @@ class ChatApplication(Service):
         @return:
         @rtype:
         '''
+        EventPollingService.__init__(self, pool, event_store)
         self.repository = repo
         self.auth_service = auth_service
 
@@ -75,6 +80,23 @@ class ChatApplication(Service):
     def authenticate(self, token):
         return self.auth_service.authenticate(token)
 
+    def create_chatroom(self, chatroom):
+        '''
+        Create new chatroom with name chatroom.
+        @param chatroom: Name of new chatroom.
+        @type chatroom: str
+        @return:
+        @rtype: Deferred
+        '''
+        assert isinstance(chatroom, str), "Chatroom name must be str, " \
+                                          "not %s." % type(chatroom)
+        return self.repository.pool.runOperation(CREATE_CHATROOM, (chatroom,))
+
+    def process_ContestRaceCreated(self, ev):
+        chatroom_name = str(ev.payload)
+        d = self.create_chatroom(chatroom_name)
+        d.addCallback(lambda _:self.event_dispatched(ev.id))
+        return d
 
     # Don't think too hard about next two methods: it's shit and created for
     #  speed.
@@ -117,3 +139,4 @@ class ChatApplication(Service):
         d = self.repository.pool.runQuery(query, (phone,))
         d.addCallback(result)
         return d
+

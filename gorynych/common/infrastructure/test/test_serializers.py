@@ -44,7 +44,7 @@ class JSONSerializerTest(unittest.TestCase):
     def test_to_bytes(self):
         a = [dict(a='b', c='d'), 1, None, 'a', False]
         res = serializers.JSONSerializer().to_bytes(a)
-        self.assertIsInstance(res, bytes)
+        self.assertIsInstance(res, buffer)
 
 
 class PickleSerializer(unittest.TestCase):

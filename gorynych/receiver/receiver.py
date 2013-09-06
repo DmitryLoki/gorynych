@@ -412,3 +412,31 @@ class AuditFileLog(AuditLog):
 class DumbAuditLog(AuditLog):
     def _write_log(self, log_message):
         pass
+
+
+class FakeRabbitMQService(object):
+    """
+    This is a special class to test classes derived from RabbitMQService.
+    Put your derived class as an argument to the constructor and you'll get the
+    patched version of it so you can send and read messages without touching
+    any actual RabbitMQ mechanics.
+
+    Don't know where to put it. Let it be here for a while.
+    """
+
+    def __new__(self, derived_class):
+        import mock
+        import types
+
+        def mock_write(target, data, key='', exchange=''):
+            target.storage = data
+
+        def mock_read(target, queue_name):
+            return target.storage
+
+        with mock.patch.object(derived_class, '__init__') as patched:
+            patched.return_value = None
+            instance = derived_class()
+            instance.write = types.MethodType(mock_write, instance)
+            instance.read = types.MethodType(mock_read, instance)
+            return instance

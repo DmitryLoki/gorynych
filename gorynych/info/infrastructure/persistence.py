@@ -8,11 +8,12 @@ from twisted.python import log
 from zope.interface import implements, implementer
 import psycopg2
 
-from gorynych.info.domain.contest import Paraglider, IContestRepository, ContestFactory
+from gorynych.info.domain.interfaces import IContestRepository, IPersonRepository, IRaceRepository
+from gorynych.info.domain.contest import ContestFactory
 from gorynych.info.domain.ids import PersonID, TransportID
-from gorynych.info.domain.race import IRaceRepository, RaceFactory
+from gorynych.info.domain.race import RaceFactory, Paraglider
 from gorynych.common.domain.types import checkpoint_collection_from_geojson, geojson_feature_collection, Name
-from gorynych.info.domain.person import IPersonRepository, PersonFactory
+from gorynych.info.domain.person import PersonFactory
 from gorynych.common.exceptions import NoAggregate, DatabaseValueError
 from gorynych.common.infrastructure import persistence as pe
 from gorynych.info.domain import interfaces
@@ -109,9 +110,6 @@ class PGSQLPersonRepository(BasePGSQLRepository):
                 data_row[1],
                 data_row[2],
                 data_row[3],
-                regdate.year,
-                regdate.month,
-                regdate.day,
                 data_row[5])
             result._id = data_row[6]
             return result
@@ -288,7 +286,7 @@ class PGSQLRaceRepository(BasePGSQLRepository):
             cur.execute("DELETE FROM race_transport WHERE id=%s AND "
                         "transport_id in %s", (obj._id, ids))
         if to_insert_tr:
-            q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s)",
+            q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s)",
                 (pitem)) for pitem in to_insert_tr)
             cur.execute("INSERT INTO race_transport VALUES " + q)
         return obj
@@ -305,8 +303,9 @@ class PGSQLRaceRepository(BasePGSQLRepository):
         bearing = ''
         if obj.type == 'opendistance':
             if obj.task.bearing is None:
-                raise ValueError("Race doesn't have a bearing.")
-            bearing = json.dumps(dict(bearing=int(obj.task.bearing)))
+                bearing = None
+            else:
+                bearing = json.dumps(dict(bearing=int(obj.task.bearing)))
         result['race'] = (obj.title, obj.start_time, obj.end_time,
         obj.timezone, obj.type,
         geojson_feature_collection(obj.checkpoints),
@@ -499,8 +498,8 @@ class PGSQLTrackerRepository(BasePGSQLRepository):
             defer.returnValue('')
 
         # something has been changed in assignees
-        to_insert = set(obj.assignee.viewitems()).difference(set(ass))
-        to_delete = set(ass).difference(set(obj.assignee.viewitems()))
+        to_insert = set(obj.assignee.viewitems()).difference(set(ass.items()))
+        to_delete = set(ass.items()).difference(set(obj.assignee.viewitems()))
 
         def update(cur):
             cur.execute(pe.update('tracker'), self._extract_sql_fields(obj))

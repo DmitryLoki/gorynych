@@ -1,12 +1,14 @@
 import unittest
 
 import mock
+import time
+from copy import deepcopy
 
 from gorynych.common.domain import events
 from gorynych.info.domain.test.helpers import create_contest
-from gorynych.info.domain import contest, person
+from gorynych.info.domain import contest, person, race
 from gorynych.common.domain.types import Address, Name, Country
-from gorynych.info.domain.ids import PersonID, RaceID
+from gorynych.info.domain.ids import PersonID, RaceID, TrackerID, TransportID
 
 
 class MockedPersonRepository(mock.Mock):
@@ -31,7 +33,7 @@ class ContestFactoryTest(unittest.TestCase):
     def test_contestid_successfull_contest_creation(self):
         cont = create_contest(1, 2)
         self.assertIsInstance(cont.address, Address)
-        self.assertEqual(cont.title, 'Hello World')
+        self.assertEqual(cont.title, 'Hello world')
         self.assertEqual(cont.country, 'RU')
         self.assertEqual(cont.timezone, 'Europe/Moscow')
         self.assertEqual(cont.place, 'Yrupinsk')
@@ -123,7 +125,7 @@ class ContestTest(unittest.TestCase):
     def test_change_title(self):
         cont = create_contest(1, '15')
         cont.title = '  hello moOn  '
-        self.assertEqual(cont.title, 'Hello Moon')
+        self.assertEqual(cont.title, 'hello moOn')
 
     def test_change_address(self):
         cont = create_contest(1, '15')
@@ -188,11 +190,64 @@ class ContestTestWithRegisteredParagliders(unittest.TestCase):
 class ParagliderTest(unittest.TestCase):
     def test_success_creation(self):
         p_id = PersonID()
-        p = contest.Paraglider(p_id, Name('Vasya', 'Pupkin'),
-                            Country('RU'), 'Mantra 9', 15, 16)
+        t_id = TrackerID(TrackerID.device_types[0], '123456789012345')
+        p = race.Paraglider(p_id, Name('Vasya', 'Pupkin'),
+                            Country('RU'), 'Mantra 9', 15, t_id)
         self.assertEqual(p.person_id, p_id)
         self.assertEqual(p.glider, 'mantra')
         self.assertEqual(p.contest_number, 15)
-        # TODO: uncomment then TrackerID will be implemented.
-        # self.assertEqual(p.tracker_id, TrackerID())
+        self.assertEqual(p.tracker_id, t_id)
 
+
+@mock.patch('gorynych.common.infrastructure.persistence.event_store')
+class ContestServiceTest(unittest.TestCase):
+
+    def setUp(self):
+        self.cont = create_contest(time.time(), time.time() + 3600)
+    
+    def test_register_paraglider(self, patched):
+        event_store = mock.Mock()
+        patched.return_value = event_store
+
+        alone_cont = deepcopy(self.cont)
+        pid = PersonID()
+        populated_cont = self.cont.register_paraglider(pid,
+                                                       'glider',
+                                                       11)
+        self.assertFalse(alone_cont.paragliders)
+        self.assertTrue(populated_cont.paragliders)
+
+        pgl = populated_cont.paragliders
+        self.assertEquals(pgl.keys()[0], pid)
+        self.assertEquals(pgl[pid]['role'], 'paraglider')
+        self.assertEquals(pgl[pid]['glider'], 'glider')
+        self.assertEquals(pgl[pid]['contest_number'], 11)
+
+    def test_add_transport(self, patched):
+        event_store = mock.Mock()
+        patched.return_value = event_store
+
+        alone_cont = deepcopy(self.cont)
+        tid = TransportID()
+        populated_cont = self.cont.add_transport(tid)
+
+        self.assertFalse(alone_cont.transport)
+        self.assertIn(tid, populated_cont.transport)
+
+    def test_change_paraglider(self, patched):
+        event_store = mock.Mock()
+        patched.return_value = event_store
+
+        pid = PersonID()
+        cont = self.cont.register_paraglider(pid,
+                                             'glider',
+                                             11)
+        changed_cont = contest.change_participant(cont, dict(glider='noglider',
+                                                             contest_number=21,
+                                                             person_id=pid))
+
+        pgl = changed_cont.paragliders
+
+        self.assertEquals(pgl.keys()[0], pid)
+        self.assertEquals(pgl[pid]['glider'], 'noglider')
+        self.assertEquals(pgl[pid]['contest_number'], 21)

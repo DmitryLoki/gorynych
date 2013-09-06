@@ -58,14 +58,18 @@ class Tracker(AggregateRoot):
 
     def unassign(self, contest_id):
         if self.is_free():
-            raise DomainError("Tracker don't assigned to anyone.")
+            raise DomainError("Tracker isn't assigned to anyone.")
         elif not self.assignee.has_key(contest_id):
             raise DomainError("Tracker hasn't been assigned to contest %s" %
                               contest_id)
         else:
             aid = self.assignee[contest_id]
             del self.assignee[contest_id]
-            aid = PersonID.fromstring(aid)
+            assignee_type = aid.split('-', 1)[0]
+            if assignee_type == 'pers':
+                aid = PersonID.fromstring(aid)
+            elif assignee_type == 'trns':
+                aid = TransportID.fromstring(aid)
             return pe.event_store().persist(TrackerUnAssigned(
                 aggregate_id=aid, payload=(str(self.id), str(contest_id))))
 

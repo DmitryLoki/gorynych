@@ -3,6 +3,7 @@ import simplejson as json
 
 from shapely.geometry import Point
 from gorynych.info.domain.test.helpers import create_checkpoints
+from gorynych.common.domain.services import point_dist_calculator
 
 from gorynych.common.domain import types
 
@@ -60,7 +61,8 @@ class CheckpointTest(unittest.TestCase):
     def test_creating(self):
         point1 = Point(42.502, 0.798)
         ch1 = types.Checkpoint(name='A01', geometry=point1,
-                                ch_type='TO', times=(2, None), radius=2)
+                                ch_type='TO', times=(2, None), radius=2,
+                                checked_on='exit')
         ch2 = types.Checkpoint(name='A01', geometry=Point(42.502, 0.798),
                                  times=(4, 6), radius=3)
         ch3 = types.Checkpoint(name='B02', geometry=Point(1, 2), ch_type='es',
@@ -71,6 +73,9 @@ class CheckpointTest(unittest.TestCase):
 
         self.assertEqual(ch1.geometry, point1)
         self.assertEqual(ch1.radius, 2)
+
+        self.assertEqual(ch1.checked_on, 'exit')
+        self.assertEqual(ch2.checked_on, 'enter')
 
         self.assertEqual(ch3.type, 'es')
         self.assertEqual(ch1.type, 'to')
@@ -97,7 +102,8 @@ class CheckpointTest(unittest.TestCase):
                               'properties': {'radius': 2, 'name': 'A01',
                                             'checkpoint_type': 'to',
                                             'open_time': 2,
-                                            'close_time': None}
+                                            'close_time': None,
+                                            'checked_on': 'enter'}
                                 }
 
         self.assertEqual(json.dumps(ch1.__geo_interface__),
@@ -165,6 +171,7 @@ class CheckpointTest(unittest.TestCase):
                                 'checkpoint_type': 'ordinal'}}
         ch = types.Checkpoint.from_geojson(point)
         self.assertIsInstance(str(ch), bytes)
+        point['properties']['checked_on'] = 'enter'
         self.assertEqual(str(ch), json.dumps(point))
 
     def test_geojson_feature_collection(self):
@@ -174,17 +181,21 @@ class CheckpointTest(unittest.TestCase):
         self.assertIsInstance(res, str)
 
     def test_distance_to(self):
-        point1 = {'geometry': {'type': 'Point', 'coordinates': [0.0, 1.0]},
+        coords1 = [0.0, 1.0]
+        point1 = {'geometry': {'type': 'Point', 'coordinates': coords1},
             'type': 'Feature',
             'properties': {'name': "A01", 'radius': 400,
                 'open_time': 12345, 'close_time': 123456}}
-        point2 = {'geometry': {'type': 'Point', 'coordinates': [0.0, 2.0]},
+        coords2 = [0.0, 2.0]
+        point2 = {'geometry': {'type': 'Point', 'coordinates': coords2},
             'type': 'Feature',
             'properties': {'name': "A01", 'radius': 400,
                 'open_time': 12345, 'close_time': 123456}}
         ch1 = types.Checkpoint.from_geojson(point1)
         ch2 = types.Checkpoint.from_geojson(point2)
-        self.assertEqual(int(ch1.distance_to(ch2)), 111319)
+
+        check_distance = point_dist_calculator(coords1[0], coords1[1], coords2[0], coords2[1])
+        self.assertEqual(ch1.distance_to(ch2), check_distance)
 
 
 if __name__ == '__main__':

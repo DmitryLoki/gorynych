@@ -95,15 +95,17 @@ class Person(AggregateRoot):
 
     def apply_TrackerUnAssigned(self, ev):
         tr, cont = ev.payload
-        del self.trackers[cont]
+        # TODO: it's a workaround not a fix. Think more and redo.
+        if self.trackers.has_key(cont):
+            del self.trackers[cont]
 
 
 class PersonFactory(object):
     # Person can hold additional data of those types.
     person_data_types = ['phone']
 
-    def create_person(self, name, surname, country, email, year=None,
-            month=None, day=None, person_id=None, **person_data):
+    def create_person(self, name, surname, country, email, person_id=None,
+            **person_data):
         '''
         Create an instance of Person aggregate.
         @param name:
@@ -131,33 +133,6 @@ class PersonFactory(object):
                 setattr(person, data_type, person_data[data_type])
 
         return person
-
-
-# TODO: move interfaces into domain.interfaces.
-class IPersonRepository(Interface):
-
-    def get_by_id(id):
-        '''
-        Return a person with id.
-        @param id:
-        @type id:
-        @return: a person
-        @rtype: Person
-        '''
-
-    def save(person):
-        '''
-        Persist person.
-        @param person:
-        @type person: Person
-        @return:
-        @rtype:
-        '''
-
-    def get_list(limit, offset):
-        '''
-        Return list of a person
-        '''
 
 
 def change_person(person, params):

@@ -77,7 +77,7 @@ class TrackerID(DomainIdentifier):
     device_type-device_id
     '''
     # TODO: global constants.
-    device_types = ['tr203', 'telt_gh3000']
+    device_types = ['tr203', 'telt_gh3000', 'new_mobile', 'mobile']
 
     def __init__(self, device_type, device_id):
         super(TrackerID, self).__init__()

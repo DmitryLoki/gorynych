@@ -8,7 +8,7 @@ from gorynych.common.infrastructure import persistence as pe
 from gorynych.common.exceptions import DomainError
 
 
-DEVICE_TYPES = ['tr203', 'telt_gh3000']
+DEVICE_TYPES = ['tr203', 'telt_gh3000', 'new_mobile', 'mobile']
 
 
 class Tracker(AggregateRoot):

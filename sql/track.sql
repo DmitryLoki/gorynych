@@ -56,7 +56,7 @@ SELECT track_id, id from track where track_id=%s;
 -- Select all_track
 SELECT
   TRACK_ID, TRACK_ID, ID
-FROM TRACK
+FROM TRACK;
 
 
 -- Select tracks

@@ -14,8 +14,8 @@ from gorynych.processor.domain import services
 from gorynych.processor.domain.racetypes import RaceTypesFactory
 
 
-DTYPE = [('id', 'i4'), ('timestamp', 'i4'), ('lat', 'f4'),
-    ('lon', 'f4'), ('alt', 'i2'), ('g_speed', 'f4'), ('v_speed', 'f4'),
+DTYPE = [('id', 'i4'), ('timestamp', 'i4'), ('lat', 'f8'),
+    ('lon', 'f8'), ('alt', 'i2'), ('g_speed', 'f4'), ('v_speed', 'f4'),
     ('distance', 'i4')]
 
 EARTH_RADIUS = 6371000

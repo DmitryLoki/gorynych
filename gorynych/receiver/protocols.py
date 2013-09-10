@@ -83,7 +83,7 @@ class UDPTeltonikaGH3000Protocol(protocol.DatagramProtocol):
                                     device_type=self.device_type)
 
 
-class MobileReceivingProtocol(protocol.Protocol):
+RedViewGT60Protocolclass MobileReceivingProtocol(protocol.Protocol):
 
     '''
     Line receiver protocol. Used by mobile application.
@@ -171,3 +171,11 @@ class HttpTR203Resource(Resource):
     def render_POST(self, msg):
         log.msg('POST: {}, args: {}'.format(msg, msg.args))
         return self._handle(msg.content.read())
+
+
+class RedViewGT60Protocol(protocol.Protocol):
+    device_type = 'gt60'
+
+    def dataReceived(self, data):
+        self.factory.service.handle_message(
+            data, proto='TCP', device_type=self.device_type)

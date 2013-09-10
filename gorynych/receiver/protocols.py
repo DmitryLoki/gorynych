@@ -83,7 +83,7 @@ class UDPTeltonikaGH3000Protocol(protocol.DatagramProtocol):
                                     device_type=self.device_type)
 
 
-RedViewGT60Protocolclass MobileReceivingProtocol(protocol.Protocol):
+class MobileReceivingProtocol(protocol.Protocol):
 
     '''
     Line receiver protocol. Used by mobile application.

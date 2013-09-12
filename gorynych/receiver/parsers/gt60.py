@@ -7,6 +7,15 @@ import datetime
 from operator import xor
 
 
+class Command(object):
+
+    def __init__(self, msg):
+        body = msg[2:-2]
+        self.id = body[2:9].encode('hex').strip('f')
+        self.code = body[9:11].encode('hex')
+        self.data = body[11:-2]
+
+
 @implementer(IParseMessage)
 class RedViewGT60(object):
 
@@ -29,6 +38,10 @@ class RedViewGT60(object):
     a memo.
     """
 
+    dispatcher = {
+        '9955': 'geodata',
+        # to be filled
+    }
     precision = 6  # to round latlon coordinates
 
     def check_message_correctness(self, msg):
@@ -42,17 +55,53 @@ class RedViewGT60(object):
     def parse(self, msg):
         # determine, whether msg a command or a piece of geodata.
         if msg[:1] == '$$' and msg[-2:] == '\r\n':
-            return self.handle_command(msg)
+            cmd = Command(msg)
+            return self.handle_command(cmd)
         elif msg[0] == '$' and msg[-1] == '#':
             return self.parse_geodata(msg)
         else:
             raise ValueError('Unrecognized message type')
 
-    def handle_command(self, msg):
-        # nothing to do for now
-        pass
+    def handle_command(self, command):
+        """
+        Takes Command instance as an input.
+        """
+        method = getattr(self, 'handle_' + self.dispatcher.get(command.code, ''), None)
+        if method:
+            return method(command.id, command.data)
 
-    def parse_geodata(self, msg):
+    def handle_geodata(self, imei, data):
+        def latitude(digits, direction):
+            degrees = int(digits[0:2]) + float(digits[2:]) / 60.
+            degrees = round(degrees, self.precision)
+            if direction == 'N':
+                return degrees
+            else:
+                return -degrees
+
+        def longtitude(digits, direction):
+            degrees = int(digits[0:3]) + float(digits[3:]) / 60.
+            degrees = round(degrees, self.precision)
+            if direction == 'E':
+                return degrees
+            else:
+                return -degrees
+
+        dataset = data.split('|')
+        nmea = dataset[0]
+        alt = int(dataset[2])
+        nmea = nmea.split(',')
+        ts = int(
+            time.mktime(time.strptime(nmea[8] + nmea[0].split('.')[0],
+                                      '%d%m%y%H%M%S')))
+        result = dict(imei=imei,
+                      alt=alt,
+                      lat=latitude(nmea[2], nmea[3]),
+                      lon=longtitude(nmea[4], nmea[5]),
+                      ts=ts)
+        return result
+
+    def parse_compressed_geodata(self, msg):
         points = []
         imei = str(int(msg[2:10].encode('hex'), 16))[:14]
         count = ord(msg[16])  # how many points are in the packet
@@ -74,7 +123,7 @@ class RedViewGT60(object):
         return struct.unpack('>i', bytestring)[0]
 
     def get_coord(self, bytestring):
-        return round(self._to_int(bytestring)/60000., self.precision)
+        return round(self._to_int(bytestring) / 60000., self.precision)
 
     def get_time(self, bytestring):
         offsets = [

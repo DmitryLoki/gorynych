@@ -45,6 +45,8 @@ class RedViewGT60(object):
     precision = 6  # to round latlon coordinates
 
     def check_message_correctness(self, msg):
+        if self.is_command(msg):
+            return msg
         checksum = ord(msg[-2])
         data = map(ord, msg[:-2])
         calculated_checksum = sum(data) % 256
@@ -52,9 +54,14 @@ class RedViewGT60(object):
             raise ValueError("Incorrect checksum")
         return msg
 
+    def is_command(self, msg):
+        if msg[:2] == '$$' and msg[-2:] == '\r\n':
+            return True
+        return False
+
     def parse(self, msg):
         # determine, whether msg a command or a piece of geodata.
-        if msg[:1] == '$$' and msg[-2:] == '\r\n':
+        if self.is_command(msg):
             cmd = Command(msg)
             return self.handle_command(cmd)
         elif msg[0] == '$' and msg[-1] == '#':
@@ -67,8 +74,9 @@ class RedViewGT60(object):
         Takes Command instance as an input.
         """
         method = getattr(self, 'handle_' + self.dispatcher.get(command.code, ''), None)
-        if method:
-            return method(command.id, command.data)
+        if not method:
+            raise NotImplementedError
+        return method(command.id, command.data)
 
     def handle_geodata(self, imei, data):
         def latitude(digits, direction):
@@ -98,7 +106,8 @@ class RedViewGT60(object):
                       alt=alt,
                       lat=latitude(nmea[2], nmea[3]),
                       lon=longtitude(nmea[4], nmea[5]),
-                      ts=ts)
+                      ts=ts,
+                      h_speed=0)
         return result
 
     def parse_compressed_geodata(self, msg):
@@ -116,7 +125,6 @@ class RedViewGT60(object):
                          alt=int(pathchunk[12:14].encode('hex'), 16),
                          h_speed=0)
             points.append(point)
-        print points
         return points
 
     def _to_int(self, bytestring):

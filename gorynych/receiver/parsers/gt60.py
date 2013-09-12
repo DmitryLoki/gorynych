@@ -32,6 +32,11 @@ class RedViewGT60(object):
     precision = 6  # to round latlon coordinates
 
     def check_message_correctness(self, msg):
+        checksum = ord(msg[-2])
+        data = map(ord, msg[:-2])
+        calculated_checksum = sum(data) % 256
+        if checksum != calculated_checksum:
+            raise ValueError("Incorrect checksum")
         return msg
 
     def parse(self, msg):

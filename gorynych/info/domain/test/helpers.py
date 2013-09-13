@@ -3,7 +3,7 @@ Functions used in other tests.
 '''
 from shapely.geometry import Point
 from gorynych.common.domain.types import Checkpoint, Name
-from gorynych.info.domain import contest, race
+from gorynych.info.domain import contest, race, person
 from gorynych.info.domain.person import PersonID
 from gorynych.info.domain.tracker import TrackerFactory
 from gorynych.info.domain.transport import TransportFactory
@@ -30,10 +30,10 @@ def create_race(cont=None):
     pid2 = PersonID()
     r = factory.create_race('Test Race', 'racetogoal', cont.timezone, [], [],
                 timelimits=(cont.start_time, cont.end_time))
-    r.paragliders['12'] = contest.Paraglider(pid1, Name('Vasya', 'Hyev'),
+    r.paragliders['12'] = race.Paraglider(pid1, Name('Vasya', 'Hyev'),
          'RUSSIA velikaya nasha derzhava Rossia velikaya nasha strana',
          'pizdatyi glider', '12')
-    r.paragliders['13'] = contest.Paraglider(pid2, Name('John', 'Doe'),
+    r.paragliders['13'] = race.Paraglider(pid2, Name('John', 'Doe'),
         'Ya nenavizhy etot ebannyi test i mena zaeblo eto pisat',
         'hyevyi glider', '13')
     r._checkpoints = create_checkpoints()
@@ -70,3 +70,10 @@ def create_transport(transport_type):
     return TransportFactory().create_transport(transport_type=transport_type,
                                                title='MyFeet' + str(randint(1, 100500)),
                                                description='Alive! Safe! Eagle!')
+
+
+def create_person(name='John', surname='Doe',
+                  country='UA', email='johndoe@example.com', id=None):
+    factory = person.PersonFactory()
+    pers = factory.create_person(name, surname, country, email, id)
+    return pers

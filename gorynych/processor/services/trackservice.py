@@ -2,7 +2,6 @@
 from collections import defaultdict
 import time
 import cPickle
-import mock
 
 from twisted.python import log
 from twisted.internet import threads, defer, task
@@ -220,8 +219,6 @@ class OnlineTrashService(RabbitMQService):
         self.repo = repo
         # {race_id:{track_id:Track}}
         self.tracks = defaultdict(dict)
-        self.saver = task.LoopingCall(self.persist)
-        self.saver.start(30, False)
         self.processor = task.LoopingCall(self.process)
         self.processor.start(60, False)
         # device_id:(race_id, contest_number, time)
@@ -320,9 +317,10 @@ class OnlineTrashService(RabbitMQService):
                     result.id, device_id))
         defer.returnValue(result)
 
+    @defer.inlineCallbacks
     def process(self):
         '''
-        Process tracks.
+        Process and save tracks.
         @return:
         @rtype:
         '''
@@ -330,13 +328,8 @@ class OnlineTrashService(RabbitMQService):
             for key in self.tracks[rid].keys():
                 try:
                     self.tracks[rid][key].process_data()
+                    yield self.repo.save(self.tracks[rid][key])
                 except Exception as e:
                     log.err("%r" % e)
         return
 
-    @defer.inlineCallbacks
-    def persist(self):
-        for rid in self.tracks.keys():
-            for key in self.tracks[rid].keys():
-                yield self.repo.save(self.tracks[rid][key])
-        return

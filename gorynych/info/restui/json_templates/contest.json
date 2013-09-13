@@ -1,1 +1,0 @@
-{"id": "$contest_id", "title": "$contest_title", "country": "$contest_country_code", "start_time": "$contest_start_date", "end_time": "$contest_end_date","coords":$contest_coords,"retrieve_id":$retrieve_id}

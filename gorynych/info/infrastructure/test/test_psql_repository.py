@@ -30,23 +30,29 @@ POOL = db_helpers.POOL
 
 
 class MockeryTestCase(unittest.TestCase):
-
     def setUp(self):
-        self.repo = self.repo_type(POOL)
-        self.patch = mock.patch('gorynych.info.infrastructure.persistence.pe'
-                                '.event_store')
-        self.pe = self.patch.start()
-        m = mock.Mock()
-        m.load_events.return_value = []
-        m.load_events_for_aggregates.return_value = {}
-        self.pe.return_value = m
-        d = db_helpers.initDB(self.sql_file, POOL)
-        return d
+        try:
+            self.repo = self.repo_type(POOL)
+            self.patch = mock.patch(
+                'gorynych.info.infrastructure.persistence.pe'
+                '.event_store')
+            self.pe = self.patch.start()
+            m = mock.Mock()
+            m.load_events.return_value = []
+            m.load_events_for_aggregates.return_value = {}
+            self.pe.return_value = m
+            d = db_helpers.initDB(self.sql_file, POOL)
+            return d
+        except:
+            pass
 
     def tearDown(self):
-        del self.repo
-        self.patch.stop()
-        return db_helpers.tearDownDB(self.sql_file, POOL)
+        try:
+            del self.repo
+            self.patch.stop()
+            return db_helpers.tearDownDB(self.sql_file, POOL)
+        except:
+            pass
 
     @defer.inlineCallbacks
     def get_by_nonexistent_id(self):
@@ -63,16 +69,17 @@ class TransportRepositoryTest(MockeryTestCase):
     def setUp(self):
         d = super(TransportRepositoryTest, self).setUp()
         d.addCallback(lambda _: POOL.runOperation(
-            'insert into transport_type(transport_type) values(%s)', (self.test_transport_type,)))
+            'insert into transport_type(transport_type) values(%s)',
+            (self.test_transport_type,)))
         return d
 
     @defer.inlineCallbacks
     def test_save_new(self):
-
         transport = create_transport(self.test_transport_type)
         saved = yield self.repo.save(transport)
         self.assertEqual(saved, transport)
-        db_row = yield POOL.runQuery(pe.select('transport'), (str(transport.id),))
+        db_row = yield POOL.runQuery(pe.select('transport'),
+            (str(transport.id),))
         self.assertEqual(len(db_row), 1)
         db_row = db_row[0]
 
@@ -127,10 +134,10 @@ class TrackerRepositoryTest(MockeryTestCase):
         self.assertEqual(len(db_row), 1)
         db_row = db_row[0]
         self.assertTupleEqual((tracker.device_id, tracker.device_type,
-                              TrackerID(
-                                  tracker.device_type, tracker.device_id),
-                              tracker.name),
-                              (db_row[0], db_row[1], db_row[2], db_row[3]))
+        TrackerID(
+            tracker.device_type, tracker.device_id),
+        tracker.name),
+            (db_row[0], db_row[1], db_row[2], db_row[3]))
 
     @defer.inlineCallbacks
     def test_get_by_id(self):
@@ -151,7 +158,7 @@ class TrackerRepositoryTest(MockeryTestCase):
         saved = yield self.repo.save(tracker)
         yield POOL.runOperation(
             'insert into tracker_assignees(id, assignee_id, assigned_for) values(%s, %s, %s)',
-                               (saved._id, 'some_guy', 'for the sake of good'))
+            (saved._id, 'some_guy', 'for the sake of good'))
         ass = yield self.repo._get_assignee(saved._id)
         self.assertEqual(ass, {'for the sake of good': 'some_guy'})
 
@@ -159,7 +166,8 @@ class TrackerRepositoryTest(MockeryTestCase):
         self.assertFailure(
             POOL.runOperation(
                 'insert into tracker_assignees(id, assignee_id, assigned_for) values(%s, %s, %s)',
-                          (saved._id, 'some_guy', 'for the sake of good')), psycopg2.IntegrityError)
+                (saved._id, 'some_guy', 'for the sake of good')),
+            psycopg2.IntegrityError)
 
     @defer.inlineCallbacks
     def test_update(self):
@@ -179,7 +187,6 @@ class TrackerRepositoryTest(MockeryTestCase):
 
 
 class PersonRepositoryTest(MockeryTestCase):
-
     repo_type = PGSQLPersonRepository
     sql_file = 'person'
 
@@ -189,24 +196,24 @@ class PersonRepositoryTest(MockeryTestCase):
         pers = create_person(email=email)
         saved_pers = yield self.repo.save(pers)
         self.assertEqual(pers, saved_pers,
-                         'Something strange happend while saving.')
+            'Something strange happend while saving.')
         self.assertIsNotNone(saved_pers._id)
         db_row = yield POOL.runQuery(pe.select('person'), (str(pers.id),))
         self.assertEqual(len(db_row), 1)
         db_row = db_row[0]
         self.assertTupleEqual(('John', 'Doe', 'UA', str(pers.id)),
-                             (db_row[0], db_row[1], db_row[2], db_row[5]))
+            (db_row[0], db_row[1], db_row[2], db_row[5]))
 
     @defer.inlineCallbacks
     def test_get_by_id(self):
         p_id = PersonID()
         date = datetime.now()
         p__id = yield POOL.runQuery(pe.insert('person'),
-                                   ('name', 'surname', date, 'ru', 'a@a.ru', str(p_id)))
+            ('name', 'surname', date, 'ru', 'a@a.ru', str(p_id)))
         saved_pers = yield self.repo.get_by_id(p_id)
         self.assertIsNotNone(saved_pers)
         self.assertTupleEqual(('Name Surname', 'RU', str(p_id)),
-                             (saved_pers.name.full(), saved_pers.country, str(saved_pers.id)))
+            (saved_pers.name.full(), saved_pers.country, str(saved_pers.id)))
         self.assertEqual(p__id[0][0], saved_pers._id)
 
     def test_get_by_nonexistent_id(self):
@@ -217,7 +224,7 @@ class PersonRepositoryTest(MockeryTestCase):
         p_id = PersonID()
         date = datetime.now()
         yield POOL.runOperation(pe.insert('person'),
-                               ('name', 'Surname', date, 'ru', 'a@a.ru', str(p_id)))
+            ('name', 'Surname', date, 'ru', 'a@a.ru', str(p_id)))
         try:
             saved_pers = yield self.repo.get_by_id(p_id)
         except Exception:
@@ -234,7 +241,6 @@ class PersonRepositoryTest(MockeryTestCase):
 
     @defer.inlineCallbacks
     def test_save_duplicate(self):
-
         email = 'a@a.ru'
         pers = create_person(email=email)
         pers2 = create_person(email=email)
@@ -245,7 +251,6 @@ class PersonRepositoryTest(MockeryTestCase):
 
 
 class ContestRepositoryTest(MockeryTestCase):
-
     repo_type = PGSQLContestRepository
     sql_file = 'contest'
 
@@ -256,20 +261,20 @@ class ContestRepositoryTest(MockeryTestCase):
         stime = int(time.time())
         etime = stime + 1
         c__id = yield POOL.runQuery(pe.insert('contest'),
-                                   ('PGContest', stime, etime, tz, 'place', 'cou', 42.1, 42.2,
-                                    str(c_id)))
+            ('PGContest', stime, etime, tz, 'place', 'cou', 42.1, 42.2,
+            str(c_id)))
         c__id = c__id[0][0]
         # Add participants to contest
         pg1_id = PersonID()
         pg2_id = PersonID()
         org1_id = PersonID()
         yield POOL.runOperation(pe.insert('participant', 'contest'),
-                               (str(c_id), str(pg1_id), 'paraglider', 'gl1', '15', '', 'person'))
+            (str(c_id), str(pg1_id), 'paraglider', 'gl1', '15', '', 'person'))
         yield POOL.runOperation(pe.insert('participant', 'contest'),
-                               (str(c_id), str(pg2_id), 'paraglider', 'gl2', '18', '', 'person'))
+            (str(c_id), str(pg2_id), 'paraglider', 'gl2', '18', '', 'person'))
         yield POOL.runOperation(pe.insert('participant', 'contest'),
-                               (str(c_id), str(org1_id), 'organizator', '', '', 'retrieve',
-                                'person'))
+            (str(c_id), str(org1_id), 'organizator', '', '', 'retrieve',
+            'person'))
 
         # DB prepared, start test.
         cont = yield self.repo.get_by_id(c_id)
@@ -282,12 +287,12 @@ class ContestRepositoryTest(MockeryTestCase):
         self.assertEquals((cont.start_time, cont.end_time), (stime, etime))
         self.assertIsInstance(cont.id, ContestID)
         self.assertDictEqual(cont._participants,
-                             {pg1_id: {'role': 'paraglider', 'contest_number': '15',
-                                       'glider': 'gl1'},
-                              pg2_id: {
-                              'role': 'paraglider', 'contest_number': '18',
-                              'glider': 'gl2'},
-                              org1_id: {'role': 'organizator'}})
+            {pg1_id: {'role': 'paraglider', 'contest_number': '15',
+                'glider': 'gl1'},
+                pg2_id: {
+                    'role': 'paraglider', 'contest_number': '18',
+                    'glider': 'gl2'},
+                org1_id: {'role': 'organizator'}})
 
     def _prepare_participants(self, p_rows):
         participants = dict()
@@ -319,12 +324,12 @@ class ContestRepositoryTest(MockeryTestCase):
         cont._participants = dict()
         pid1 = PersonID()
         cont._participants[pid1] = dict(role='paraglider',
-                                        contest_number=13,
-                                        glider='gl')
+            contest_number=13,
+            glider='gl')
         pid2 = PersonID()
         cont._participants[pid2] = dict(role='paraglider',
-                                        contest_number=14,
-                                        glider='gl')
+            contest_number=14,
+            glider='gl')
         pid3 = PersonID()
         cont._participants[pid3] = dict(role='organizator')
         rid1 = RaceID()
@@ -370,7 +375,6 @@ class ContestRepositoryTest(MockeryTestCase):
 
 
 class RaceRepositoryTest(MockeryTestCase):
-
     repo_type = PGSQLRaceRepository
     sql_file = 'race'
 
@@ -393,11 +397,13 @@ class RaceRepositoryTest(MockeryTestCase):
         et = 1347732000
         _chs = geojson_feature_collection(chs)
         r_id = yield POOL.runQuery(pe.insert('race'),
-                                  (t, st, et, tz,
-                                   'racetogoal', _chs, None, st - 1, et + 1, str(rid)))
+            (t, st, et, tz,
+            'racetogoal', _chs, None, st - 1, et + 1, str(rid)))
 
         defer.returnValue(
-            (r_id[0][0], rid, t, st, et, st - 1, et + 1, tz, 'racetogoal', chs))
+            (
+                r_id[0][0], rid, t, st, et, st - 1, et + 1, tz, 'racetogoal',
+                chs))
 
     def _compare_race(self, i, ri, t, st, et, mst, met, tz, rt, chs, rc):
         self.assertEqual(rc._id, i)
@@ -417,7 +423,7 @@ class RaceRepositoryTest(MockeryTestCase):
         yield self.assertFailure(self.repo.get_by_id(ri), DatabaseValueError)
         pid = PersonID()
         yield POOL.runOperation(pe.insert('paraglider', 'race'),
-                               (i, str(pid), '1', 'ru', 'gl1', '', 'alex', 't'))
+            (i, str(pid), '1', 'ru', 'gl1', '', 'alex', 't'))
 
         rc = yield self.repo.get_by_id(ri)
 
@@ -432,17 +438,17 @@ class RaceRepositoryTest(MockeryTestCase):
         rc = create_race()
         saved_rc = yield self.repo.save(rc)
         self._compare_race(saved_rc._id, rc.id, rc.title, rc.start_time,
-                           rc.end_time, rc.timelimits[0], rc.timelimits[1],
-                           rc.timezone, rc.type,
-                           rc.checkpoints, saved_rc)
+            rc.end_time, rc.timelimits[0], rc.timelimits[1],
+            rc.timezone, rc.type,
+            rc.checkpoints, saved_rc)
         race_row = yield POOL.runQuery(pe.select('race'), (str(rc.id),))
         # print len(race_row[0])
         i, ri, t, st, et, tz, rt, chs, smth, mst, met = race_row[0]
         self._compare_race(i, ri, t, st, et, mst, met, tz, rt,
-                           checkpoint_collection_from_geojson(chs), rc)
+            checkpoint_collection_from_geojson(chs), rc)
 
         pg_row = yield POOL.runQuery(pe.select('paragliders', 'race'),
-                                     (saved_rc._id,))
+            (saved_rc._id,))
         pgs = {p.contest_number: p for p in create_participants(pg_row)}
         for key in pgs:
             # can't use __eq__ here because after _get_values_from_obj None tracker_id becomes ''
@@ -450,9 +456,9 @@ class RaceRepositoryTest(MockeryTestCase):
             self.assertEqual(pgs[key].person_id, rc.paragliders[key].person_id)
             self.assertEqual(pgs[key].glider, rc.paragliders[key].glider)
             self.assertEqual(pgs[
-                             key].contest_number, rc.paragliders[key].contest_number)
+                key].contest_number, rc.paragliders[key].contest_number)
             self.assertTrue(not pgs[
-                            key].tracker_id and not rc.paragliders[key].tracker_id)
+                key].tracker_id and not rc.paragliders[key].tracker_id)
 
     @defer.inlineCallbacks
     def test_update(self):
@@ -466,23 +472,23 @@ class RaceRepositoryTest(MockeryTestCase):
         saved_rc.paragliders[chkey]._name = Name("Mitrofan", "Ignatov")
         updated_rc = yield self.repo.save(rc)
         self._compare_race(saved_rc._id, saved_rc.id, saved_rc.title,
-                           saved_rc.start_time, saved_rc.end_time, saved_rc.timelimits[
-                               0], saved_rc.timelimits[1], saved_rc.timezone,
-                           saved_rc.type, chs, updated_rc)
+            saved_rc.start_time, saved_rc.end_time, saved_rc.timelimits[
+                0], saved_rc.timelimits[1], saved_rc.timezone,
+            saved_rc.type, chs, updated_rc)
 
         race_row = yield POOL.runQuery(pe.select('race'), (str(rc.id),))
         i, ri, t, st, et, tz, rt, chs, smth, mst, met = race_row[0]
         self._compare_race(i, ri, t, st, et, mst, met, tz, rt,
-                           checkpoint_collection_from_geojson(chs), rc)
+            checkpoint_collection_from_geojson(chs), rc)
         pg_row = yield POOL.runQuery(pe.select('paragliders', 'race'),
-                                     (saved_rc._id,))
+            (saved_rc._id,))
         pgs = {p.contest_number: p for p in create_participants(pg_row)}
         for key in pgs:
             # same shit as in test_save
             self.assertEqual(pgs[key].person_id, rc.paragliders[key].person_id)
             self.assertEqual(pgs[key].glider, rc.paragliders[key].glider)
             self.assertEqual(pgs[
-                             key].contest_number, rc.paragliders[key].contest_number)
+                key].contest_number, rc.paragliders[key].contest_number)
             self.assertTrue(not pgs[
-                            key].tracker_id and not rc.paragliders[key].tracker_id)
+                key].tracker_id and not rc.paragliders[key].tracker_id)
         yield db_helpers.tearDownDB('transport', POOL)

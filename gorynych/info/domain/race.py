@@ -5,23 +5,25 @@ __author__ = 'Boris Tsema'
 from collections import defaultdict
 from copy import deepcopy
 import re
+import json
 
 import pytz
 from zope.interface.interfaces import Interface
 
 
-from gorynych.common.domain.model import AggregateRoot, ValueObject,\
-                                        DomainEvent
-from gorynych.common.domain.types import Checkpoint
+from gorynych.common.domain.model import AggregateRoot, ValueObject
+from gorynych.common.domain.types import Checkpoint, Country, Name
 from gorynych.common.domain.services import times_from_checkpoints
 from gorynych.common.domain.events import ArchiveURLReceived, \
     RaceCheckpointsChanged
 from gorynych.common.infrastructure import persistence
 from gorynych.common.exceptions import TrackArchiveAlreadyExist
-from gorynych.info.domain.ids import RaceID
+from gorynych.info.domain.ids import RaceID, PersonID, TrackerID
+from gorynych.common.domain.types import checkpoint_from_geojson
 
 PATTERN = r'https?://airtribune.com/\w+'
 #PATTERN = r'https?://localhost:8080/\w+'
+
 
 class RaceTask(ValueObject):
     type = None
@@ -322,25 +324,103 @@ class TrackArchive(object):
             self._state = state
 
 
-class IRaceRepository(Interface):
-    def get_by_id(id):
-        '''
+class Paraglider(ValueObject):
 
-        @param id:
-        @type id:
-        @return:
-        @rtype:
-        '''
+    def __init__(self, person_id, name, country, glider, contest_number,
+                 tracker_id=None):
 
-    def save(obj):
-        '''
+        if not isinstance(person_id, PersonID):
+            person_id = PersonID().fromstring(person_id)
+        if not isinstance(name, Name):
+            raise TypeError("Name must be an instance of Name class.")
+        if not isinstance(country, Country):
+            country = Country(country)
+        if tracker_id and not isinstance(tracker_id, TrackerID):
+            tracker_id = TrackerID.fromstring(tracker_id)
 
-        @param obj:
-        @type obj:
-        @return:
-        @rtype:
-        '''
+        self.person_id = person_id
+        self._name = name
+        self.country = country.code()
+        self.glider = glider.strip().split(' ')[0].lower()
+        self.contest_number = contest_number
+        self.tracker_id = tracker_id
+        self._contest_track_id = None
+
+    @property
+    def name(self):
+        return self._name.short()
+
+    @property
+    def contest_track_id(self):
+        return self._contest_track_id
+
+    @contest_track_id.setter
+    def contest_track_id(self, value):
+        self._contest_track_id = str(value)
+
+    def __eq__(self, other):
+        return self.person_id == other.person_id and (self.glider == other
+        .glider) and (self.contest_number == other.contest_number) and (self
+                                                                                       .tracker_id == other.tracker_id)
 
 
 def change_race_transport(rc, params):
     return rc
+
+
+def change_race(contest_race, race_params):
+    '''
+    Change information about race in contest.
+    @param params:
+    @type params:
+    @return: Race
+    @rtype:
+    '''
+    if 'checkpoints' in race_params:
+        if isinstance(race_params['checkpoints'], (str, unicode)):
+            try:
+                ch_list = json.loads(
+                    race_params['checkpoints'])['features']
+            except Exception as e:
+                raise ValueError(
+                    "Problems with checkpoint reading: %r .Got %s, %r" %
+                                (e, type(race_params['checkpoints']),
+                                    race_params['checkpoints']))
+        elif isinstance(race_params['checkpoints'], dict):
+            ch_list = race_params['checkpoints']['features']
+        else:
+            raise ValueError(
+                "Problems with checkpoint reading: got %s, %r" %
+                (type(race_params['checkpoints']), race_params['checkpoints']))
+        checkpoints = []
+        for ch in ch_list:
+            checkpoints.append(checkpoint_from_geojson(ch))
+        contest_race.checkpoints = checkpoints
+    if 'title' in race_params:
+        contest_race.title = race_params['title']
+    if 'bearing' in race_params:
+        contest_race.bearing = race_params['bearing']
+    return contest_race
+
+
+def create_race_for_contest(cont, person_list,
+                            transport_list, race_params):
+    paragliders = cont.paragliders
+    persons = {p.id: p for p in person_list}
+    plist = []
+
+    for key in paragliders:
+        pers = persons[key]
+        plist.append(Paraglider(key, pers.name, pers.country,
+                     paragliders[key]['glider'],
+                     paragliders[key]['contest_number'],
+                     pers.trackers.get(cont.id)))
+
+    factory = RaceFactory()
+    r = factory.create_race(race_params['title'], race_params['race_type'],
+                            cont.timezone, plist,
+                            race_params['checkpoints'],
+                            bearing=race_params.get('bearing'),
+                            transport=transport_list,
+                            timelimits=(cont.start_time, cont.end_time))
+    return r

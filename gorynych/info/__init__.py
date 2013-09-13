@@ -26,14 +26,13 @@ def makeService(config, services=None):
     from gorynych.info.application import ApplicationService, LastPointApplication
     from gorynych.info.restui import base_resource
     # import persistence staff
-    from gorynych.info.domain.contest import IContestRepository
-    from gorynych.info.domain.race import IRaceRepository
-    from gorynych.info.domain.person import IPersonRepository
     from gorynych.info.domain import interfaces
     from gorynych.common.infrastructure import persistence
     from gorynych.eventstore.eventstore import EventStore
     from gorynych.eventstore.store import PGSQLAppendOnlyStore
     from gorynych.info.infrastructure.persistence import PGSQLContestRepository, PGSQLPersonRepository, PGSQLRaceRepository, PGSQLTrackerRepository, PGSQLTransportRepository
+    # Time sinchronization. TODO: find better place for it.
+    from gorynych.info.restui.resources import TimeResource
 
     if not services:
         services = service.MultiService()
@@ -58,11 +57,11 @@ def makeService(config, services=None):
     last_point.setServiceParent(services)
 
     # Repositories init.
-    persistence.register_repository(IContestRepository,
+    persistence.register_repository(interfaces.IContestRepository,
                                     PGSQLContestRepository(pool) )
-    persistence.register_repository(IRaceRepository,
+    persistence.register_repository(interfaces.IRaceRepository,
                                     PGSQLRaceRepository(pool))
-    persistence.register_repository(IPersonRepository,
+    persistence.register_repository(interfaces.IPersonRepository,
                                     PGSQLPersonRepository(pool))
     persistence.register_repository(interfaces.ITrackerRepository,
         PGSQLTrackerRepository(pool))
@@ -71,7 +70,9 @@ def makeService(config, services=None):
 
     # REST API init
     api_tree = base_resource.resource_tree()
-    site_factory = server.Site(base_resource.APIResource(api_tree, app_service))
+    api_resource = base_resource.APIResource(api_tree, app_service)
+    api_resource.putChild('time', TimeResource())
+    site_factory = server.Site(api_resource)
 
     internet.TCPServer(config['webport'], site_factory,
                        interface='localhost').setServiceParent(services)

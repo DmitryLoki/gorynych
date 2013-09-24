@@ -25,7 +25,7 @@ class A:
         pass
 
 ADD_TRACK_TO_GROUP = """
-    INSERT INTO TRACKS_GROUP VALUES (%s,
+    INSERT INTO TRACKS_GROUP(group_id, track_id, track_label) VALUES (%s,
         (SELECT ID FROM TRACK WHERE TRACK_ID=%s), %s);
 """
 

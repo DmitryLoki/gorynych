@@ -343,7 +343,9 @@ class ReceiverService(Service):
             d2 = defer.Deferred()
             if isinstance(message, list):
                 for item in message:
-                    d2.addCallback(lambda _: self.sender.write(item))
+                    # item=item magic is required by lambda to grab item correctly
+                    # otherwise item is always message[-1]. Do not modify!
+                    d2.addCallback(lambda _, item=item: self.sender.write(item))
                     self._save_coords_for_checker(item)
             else:
                 d2.addCallback(lambda _: self.sender.write(message))

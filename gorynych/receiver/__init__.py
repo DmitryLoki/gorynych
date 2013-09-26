@@ -16,7 +16,8 @@ class Options(BaseOptions):
 def makeService(config):
     from gorynych.receiver.receiver import ReceiverRabbitService, ReceiverService, AuditFileLog,\
                                            TR203ReceivingFactory, MobileReceivingFactory, \
-                                           GPRSMobileReceivingFactory, SBDMobileReceivingFactory
+                                           GPRSMobileReceivingFactory, SBDMobileReceivingFactory, \
+                                           GT60ReceivingFactory
     from gorynych.receiver.protocols import UDPTR203Protocol, UDPTeltonikaGH3000Protocol, HttpTR203Resource
     ####### check_trackers ####
     from gorynych.receiver.online_tester import RetreiveJSON
@@ -71,6 +72,11 @@ def makeService(config):
         site_factory = Site(HttpTR203Resource(receiver_service))
         internet.TCPServer(config['port'], site_factory,
                            interface='localhost').setServiceParent(sc)
+
+    elif config['tracker'] == 'gt60':
+        mob_tcp = internet.TCPServer(
+            config['port'], GT60ReceivingFactory(receiver_service))
+        mob_tcp.setServiceParent(sc)
 
     root = RetreiveJSON(receiver_service)
     internet.TCPServer(config['webport'], Site(root)).setServiceParent(sc)

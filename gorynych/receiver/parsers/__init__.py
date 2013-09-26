@@ -35,3 +35,4 @@ from logonly_tr203 import LogOnlyGlobalSatTR203
 from telt_gh3000 import TeltonikaGH3000UDP
 from old_mobile import MobileTracker
 from new_mobile.parser import GPRSParser, SBDParser
+from gt60 import RedViewGT60

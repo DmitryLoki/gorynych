@@ -16,9 +16,11 @@ from pika.connection import ConnectionParameters
 from pika.adapters.twisted_connection import TwistedProtocolConnection
 
 from gorynych.receiver.parsers import GlobalSatTR203, TeltonikaGH3000UDP,\
-                                      MobileTracker, GPRSParser, SBDParser
+                                      MobileTracker, GPRSParser, SBDParser, \
+                                      RedViewGT60
 from gorynych.receiver.protocols import TR203ReceivingProtocol, MobileReceivingProtocol,\
-                                        ProtobuffMobileProtocol, IridiumSBDProtocol
+                                        ProtobuffMobileProtocol, IridiumSBDProtocol, \
+                                        RedViewGT60Protocol
 
 ################### Network part ##########################################
 
@@ -50,6 +52,14 @@ class GPRSMobileReceivingFactory(protocol.ServerFactory):
 class SBDMobileReceivingFactory(protocol.ServerFactory):
 
     protocol = IridiumSBDProtocol
+
+    def __init__(self, service):
+        self.service = service
+
+
+class GT60ReceivingFactory(protocol.ServerFactory):
+
+    protocol = RedViewGT60Protocol
 
     def __init__(self, service):
         self.service = service
@@ -299,7 +309,7 @@ class ReceiverRabbitService(RabbitMQService):
 class ReceiverService(Service):
     parsers = dict(tr203=GlobalSatTR203(), telt_gh3000=TeltonikaGH3000UDP(),
                    mobile=MobileTracker(), new_mobile=GPRSParser(),
-                   new_mobile_sbd=SBDParser())
+                   new_mobile_sbd=SBDParser(), gt60=RedViewGT60())
 
     def __init__(self, sender, audit_log):
         self.sender = sender

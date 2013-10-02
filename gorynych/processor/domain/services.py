@@ -156,11 +156,9 @@ class FileParserAdapter(object):
         return track, []
 
     def correct(self, obj):
-        if not obj._state.finish_time:
-            return [events.TrackEnded(obj.id, dict(state='landed',
-                                            distance=int(obj.points[-1]['distance'])),
-                occured_on=obj.points[-1]['timestamp'])]
-        return []
+        return [events.TrackEnded(obj.id, dict(state='landed',
+                                        distance=int(obj.points[-1]['distance'])),
+            occured_on=obj.points[-1]['timestamp'])]
 
 
 class ParaglidingTrackCorrector(object):

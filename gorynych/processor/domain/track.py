@@ -43,7 +43,7 @@ class TrackState(ValueObject):
     '''
     Hold track state. Memento.
     '''
-    states = ['not started', 'started', 'finished', 'landed']
+    states = ['not started', 'started', 'es_taken', 'finished']
     def __init__(self, id, event_list):
         self.id = id
         # Time when track speed become more then threshold.
@@ -52,10 +52,11 @@ class TrackState(ValueObject):
         self.track_type = None
         self.race_task = None
         self.last_checkpoint = 0
-        self.state = 'not started'
+        self._state = 'not started'
         self.statechanged_at = None
         self.started = False
-        self.in_air = False
+        self.in_air = True # TODO: change it when time will come.
+        self.in_air_changed = None
         self.start_time = None
         # Buffer for points.
         self._buffer = np.empty(0, dtype=DTYPE)
@@ -92,11 +93,9 @@ class TrackState(ValueObject):
             self.started = True
 
     def apply_TrackEnded(self, ev):
-        if not self.state == 'finished':
-            self.state = ev.payload['state']
-            self.statechanged_at = ev.occured_on
+        self.in_air = False
         self.ended = True
-        self.end_time = ev.occured_on
+        self.end_time = self.in_air_changed = ev.occured_on
         self.last_distance = ev.payload.get('distance')
 
     def apply_TrackFinished(self, ev):
@@ -106,7 +105,10 @@ class TrackState(ValueObject):
         self.ended = True
 
     def apply_TrackFinishTimeReceived(self, ev):
-        self.finish_time = ev.payload
+        if not self.state == 'es_taken':
+            self.finish_time = ev.payload
+            self.state = 'es_taken'
+            self.statechanged_at = ev.occured_on
 
     def apply_TrackInAir(self, ev):
         self.in_air = True
@@ -129,6 +131,15 @@ class TrackState(ValueObject):
         result['state'] = self.state
         result['statechanged_at'] = self.statechanged_at
         return result
+
+    @property
+    def state(self):
+        return self._state
+
+    @state.setter
+    def state(self, state):
+        if self.states.index(self.state) < self.states.index(state):
+            self._state = state
 
 
 class Track(AggregateRoot):

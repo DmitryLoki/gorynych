@@ -311,9 +311,9 @@ class TrackArchiveResource(APIResource):
             status = ta.state
             for key in keys:
                 if ta.progress.has_key(key):
-                    result[key] = json.dumps(list(ta.progress[key]))
+                    result[key] = list(ta.progress[key])
                 else:
-                    result[key] = json.dumps([])
+                    result[key] = []
             progress = dict()
             progress['parsed_tracks'] = result['parsed_tracks']
             progress['unparsed_tracks'] = result['unparsed_tracks']

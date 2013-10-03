@@ -370,8 +370,6 @@ class OfflineCorrectorService:
         @rtype:
         '''
         data = ma.masked_inside(track['timestamp'], stime, etime)
-        if data.mask is False:
-            raise ValueError("Track not from this task.")
         track = track.compress(data.mask)
         # Eliminate repetitive points.
         times, indices = np.unique(track['timestamp'], return_index=True)
@@ -403,6 +401,8 @@ class OfflineCorrectorService:
         assert isinstance(etime, int), "End time must be integer."
         assert isinstance(track, np.ndarray), "Track must be numpy.array " \
                                               "type."
+        assert len(track) > 0, "Track has zero length."
+
         track = self._clean_timestamps(track, stime, etime)
         if not track['alt'].any():
             raise NoGPSData("Track don't has GPS altitude.")

@@ -18,7 +18,8 @@ class TestTrack(unittest.TestCase):
     def setUp(self):
         tid = track.TrackID()
         e1 = events.TrackCreated(tid,
-                                 dict(track_type='competition_aftertask', race_task=th_fai_1_task))
+                                 dict(track_type='competition_aftertask',
+                                     race_task=test_race))
         self.track = track.Track(tid, [e1])
 
     def tearDown(self):
@@ -50,10 +51,10 @@ class TestTrack(unittest.TestCase):
         print len(self.track.points)
         print 'distance:', self.track.points[-1]['distance']
         self._check_events(self.track.changes,
-                           finish_time=1374243311,
+                           finish_time=1374243310,
                            finished=True, checkpoints_taken=6, amount=9)
         self._check_track_state(self.track._state,
-                                finish_time=1374243311,
+                                finish_time=1374243310,
                                 last_checkpoint=6,
                                 ended=True)
         # 4 checkpoint taken at 16:45

@@ -1,12 +1,13 @@
 # coding=utf-8
-import time
-from twisted.internet import defer
-from twisted.python import log
-
 __author__ = 'Boris Tsema'
+import time
 import cPickle
+from collections import defaultdict
+import json
 
 import numpy as np
+from twisted.internet import defer
+from twisted.python import log
 
 from gorynych.common.infrastructure.persistence import np_as_text
 from gorynych.common.infrastructure import persistence as pe
@@ -36,21 +37,24 @@ def find_snapshots(data):
     '''
     @param data:
     @type data: L{gorynych.processor.domain.track.Track}
-    @return:
-    @rtype: C{list}
+    @return: dict with timestamp as a key and state set as a value.
+    @rtype: C{dict}
     '''
-    result = dict()
+    result = defaultdict(set)
     state = data._state
+    # Every track is in air from it's first point by default.
+    # TODO: change it someday.
+    result[data.points['timestamp'][0]].add('in_air_true')
+    if not state.in_air and state.in_air_changed:
+        result[int(state.in_air_changed)].add('in_air_false')
     if state.started and state.start_time:
-        result['started'] = int(state.start_time)
+        result[int(state.start_time)].add('started')
     if state.ended and state.end_time:
-        result[state.state] = int(state.end_time)
+        result[int(state.end_time)].add(state.state)
     if state.finish_time:
-        result['finished'] = int(state.finish_time)
-    if data._state.end_time:
-        result['landed'] = int(data._state.end_time)
+        result[int(state.finish_time)].add('finished')
     if state.start_time:
-        result['started'] = int(state.start_time)
+        result[int(state.start_time)].add('started')
     return result
 
 
@@ -114,7 +118,7 @@ class TrackRepository(object):
         for snap in snaps:
             try:
                 yield self.pool.runOperation(INSERT_SNAPSHOT,
-                            (snaps[snap], obj._id, snap))
+                            (snap, obj._id, json.dumps(list(snaps[snap]))))
             except Exception as e:
                 log.err("Error while inserting snapshot %s:%s for track %s: "
                         "%r" %

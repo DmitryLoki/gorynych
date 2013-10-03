@@ -8,6 +8,7 @@ from collections import defaultdict
 from twisted.application.service import Service
 from twisted.internet import defer
 from twisted.python import log
+import simplejson as json
 
 __author__ = 'Boris Tsema'
 
@@ -136,6 +137,7 @@ GET_HEADERS_SNAPSHOTS = """
       AND s.id = tg.track_id;
     """
 
+
 class TrackVisualizationService(Service):
     # Don't show pilots earlier then time - track_gap. In seconds
     track_gap = 15000
@@ -175,30 +177,32 @@ class TrackVisualizationService(Service):
 
         if track_labels:
             track_labels = track_labels.split(',')
-            tracks = yield self.pool.runQuery(SELECT_DATA_BY_LABEL, (group_id, from_time,
-                                                      to_time, tuple(track_labels)))
+            tracks = yield self.pool.runQuery(SELECT_DATA_BY_LABEL,
+                (group_id, from_time,
+                to_time, tuple(track_labels)))
             snaps = yield self.pool.runQuery(SELECT_DATA_SNAPSHOTS_BY_LABEL,
-                                        (group_id, from_time, to_time, tuple(track_labels)))
+                (group_id, from_time, to_time, tuple(track_labels)))
 
         else:
-            tracks = yield self.pool.runQuery(SELECT_DATA, (group_id, from_time,
-                                                      to_time))
+            tracks = yield self.pool.runQuery(SELECT_DATA,
+                (group_id, from_time,
+                to_time))
             snaps = yield self.pool.runQuery(SELECT_DATA_SNAPSHOTS,
-                                        (group_id, from_time, to_time))
-            
+                (group_id, from_time, to_time))
+
         t2 = time.time()
         result['timeline'] = self.prepare_result(tracks, snaps)
-        log.msg("data requested in %0.3f" % (t2-t1))
+        log.msg("data requested in %0.3f" % (t2 - t1))
         if start_positions:
             ts1 = time.time()
             hdata = yield self.pool.runQuery(GET_HEADERS_DATA, (group_id,
-                                from_time - self.track_gap, from_time))
+            from_time - self.track_gap, from_time))
             hsnaps = yield self.pool.runQuery(GET_HEADERS_SNAPSHOTS,
-                                              (group_id, from_time))
+                (group_id, from_time))
             ts2 = time.time()
             start_data = self.prepare_start_data(hdata, hsnaps)
             result['start'] = start_data
-            log.msg("start positions requested in %0.3f" % (ts2-ts1))
+            log.msg("start positions requested in %0.3f" % (ts2 - ts1))
         defer.returnValue(result)
 
     def prepare_start_data(self, hdata, hsnaps):
@@ -221,12 +225,25 @@ class TrackVisualizationService(Service):
 
         # Add last state to result.
         for row in hsnaps:
-            result[str(row[0])]['state'] = str(row[1])
-            result[str(row[0])]['statechanged_at'] = int(row[2])
+            cont_number, state, state_ts = row
+            try:
+                state = json.loads(state)
+                if 'in_air_true' in state:
+                    result[cont_number]['in_air'] = True
+                    del state[state.index('in_air_true')]
+                elif 'in_air_false' in state:
+                    result[cont_number]['in_air'] = False
+                    del state[state.index('in_air_false')]
 
-        for pilot in result:
-            if not result[pilot].has_key('state'):
-                result[pilot]['state'] = 'not started'
+                if len(state) > 0:
+                    result[cont_number]['state'] = state[0]
+                    result[cont_number]['statechanged_at'] = int(state_ts)
+            except:
+                continue
+
+        for contest_number in result:
+            if not result[contest_number].has_key('state'):
+                result[contest_number]['state'] = 'not started'
         return result
 
     def prepare_result(self, tracks, snaps):
@@ -245,12 +262,24 @@ class TrackVisualizationService(Service):
         for row in tracks:
             for data in row[1].split(';'):
                 result[int(row[0])][str(data.split(',')[0])
-                                    ] = parse_result(data.split(',')[1:])
+                ] = parse_result(data.split(',')[1:])
 
         for row in snaps:
             timestamp, snapshot, contest_number = row
             if result[timestamp].has_key(contest_number):
-                result[timestamp][contest_number]['state'] = snapshot
+                concrete_pilot = result[timestamp][contest_number]
+                try:
+                    snapshot = json.loads(snapshot)
+                    if 'in_air_true' in snapshot:
+                        concrete_pilot['in_air'] = True
+                        del snapshot[snapshot.index('in_air_true')]
+                    elif 'in_air_false' in snapshot:
+                        concrete_pilot['in_air'] = False
+                        del snapshot[snapshot.index('in_air_false')]
+                except:
+                    continue
+                if len(snapshot) > 0:
+                    concrete_pilot['state'] = snapshot[0]
 
         return result
 
@@ -258,7 +287,8 @@ class TrackVisualizationService(Service):
 def parse_result(data):
     res = dict()
     res['lat'], res['lon'], res['alt'], res['vspd'], res['gspd'], \
-    res['dist'] = data
+        res['dist'] = data
+
     def _float(num):
         result = float(num)
         if math.isnan(result):
@@ -270,9 +300,9 @@ def parse_result(data):
         return result
 
     formats = dict(lat=_float, lon=_float, alt=int, gspd=_float, vspd=_float,
-                   dist=int)
+        dist=int)
     for key in res:
         res[key] = formats[key](res[key])
     return dict(dist=res['dist'],
-                spds=[res['gspd'], res['vspd']],
-                crds=[res['lat'], res['lon'], res['alt']])
+        spds=[res['gspd'], res['vspd']],
+        crds=[res['lat'], res['lon'], res['alt']])

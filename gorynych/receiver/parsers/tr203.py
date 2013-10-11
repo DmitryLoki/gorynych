@@ -72,5 +72,5 @@ class GlobalSatTR203(object):
         arr = msg.split('*')[0].split(',')
         gsr = arr[0]
         hdop = float(arr[9])
-        fix = arr[2]
+        fix = int(arr[2])
         return gsr == 'GSr' and hdop <= MAXIMUM_HDOP and fix == 3

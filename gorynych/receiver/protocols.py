@@ -95,7 +95,7 @@ class MobileReceivingProtocol(protocol.Protocol):
             data, proto='TCP', device_type=self.device_type)
 
 
-class ProtobuffMobileProtocol(protocol.Protocol):
+class App13ProtobuffMobileProtocol(protocol.Protocol):
 
     """
     New mobile application protocol, is also used by a satellite modem.
@@ -114,7 +114,7 @@ class ProtobuffMobileProtocol(protocol.Protocol):
 class IridiumSBDProtocol(protocol.Protocol):
 
     """
-    It's actually the same ProtobuffMobileProtocol encapsulated in SBD package.
+    It's actually the same App13ProtobuffMobileProtocol encapsulated in SBD package.
     It also sends no confirmation.
     """
     device_type = 'new_mobile_sbd'

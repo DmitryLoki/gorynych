@@ -19,7 +19,7 @@ from gorynych.receiver.parsers import GlobalSatTR203, TeltonikaGH3000UDP,\
                                       MobileTracker, GPRSParser, SBDParser, \
                                       RedViewGT60
 from gorynych.receiver.protocols import TR203ReceivingProtocol, MobileReceivingProtocol,\
-                                        ProtobuffMobileProtocol, IridiumSBDProtocol, \
+                                        App13ProtobuffMobileProtocol, IridiumSBDProtocol, \
                                         RedViewGT60Protocol
 
 ################### Network part ##########################################
@@ -44,12 +44,12 @@ class MobileReceivingFactory(protocol.ServerFactory):
         self.service = service
 
 
-class GPRSMobileReceivingFactory(protocol.ServerFactory):
+class App13ReceivingFactory(protocol.ServerFactory):
     '''
     Factory for mobile application which sends data in protocol buffer format.
     '''
 
-    protocol = ProtobuffMobileProtocol
+    protocol = App13ProtobuffMobileProtocol
 
     def __init__(self, service):
         self.service = service

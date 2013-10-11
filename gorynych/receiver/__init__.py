@@ -16,7 +16,7 @@ class Options(BaseOptions):
 def makeService(config):
     from gorynych.receiver.receiver import ReceiverRabbitService, ReceiverService, AuditFileLog,\
                                            TR203ReceivingFactory, MobileReceivingFactory, \
-                                           GPRSMobileReceivingFactory, SBDMobileReceivingFactory, \
+                                           App13ReceivingFactory, SBDMobileReceivingFactory, \
                                            GT60ReceivingFactory
     from gorynych.receiver.protocols import UDPTR203Protocol, UDPTeltonikaGH3000Protocol, HttpTR203Resource
     ####### check_trackers ####
@@ -60,7 +60,7 @@ def makeService(config):
 
     elif config['tracker'] == 'app13':
         mob_tcp = internet.TCPServer(
-            config['port'], GPRSMobileReceivingFactory(receiver_service))
+            config['port'], App13ReceivingFactory(receiver_service))
         mob_tcp.setServiceParent(sc)
 
     elif config['tracker'] == 'new_mobile_sbd':

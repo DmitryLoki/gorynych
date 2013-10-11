@@ -12,9 +12,13 @@ class Options(BaseOptions):
         ['webport', 'wb', 8084, None, int]
     ]
 
+
 def makeService(config):
-    from gorynych.receiver.receiver import ReceiverRabbitService, ReceiverService, AuditFileLog, ReceivingFactory
-    from gorynych.receiver.protocols import UDPTR203Protocol, UDPTeltonikaGH3000Protocol
+    from gorynych.receiver.receiver import ReceiverRabbitService, ReceiverService, AuditFileLog,\
+                                           TR203ReceivingFactory, MobileReceivingFactory, \
+                                           App13ReceivingFactory, SBDMobileReceivingFactory, \
+                                           GT60ReceivingFactory
+    from gorynych.receiver.protocols import UDPTR203Protocol, UDPTeltonikaGH3000Protocol, HttpTR203Resource
     ####### check_trackers ####
     from gorynych.receiver.online_tester import RetreiveJSON
 
@@ -36,7 +40,7 @@ def makeService(config):
 
     if config['tracker'] == 'tr203':
         tr203_tcp = internet.TCPServer(
-            config['port'], ReceivingFactory(receiver_service))
+            config['port'], TR203ReceivingFactory(receiver_service))
         tr203_tcp.setServiceParent(sc)
 
         tr203_udp = UDPTR203Protocol(receiver_service)
@@ -49,8 +53,32 @@ def makeService(config):
         telt_udp_receiver = internet.UDPServer(config['port'], telt_udp)
         telt_udp_receiver.setServiceParent(sc)
 
+    elif config['tracker'] == 'mobile':
+        mob_tcp = internet.TCPServer(
+            config['port'], MobileReceivingFactory(receiver_service))
+        mob_tcp.setServiceParent(sc)
+
+    elif config['tracker'] == 'app13':
+        mob_tcp = internet.TCPServer(
+            config['port'], App13ReceivingFactory(receiver_service))
+        mob_tcp.setServiceParent(sc)
+
+    elif config['tracker'] == 'new_mobile_sbd':
+        mob_tcp = internet.TCPServer(
+            config['port'], SBDMobileReceivingFactory(receiver_service))
+        mob_tcp.setServiceParent(sc)
+
+    elif config['tracker'] == 'http':
+        site_factory = Site(HttpTR203Resource(receiver_service))
+        internet.TCPServer(config['port'], site_factory,
+                           interface='localhost').setServiceParent(sc)
+
+    elif config['tracker'] == 'gt60':
+        mob_tcp = internet.TCPServer(
+            config['port'], GT60ReceivingFactory(receiver_service))
+        mob_tcp.setServiceParent(sc)
+
     root = RetreiveJSON(receiver_service)
     internet.TCPServer(config['webport'], Site(root)).setServiceParent(sc)
 
     return sc
-

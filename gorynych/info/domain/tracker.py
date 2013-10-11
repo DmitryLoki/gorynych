@@ -8,9 +8,6 @@ from gorynych.common.infrastructure import persistence as pe
 from gorynych.common.exceptions import DomainError
 
 
-DEVICE_TYPES = ['tr203', 'telt_gh3000']
-
-
 class Tracker(AggregateRoot):
 
     def __init__(self, tracker_id, device_id, device_type):
@@ -89,7 +86,8 @@ class TrackerFactory(object):
             last_point=None):
         if not isinstance(tracker_id, TrackerID):
             tracker_id = TrackerID(device_type, device_id)
-        if isinstance(device_id, str) and device_type in DEVICE_TYPES:
+        if isinstance(device_id, str) and device_type in \
+                tracker_id.device_types:
             tracker = Tracker(TrackerID(device_type, device_id), device_id,
                 device_type)
         else:

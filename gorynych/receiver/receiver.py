@@ -15,14 +15,60 @@ from twisted.python import log
 from pika.connection import ConnectionParameters
 from pika.adapters.twisted_connection import TwistedProtocolConnection
 
-from gorynych.receiver.parsers import GlobalSatTR203, TeltonikaGH3000UDP
-from gorynych.receiver.protocols import TR203ReceivingProtocol
+from gorynych.receiver.parsers import GlobalSatTR203, TeltonikaGH3000UDP,\
+                                      MobileTracker, GPRSParser, SBDParser, \
+                                      RedViewGT60
+from gorynych.receiver.protocols import TR203ReceivingProtocol, MobileReceivingProtocol,\
+                                        App13ProtobuffMobileProtocol, IridiumSBDProtocol, \
+                                        RedViewGT60Protocol
 
 ################### Network part ##########################################
 
-class ReceivingFactory(protocol.ServerFactory):
+
+class TR203ReceivingFactory(protocol.ServerFactory):
 
     protocol = TR203ReceivingProtocol
+
+    def __init__(self, service):
+        self.service = service
+
+
+class MobileReceivingFactory(protocol.ServerFactory):
+    '''
+    Factory for old mobile application which is not used.
+    '''
+
+    protocol = MobileReceivingProtocol
+
+    def __init__(self, service):
+        self.service = service
+
+
+class App13ReceivingFactory(protocol.ServerFactory):
+    '''
+    Factory for mobile application which sends data in protocol buffer format.
+    '''
+
+    protocol = App13ProtobuffMobileProtocol
+
+    def __init__(self, service):
+        self.service = service
+
+
+class SBDMobileReceivingFactory(protocol.ServerFactory):
+    '''
+    Factory for satellite hybrid tracker.
+    '''
+
+    protocol = IridiumSBDProtocol
+
+    def __init__(self, service):
+        self.service = service
+
+
+class GT60ReceivingFactory(protocol.ServerFactory):
+
+    protocol = RedViewGT60Protocol
 
     def __init__(self, service):
         self.service = service
@@ -270,7 +316,9 @@ class ReceiverRabbitService(RabbitMQService):
 
 
 class ReceiverService(Service):
-    parsers = dict(tr203=GlobalSatTR203(), telt_gh3000=TeltonikaGH3000UDP())
+    parsers = dict(tr203=GlobalSatTR203(), telt_gh3000=TeltonikaGH3000UDP(),
+                   mobile=MobileTracker(), new_mobile=GPRSParser(),
+                   new_mobile_sbd=SBDParser(), gt60=RedViewGT60())
 
     def __init__(self, sender, audit_log):
         self.sender = sender

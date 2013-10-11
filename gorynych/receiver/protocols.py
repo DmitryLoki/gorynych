@@ -86,7 +86,7 @@ class UDPTeltonikaGH3000Protocol(protocol.DatagramProtocol):
 class MobileReceivingProtocol(protocol.Protocol):
 
     '''
-    Line receiver protocol. Used by mobile application.
+    Protocol for old unused mobile application.
     '''
     device_type = 'mobile'
 
@@ -100,7 +100,7 @@ class ProtobuffMobileProtocol(protocol.Protocol):
     """
     New mobile application protocol, is also used by a satellite modem.
     """
-    device_type = 'new_mobile'
+    device_type = 'app13'
 
     def dataReceived(self, data):
         resp_list = self.factory.service.parsers[

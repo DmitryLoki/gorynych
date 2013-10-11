@@ -34,6 +34,9 @@ class TR203ReceivingFactory(protocol.ServerFactory):
 
 
 class MobileReceivingFactory(protocol.ServerFactory):
+    '''
+    Factory for old mobile application which is not used.
+    '''
 
     protocol = MobileReceivingProtocol
 
@@ -42,6 +45,9 @@ class MobileReceivingFactory(protocol.ServerFactory):
 
 
 class GPRSMobileReceivingFactory(protocol.ServerFactory):
+    '''
+    Factory for mobile application which sends data in protocol buffer format.
+    '''
 
     protocol = ProtobuffMobileProtocol
 
@@ -50,6 +56,9 @@ class GPRSMobileReceivingFactory(protocol.ServerFactory):
 
 
 class SBDMobileReceivingFactory(protocol.ServerFactory):
+    '''
+    Factory for satellite hybrid tracker.
+    '''
 
     protocol = IridiumSBDProtocol
 

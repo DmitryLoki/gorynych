@@ -58,7 +58,7 @@ def makeService(config):
             config['port'], MobileReceivingFactory(receiver_service))
         mob_tcp.setServiceParent(sc)
 
-    elif config['tracker'] == 'new_mobile':
+    elif config['tracker'] == 'app13':
         mob_tcp = internet.TCPServer(
             config['port'], GPRSMobileReceivingFactory(receiver_service))
         mob_tcp.setServiceParent(sc)

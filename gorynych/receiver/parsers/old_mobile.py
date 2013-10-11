@@ -1,4 +1,3 @@
-# encoding: utf-8
 
 from operator import xor
 
@@ -9,6 +8,9 @@ from functools import reduce
 
 @implementer(IParseMessage)
 class MobileTracker(object):
+    '''
+    Parser for some old mobile application which is not used.
+    '''
 
     def __init__(self):
         self.format = dict(imei=0, lat=1, lon=2, alt=3,

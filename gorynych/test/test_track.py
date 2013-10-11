@@ -16,7 +16,7 @@ VIZ_URL = 'http://localhost:8886'
 RECEIVER = {
     'tr203': 9999,
     'telt_gh3000': 9998,
-    'new_mobile': 10001
+    'app13': 10001
 }
 
 

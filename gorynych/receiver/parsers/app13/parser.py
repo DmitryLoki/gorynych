@@ -24,8 +24,10 @@ class Frame(object):
         return HEADER.pack(MAGIC_BYTE, self.id, len(self.msg)) + self.msg
 
 
-@implementer(IParseMessage)
-class NewMobileTracker(object):
+class App13Tracker(object):
+    '''
+    Common class for mobile application tracker and satellite tracker.
+    '''
 
     def __init__(self):
         self.imei = None
@@ -93,7 +95,10 @@ class NewMobileTracker(object):
 
 
 @implementer(IParseMessage)
-class GPRSParser(NewMobileTracker):
+class App13Parser(App13Tracker):
+    '''
+    Parse mobile application tracker developed at the end of 2013.
+    '''
 
     def parse(self, msg):
         self.points = []
@@ -114,7 +119,7 @@ class GPRSParser(NewMobileTracker):
 
 
 @implementer(IParseMessage)
-class SBDParser(NewMobileTracker):
+class SBDParser(App13Tracker):
     """
     Method 'parse' is a little bit different: simple-packed case is allowed,
     and message is a dict, not a string.

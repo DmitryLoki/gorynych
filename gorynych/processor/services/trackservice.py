@@ -243,12 +243,12 @@ class OnlineTrashService(RabbitMQService):
         return self.handle_track_data(data)
 
     @defer.inlineCallbacks
-    def _get_race_by_tracker(self, device_id, t):
+    def _get_race_by_tracker(self, device_id, now):
         result = self.devices.get(device_id)
-        if result and t - result[2] < 300:
+        if result and now - result[2] < 300:
             defer.returnValue((result[0], result[1]))
         row = yield self.pool.runQuery(pe.select('current_race_by_tracker',
-            'race'),(device_id, t))
+            'race'),(device_id, now))
         if not row:
             defer.returnValue(None)
         self.devices[device_id] = (row[0][0], row[0][1], int(time.time()))

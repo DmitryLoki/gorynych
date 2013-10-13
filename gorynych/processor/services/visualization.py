@@ -231,7 +231,7 @@ class TrackVisualizationService(Service):
                 if 'in_air_true' in state:
                     result[cont_number]['in_air'] = True
                     del state[state.index('in_air_true')]
-                elif 'in_air_false' in state:
+                if 'in_air_false' in state:
                     result[cont_number]['in_air'] = False
                     del state[state.index('in_air_false')]
 

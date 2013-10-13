@@ -44,7 +44,7 @@ def find_snapshots(data):
     state = data._state
     # Every track is in air from it's first point by default.
     # TODO: change it someday.
-    result[data.points['timestamp'][0]].add('in_air_true')
+    result[int(data.points['timestamp'][0])].add('in_air_true')
     if not state.in_air and state.in_air_changed:
         result[int(state.in_air_changed)].add('in_air_false')
     if state.started and state.start_time:

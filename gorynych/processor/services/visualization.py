@@ -244,6 +244,9 @@ class TrackVisualizationService(Service):
         for contest_number in result:
             if not result[contest_number].has_key('state'):
                 result[contest_number]['state'] = 'not started'
+            if not result[contest_number].has_key('in_air'):
+                # TODO: everybody in air by default, is it ok?
+                result[contest_number]['in_air'] = True
         return result
 
     def prepare_result(self, tracks, snaps):

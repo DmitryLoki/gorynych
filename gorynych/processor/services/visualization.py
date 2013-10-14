@@ -236,11 +236,9 @@ class TrackVisualizationService(Service):
                     del state[state.index('in_air_false')]
                 if 'es_taken' in state:
                     result[cont_number]['finish_time'] = int(state_ts)
-                    del state[state.index('es_taken')]
 
                 if len(state) > 0:
                     result[cont_number]['state'] = state[0]
-                    result[cont_number]['statechanged_at'] = int(state_ts)
             except:
                 continue
 

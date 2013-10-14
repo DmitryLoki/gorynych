@@ -133,7 +133,7 @@ GET_HEADERS_SNAPSHOTS = """
       snaps s,
       tracks_group tg
     WHERE
-      s.rk = 1
+      s.rk < 3
       AND s.id = tg.track_id;
     """
 
@@ -296,12 +296,12 @@ def parse_result(data):
         res['dist'] = data
 
     def _float(num):
-        result = float(num)
+        result = round(float(num), 6)
         if math.isnan(result):
-            log.msg("Nan found in vspeed.")
+            log.msg("Nan found in float.")
             result = 0
         if math.isinf(result):
-            log.msg("Infinity found in vspeed.")
+            log.msg("Infinity found in float.")
             result = 1
         return result
 

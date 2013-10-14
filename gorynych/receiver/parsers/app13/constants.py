@@ -13,6 +13,8 @@ class BasePointProto(object):
     ALT = 'alt_base'
     ANGLE_DIV = 'angle_div'
     TIMEDELTA = 'time_step'
+    H_SPEED = 'h_speed'
+    V_SPEED = 'v_speed'
 
 
 class PointProto(object):
@@ -20,6 +22,8 @@ class PointProto(object):
     LON = 'LONG'
     TS = 'TIME'
     ALT = 'ALT'
+    H_SPEED = 'H_SPEED'
+    V_SPEED = 'V_SPEED'
 
 
 class FrameId(object):

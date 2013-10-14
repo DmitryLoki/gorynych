@@ -111,8 +111,6 @@ class TrackState(ValueObject):
             self.finish_time = ev.payload
             self.state = 'es_taken'
             self.statechanged_at = ev.occured_on
-            # XXX: for aftertasks.
-            self.es_taken = int(ev.payload)
 
     def apply_TrackInAir(self, ev):
         self.in_air = True

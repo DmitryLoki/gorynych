@@ -55,6 +55,8 @@ def find_snapshots(data):
         result[int(state.finish_time)].add('finished')
     if state.start_time:
         result[int(state.start_time)].add('started')
+    if state.es_taken:
+        result[int(state.es_taken)].add('es_taken')
     return result
 
 

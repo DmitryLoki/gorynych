@@ -57,6 +57,8 @@ class TrackState(ValueObject):
         self.started = False
         self.in_air = True # TODO: change it when time will come.
         self.in_air_changed = None
+        # XXX: for aftertask tracks.
+        self.es_taken = None
         self.start_time = None
         # Buffer for points.
         self._buffer = np.empty(0, dtype=DTYPE)
@@ -109,6 +111,8 @@ class TrackState(ValueObject):
             self.finish_time = ev.payload
             self.state = 'es_taken'
             self.statechanged_at = ev.occured_on
+            # XXX: for aftertasks.
+            self.es_taken = int(ev.occured_on)
 
     def apply_TrackInAir(self, ev):
         self.in_air = True

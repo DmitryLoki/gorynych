@@ -358,7 +358,7 @@ class OfflineCorrectorService:
     '''
     # Maximum gap in track after which it accounted as finished (in seconds).
     maxtimediff = 300
-    # Time when it's safe to restart track, in seconds
+    # XXX: time when it's safe to restart track, in seconds.
     safe_time = 3600
 
     def _clean_timestamps(self, track, stime, etime):
@@ -378,22 +378,27 @@ class OfflineCorrectorService:
         track = track[indices]
         # Here we still can has points reversed in time. Fix it.
         tdifs = np.ediff1d(track['timestamp'], to_begin=1)
-        # At first let's find end of track by timeout, if any.
-        track_end_idxs = np.where(tdifs > self.maxtimediff)[0]
-        # Index of timestamp from which rules should be strict.
+        # At first let's find ends of track's chunks delimited by timeout,
+        # if any.
+        chunk_end_idxs = np.where(tdifs > self.maxtimediff)[0]
+        # Index of timestamp from which no chunks allowed, just track.
         safe_time_idx = np.where(track['timestamp'] <
                                  stime + self.safe_time)[0]
-        if len(track_end_idxs) > 0:
+        if len(chunk_end_idxs) > 0:
+            track_start_idx = 0
+            track_end_idx = chunk_end_idxs[0]
+            # Situation then there are little tracks exists before window
+            # open time.
             if len(safe_time_idx) > 0:
                 safe_time_idx = safe_time_idx[-1]
-                for i in track_end_idxs:
-                    if i >= safe_time_idx:
-                        track_end_idxs = i
+                for chunk_end_idx in chunk_end_idxs:
+                    if chunk_end_idx < safe_time_idx:
+                        track_start_idx = chunk_end_idx + 1
+                    else:
+                        track_end_idx = chunk_end_idx
                         break
-            else:
-                track_end_idxs = track_end_idxs[0]
-            track = track[:track_end_idxs]
-            tdifs = tdifs[:track_end_idxs]
+            track = track[track_start_idx:track_end_idx]
+            tdifs = tdifs[track_start_idx:track_end_idx]
 
         # Eliminate reverse points.
         data = ma.masked_greater(tdifs, 0)

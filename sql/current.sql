@@ -164,7 +164,7 @@ CREATE TABLE TRACK_TYPE(
   NAME TEXT NOT NULL UNIQUE
 );
 
-insert into track_type (name) values('competition_aftertask');
+insert into track_type (name) values('competition_aftertask'), ('online');
 
 CREATE TABLE TRACK(
 	ID SERIAL PRIMARY KEY,
@@ -214,7 +214,7 @@ CREATE TABLE DEVICE_TYPE(
   NAME TEXT
 );
 
-INSERT INTO DEVICE_TYPE (NAME) VALUES ('tr203');
+INSERT INTO DEVICE_TYPE (NAME) VALUES ('tr203'), ('telt_gh3000'), ('app13');
 
 CREATE TABLE TRACKER(
   ID BIGSERIAL PRIMARY KEY,
@@ -281,7 +281,7 @@ CREATE TABLE TRANSPORT_TYPE(
 );
 
 INSERT INTO TRANSPORT_TYPE(TRANSPORT_TYPE) VALUES ('bus'), ('car'),
-('motorcycle'), ('helicopter');
+('motorcycle'), ('helicopter'), ('van');
 
 CREATE TABLE TRANSPORT(
   ID BIGSERIAL PRIMARY KEY ,

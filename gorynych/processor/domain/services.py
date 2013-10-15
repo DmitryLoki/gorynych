@@ -358,6 +358,8 @@ class OfflineCorrectorService:
     '''
     # Maximum gap in track after which it accounted as finished (in seconds).
     maxtimediff = 300
+    # Time when it's safe to restart track, in seconds
+    safe_time = 3600
 
     def _clean_timestamps(self, track, stime, etime):
         '''
@@ -378,8 +380,18 @@ class OfflineCorrectorService:
         tdifs = np.ediff1d(track['timestamp'], to_begin=1)
         # At first let's find end of track by timeout, if any.
         track_end_idxs = np.where(tdifs > self.maxtimediff)[0]
-        if len(track_end_idxs)>0:
-            track_end_idxs = track_end_idxs[0]
+        # Index of timestamp from which rules should be strict.
+        safe_time_idx = np.where(track['timestamp'] <
+                                 stime + self.safe_time)[0]
+        if len(track_end_idxs) > 0:
+            if len(safe_time_idx) > 0:
+                safe_time_idx = safe_time_idx[-1]
+                for i in track_end_idxs:
+                    if i >= safe_time_idx:
+                        track_end_idxs = i
+                        break
+            else:
+                track_end_idxs = track_end_idxs[0]
             track = track[:track_end_idxs]
             tdifs = tdifs[:track_end_idxs]
 

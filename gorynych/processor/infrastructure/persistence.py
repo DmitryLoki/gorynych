@@ -15,7 +15,31 @@ from gorynych.common.exceptions import NoAggregate
 from gorynych.processor.domain import track
 
 
+from io import BytesIO
+from struct import pack
+
+
+def np_as_binary(data):
+    cpy = BytesIO()
+    cpy.write(pack('!11sii', b'PGCOPY\n\377\r\n\0', 0, 0))
+    cpy.write(pack('!h', len(data.dtype)))
+    for row in data:
+        for i, (field, dtype) in enumerate(data.dtype.descr):
+            format = dtype[1]
+            size = dtype[-1]
+            if format == 'f':  # lat and lon are f8 in numpy, but f4 in postgres
+                size = 4
+            if field == 'alt':  # smallint should be 2h
+                size = 2
+                format = 'h'
+            cpy.write(pack('!i%s' % format, int(size), row[i]))
+    cpy.write(pack('!h', -1))
+    cpy.seek(0)
+    return cpy
+
+
 class PickledTrackRepository(object):
+
     def save(self, data):
         f = open('track_repo', 'wb')
         cPickle.dump(data, f, -1)
@@ -57,6 +81,7 @@ def find_snapshots(data):
 
 
 class TrackRepository(object):
+
     def __init__(self, pool):
         self.pool = pool
 
@@ -82,10 +107,10 @@ class TrackRepository(object):
             d.addCallback(lambda _: pe.event_store().persist(obj.changes))
         if not obj._id:
             d.addCallback(lambda _: self.pool.runInteraction(self._save_new,
-                obj))
+                                                             obj))
         else:
             d.addCallback(lambda _: self.pool.runInteraction(self._update,
-                obj))
+                                                             obj))
             d.addCallback(self._update_times)
         d.addCallback(self._save_snapshots)
         d.addCallback(lambda obj: obj.reset())
@@ -94,7 +119,7 @@ class TrackRepository(object):
 
     def _save_new(self, cur, obj):
         cur.execute(NEW_TRACK, (obj._state.start_time, obj._state.end_time,
-        obj.type.type, str(obj.id)))
+                                obj.type.type, str(obj.id)))
         dbid = cur.fetchone()[0]
         log.msg("New track inserted %s and its id %s" % (obj.id, dbid))
 
@@ -116,7 +141,7 @@ class TrackRepository(object):
         for snap in snaps:
             try:
                 yield self.pool.runOperation(INSERT_SNAPSHOT,
-                            (snap, obj._id, json.dumps(list(snaps[snap]))))
+                                            (snap, obj._id, json.dumps(list(snaps[snap]))))
             except Exception as e:
                 log.err("Error while inserting snapshot %s:%s for track %s: "
                         "%r" %
@@ -129,12 +154,12 @@ class TrackRepository(object):
         tdiff = int(time.time()) - obj.points[0]['timestamp']
         log.msg("Save %s points for track %s" % (len(obj.points), obj._id))
         log.msg("First points for track %s was %s second ago." % (obj._id,
-            tdiff))
+                                                                  tdiff))
         points = obj.points
         points['id'] = np.ones(len(points)) * obj._id
-        data = np_as_text(points)
+        data = np_as_binary(points)
         try:
-            cur.copy_expert("COPY track_data FROM STDIN ", data)
+            cur.copy_expert('COPY track_data FROM STDIN WITH BINARY', data)
         except Exception as e:
             log.err("Error occured while COPY data on update for track %s: "
                     "%r" % (obj._id, e))
@@ -146,13 +171,13 @@ class TrackRepository(object):
         for idx, item in enumerate(obj.changes):
             if item.name == 'TrackStarted':
                 t = obj._state.start_time
-                d.addCallback(lambda _:self.pool.runOperation(
+                d.addCallback(lambda _: self.pool.runOperation(
                     "UPDATE track SET start_time=%s WHERE ID=%s", (t,
-                        obj._id)))
+                                                                   obj._id)))
             if item.name == 'TrackEnded':
                 t = obj._state.end_time
-                d.addCallback(lambda _:self.pool.runOperation(
+                d.addCallback(lambda _: self.pool.runOperation(
                     "UPDATE track SET end_time=%s WHERE ID=%s",
                     (t, obj._id)))
-        d.addCallback(lambda _:obj)
+        d.addCallback(lambda _: obj)
         return d

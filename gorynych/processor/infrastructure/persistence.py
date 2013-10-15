@@ -47,10 +47,8 @@ def find_snapshots(data):
     result[int(data.points['timestamp'][0])].add('in_air_true')
     if not state.in_air and state.in_air_changed:
         result[int(state.in_air_changed)].add('in_air_false')
-    if state.started and state.start_time:
-        result[int(state.start_time)].add('started')
-    if state.ended and state.end_time:
-        result[int(state.end_time)].add(state.state)
+    if state.state == 'finished':
+        result[int(state.statechanged_at)].add('finished')
     if state.finish_time:
         result[int(state.finish_time)].add('es_taken')
     if state.start_time:

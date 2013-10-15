@@ -133,7 +133,7 @@ GET_HEADERS_SNAPSHOTS = """
       snaps s,
       tracks_group tg
     WHERE
-      s.rk < 3
+      s.rk < 4
       AND s.id = tg.track_id;
     """
 

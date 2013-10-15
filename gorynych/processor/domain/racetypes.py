@@ -71,10 +71,10 @@ class RaceToGoal(object):
                         occured_on=nextchp.take_time))
                 if nextchp.type == 'es':
                     eventlist.append(events.TrackFinishTimeReceived(_id,
-                        payload=p['timestamp']))
+                        payload=p['timestamp'], occured_on=p['timestamp']))
                 if nextchp.type == 'goal':
                     eventlist.append(events.TrackFinished(_id,
-                        occured_on=trackstate.finish_time))
+                        occured_on=p['timestamp']))
                     calculation_ended = True
                 if nextchp.type == 'ss':
                     eventlist.append(events.TrackStarted(_id,
@@ -144,10 +144,10 @@ class SpeedRun(object):
                         occured_on=nextchp.take_time))
                 if nextchp.type == 'es':
                     eventlist.append(events.TrackFinishTimeReceived(_id,
-                        payload=p['timestamp']))
+                        payload=p['timestamp'], occured_on=p['timestamp']))
                 if nextchp.type == 'goal':
                     eventlist.append(events.TrackFinished(_id,
-                        occured_on=trackstate.finish_time))
+                        occured_on=p['timestamp']))
                     calculation_ended = True
                 if nextchp.type == 'ss':
                     eventlist.append(events.TrackStarted(_id,

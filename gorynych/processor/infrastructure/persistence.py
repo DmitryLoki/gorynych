@@ -27,8 +27,6 @@ def np_as_binary(data):
         for i, (field, dtype) in enumerate(data.dtype.descr):
             format = dtype[1]
             size = dtype[-1]
-            if format == 'f':  # lat and lon are f8 in numpy, but f4 in postgres
-                size = 4
             if field == 'alt':  # smallint should be 2h
                 size = 2
                 format = 'h'

@@ -374,7 +374,7 @@ class PGSQLContestRepository(BasePGSQLRepository):
         '''
         paragliders = dict()
         for row in rows:
-            id, pid, name, surname, email, country, glider, cnum, desc = row
+            pid, name, surname, email, country, glider, cnum, desc = row
             paragliders[PersonID.fromstring(pid)] = dict(
                 name=name,
                 surname=surname,
@@ -414,24 +414,39 @@ class PGSQLContestRepository(BasePGSQLRepository):
 
             return _id
 
-        def update(cur, prts):
+        def delete(cur, entity_type, entities):
+            ids = tuple([x[1] for x in entities])
+            if entity_type == 'paraglider':
+                cur.execute("DELETE FROM contest_paraglider WHERE id=%s "
+                            "AND person_id in "
+                            "(SELECT id FROM person WHERE person.person_id=%s)",
+                            (obj._id, ids))
+            # other guys
+
+        def insert(cur, entity_type, entities):
+            if entity_type == 'paragliders':
+                q = ','.join(cur.mogrify("(%s, (SELECT id FROM person WHERE person_id=%s), %s, %s, %s, %s, %s, %s, %s)",
+                             (pitem)) for pitem in entities)
+                cur.execute("INSERT into contest_paraglider "
+                            "(id, person_id, name, surname, email, country, "
+                            "glider, contest_number, description) "
+                            "values " + q)
+            # same shit
+
+        def update(cur, entity_type, entities):
             cur.execute(pe.update('contest'), values['contest'])
-            if values['participants'] or prts:
-                inobj = values['participants']
-                indb = prts
+            if values[entity_type] or entities:
+                inobj = values[entity_type]
+                indb = entities
                 for idx, p in enumerate(inobj):
                     p.insert(0, obj._id)
                     inobj[idx] = tuple(p)
                 to_insert = set(inobj).difference(set(indb))
                 to_delete = set(indb).difference(set(inobj))
                 if to_delete:
-                    ids = tuple([x[1] for x in to_delete])
-                    cur.execute("DELETE FROM participant WHERE id=%s "
-                                "AND participant_id in %s", (obj._id, ids))
+                    delete(cur, entity_type, to_delete)
                 if to_insert:
-                    q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s)",
-                        (pitem)) for pitem in to_insert)
-                    cur.execute("INSERT into participant values " + q)
+                    insert(cur, entity_type, to_insert)
             if obj.retrieve_id:
                 cur.execute(
                     "UPDATE contest_retrieve_id SET retrieve_id=%s where"
@@ -441,9 +456,9 @@ class PGSQLContestRepository(BasePGSQLRepository):
 
         result = None
         if obj._id:
-            prts = yield self.pool.runQuery(pe.select('participants',
-                'contest'), (obj._id,))
-            result = yield self.pool.runInteraction(update, prts)
+            paragliders = yield self.pool.runQuery(pe.select('contest_paragliders',
+                                                   'contest'), (obj._id,))
+            result = yield self.pool.runInteraction(update, 'paragliders', paragliders)
         else:
             c__id = yield self.pool.runInteraction(save_new)
             obj._id = c__id

@@ -174,8 +174,8 @@ class Contest(AggregateRoot):
     def register_paraglider(self, pers, glider, cnum, desc=""):
         glider = glider.strip().split(' ')[0].lower()
         self.paragliders[pers.id] = dict(
-            name=pers.name,
-            surname=pers.surname,
+            name=pers.name.name,
+            surname=pers.name.surname,
             email=pers.email,
             country=pers.country,
             glider=glider,

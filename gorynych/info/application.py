@@ -109,6 +109,7 @@ class ApplicationService(BaseApplicationService):
         return self._change_aggregate(params, interfaces.IContestRepository,
                                       contest.change)
 
+    @defer.inlineCallbacks
     def register_paraglider_on_contest(self, params):
         '''
 
@@ -120,13 +121,16 @@ class ApplicationService(BaseApplicationService):
         # TODO: do in domain model style. Think before.
         # [(type, title, desc, tracker_id, transport_id),]
         pers = yield self._get_aggregate(params['person_id'], interfaces.IPersonRepository)
-        d = self._get_aggregate(params['contest_id'],
+        cont = yield self._get_aggregate(params['contest_id'],
                                 interfaces.IContestRepository)
-        d.addCallback(lambda cont: cont.register_paraglider(pers, params['glider'],
+        d = defer.Deferred()
+        d.addCallback(lambda _: cont.register_paraglider(pers, params['glider'],
             params['contest_number'], params.get('description', '')))
         d.addCallback(
             persistence.get_repository(interfaces.IContestRepository).save)
-        return d
+        d.callback('fire!')
+        yield d
+        defer.returnValue(cont)
 
     def add_transport_to_contest(self, params):
         d = self.get_contest(params)

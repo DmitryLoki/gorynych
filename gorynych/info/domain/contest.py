@@ -18,8 +18,8 @@ from gorynych.common.exceptions import DomainError
 class ContestFactory(object):
 
     def create_contest(self, title, start_time, end_time,
-               contest_place, contest_country, hq_coords, timezone,
-               contest_id=None):
+                       contest_place, contest_country, hq_coords, timezone,
+                       contest_id=None):
         address = Address(contest_place, contest_country, hq_coords)
         if end_time < start_time:
             raise ValueError("Start time must be less then end time.")
@@ -45,7 +45,9 @@ class Contest(AggregateRoot):
         self._start_time = start_time
         self._end_time = end_time
         self.address = address
-        self._participants = dict()
+        self.paragliders = dict()
+        self.transport = dict()
+        self.participants = dict()
         self.race_ids = set()
         self.retrieve_id = None
 
@@ -131,39 +133,13 @@ class Contest(AggregateRoot):
                                  "invariants.")
 
     @property
-    def paragliders(self):
-        '''
-        Registered paragliders.
-        @return: {person_id: {role:..., contest_number:..., glider:},}
-        @rtype: C{dict}
-        '''
-        result = dict()
-        for key in self._participants.keys():
-            if self._participants[key]['role'] == 'paraglider':
-                result[key] = self._participants[key]
-        return result
-
-    @property
-    def transport(self):
-        '''
-
-        @return: list of transport ids (type TransportID)
-        @rtype: list
-        '''
-        result = list()
-        for key in self._participants.keys():
-            if self._participants[key]['role'] == 'transport':
-                result.append(key)
-        return result
-
-    @property
     def country(self):
         return self.address.country
 
     @country.setter
     def country(self, value):
         self.address = Address(self.place, Country(value),
-            self.address.coordinates)
+                               self.address.coordinates)
 
     @property
     def place(self):
@@ -172,7 +148,7 @@ class Contest(AggregateRoot):
     @place.setter
     def place(self, value):
         self.address = Address(value, self.address.country,
-            self.address.coordinates)
+                               self.address.coordinates)
 
     @property
     def hq_coords(self):
@@ -195,17 +171,22 @@ class Contest(AggregateRoot):
     def title(self, value):
         self._title = value.strip()
 
-    def register_paraglider(self, person_id, glider, contest_number):
-        paragliders_before = deepcopy(self._participants)
-
+    def register_paraglider(self, person_id, name, surname, email, country,
+                            glider, cnum, desc=""):
         glider = glider.strip().split(' ')[0].lower()
-        self._participants[person_id] = dict(role='paraglider',
-            contest_number=int(contest_number), glider=glider)
+        self.paragliders[person_id] = dict(
+            name=name,
+            surname=surname,
+            email=email,
+            country=country,
+            glider=glider,
+            contest_number=cnum,
+            description=desc)
         if not self._invariants_are_correct():
-            self._participants = paragliders_before
+            del self.paragliders[person_id]
             raise ValueError("Paraglider must have unique contest number.")
         persistence.event_store().persist(ParagliderRegisteredOnContest(
-                            person_id, self.id))
+            person_id, self.id))
         return self
 
     def add_transport(self, transport_id):
@@ -221,7 +202,7 @@ class Contest(AggregateRoot):
                           "transport id: %s" % transport_id)
 
     def remove_transport(self, transport_id):
-        if self._participants.has_key(str(transport_id)) and (
+        if str(transport_id) in self._participants and (
                 self._participants[transport_id]['role'] == 'transport'):
             del self._participants[transport_id]
 
@@ -233,10 +214,9 @@ class Contest(AggregateRoot):
         """
         contest_numbers = set()
         paragliders = set()
-        for key in self._participants.keys():
-            if self._participants[key]['role'] == 'paraglider':
+        for key in self.paragliders.keys():
                 contest_numbers.add(
-                    self._participants[key]['contest_number'])
+                    self.paragliders[key]['contest_number'])
                 paragliders.add(key)
         all_contest_numbers_uniq = len(paragliders) == len(contest_numbers)
 
@@ -244,7 +224,8 @@ class Contest(AggregateRoot):
         return all_contest_numbers_uniq and end_after_start
 
     def _rollback_register_paraglider(self, paraglider_before, person_id):
-        # TODO: this function should rollback all paragliders. Am I need this function?
+        # TODO: this function should rollback all paragliders. Am I need this
+        # function?
         self._participants[person_id] = paraglider_before
 
     def apply_ContestRaceCreated(self, ev):

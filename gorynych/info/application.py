@@ -117,11 +117,13 @@ class ApplicationService(BaseApplicationService):
         @return: Contest with registered paraglider wrapped in Deferred.
         @rtype: C{Contest}
         '''
+        # TODO: do in domain model style. Think before.
+        # [(type, title, desc, tracker_id, transport_id),]
+        pers = yield self._get_aggregate(params['person_id'], interfaces.IPersonRepository)
         d = self._get_aggregate(params['contest_id'],
                                 interfaces.IContestRepository)
-        d.addCallback(lambda cont: cont.register_paraglider(
-            person.PersonID.fromstring(params['person_id']), params['glider'],
-            params['contest_number']))
+        d.addCallback(lambda cont: cont.register_paraglider(pers, params['glider'],
+            params['contest_number'], params.get('description', '')))
         d.addCallback(
             persistence.get_repository(interfaces.IContestRepository).save)
         return d

@@ -350,40 +350,40 @@ class PGSQLContestRepository(BasePGSQLRepository):
 
     @defer.inlineCallbacks
     def _append_data_to_contest(self, cont):
-        participants = yield self.pool.runQuery(
-            pe.select('participants', 'contest'), (cont._id,))
-        if participants:
-            cont = self._add_participants_to_contest(cont, participants)
+        paragliders = yield self.pool.runQuery(
+            pe.select('contest_paragliders', 'contest'), (cont._id,))
+        if paragliders:
+            cont = self._add_paragliders_to_contest(cont, paragliders)
+        # ...a room for transport
         retrieve_id = yield self.pool.runQuery(
             pe.select('retrieve_id', 'contest'), (cont._id,))
         if retrieve_id:
             cont.retrieve_id = retrieve_id[0][0]
         defer.returnValue(cont)
 
-    def _add_participants_to_contest(self, cont, rows):
+    def _add_paragliders_to_contest(self, cont, rows):
         '''
 
         @param cont:
         @type cont: C{Contest}
-        @param rows: [(id, participant_id, role, glider,
-        contest_number, description, type)]
+        @param rows: [(id, person_id, name, surname, email, country,
+        glider, contest_number, description)]
         @type rows: C{list}
         @return:
         @rtype:
         '''
-        participants = dict()
+        paragliders = dict()
         for row in rows:
-            id, pid, role, glider, cnum, desc, ptype = row
-            if role == 'paraglider':
-                participants[PersonID.fromstring(pid)] = dict(
-                    role=role,
-                    contest_number=cnum,
-                    glider=str(glider))
-            elif role == 'organizator':
-                participants[PersonID.fromstring(pid)] = dict(role=role)
-            elif role == 'transport':
-                participants[TransportID.fromstring(pid)] = dict(role=role)
-        cont._participants = participants
+            id, pid, name, surname, email, country, glider, cnum, desc = row
+            paragliders[PersonID.fromstring(pid)] = dict(
+                name=name,
+                surname=surname,
+                email=email,
+                country=country,
+                glider=glider,
+                contest_number=cnum,
+                description=desc)
+        cont.paragliders = paragliders
         return cont
 
     @defer.inlineCallbacks
@@ -402,13 +402,13 @@ class PGSQLContestRepository(BasePGSQLRepository):
             i = cur.execute(pe.insert('contest'), values['contest'])
             _id = cur.fetchone()[0]
 
-            if values['participants']:
+            if values['paragliders']:
                 # Callbacks wan't work in for loop, so i insert multiple values
                 # in one query.
                 # Oh yes, executemany also wan't work in asynchronous mode.
-                q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s)",
-                    (insert_id(_id, p))) for p in values['participants'])
-                cur.execute("INSERT into participant values " + q)
+                q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s, %s, %s",
+                    (insert_id(_id, p))) for p in values['paragliders'])
+                cur.execute("INSERT into contest_paraglider values " + q)
             cur.execute("INSERT INTO contest_retrieve_id values (%s, %s)",
                 (_id, obj.retrieve_id))
 
@@ -457,13 +457,19 @@ class PGSQLContestRepository(BasePGSQLRepository):
         obj.address.place, obj.address.country,
         obj.address.lat, obj.address.lon, str(obj.id))
 
-        result['participants'] = []
-        for key in obj._participants:
-            p = obj._participants[key]
-            row = [str(key), p['role'], p.get('glider', ''),
-                p.get('contest_number', ''), p.get('description', ''),
-                key.__class__.__name__.lower()[:-2]]
-            result['participants'].append(row)
+        result['paragliders'] = []
+        for person_id, p in obj.paragliders.iteritems():
+            result['paragliders'].append([str(person_id), p['name'], p['surname'],
+                p['email'], p['country'], p.get('glider', ''),
+                p.get('contest_number', ''), p.get('description', '')])
+
+        # result['participants'] = []
+        # for key in obj._participants:
+        #     p = obj._participants[key]
+        #     row = [str(key), p['role'], p.get('glider', ''),
+        #         p.get('contest_number', ''), p.get('description', ''),
+        #         key.__class__.__name__.lower()[:-2]]
+        #     result['participants'].append(row)
 
         return result
 

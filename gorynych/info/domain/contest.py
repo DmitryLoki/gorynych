@@ -171,22 +171,21 @@ class Contest(AggregateRoot):
     def title(self, value):
         self._title = value.strip()
 
-    def register_paraglider(self, person_id, name, surname, email, country,
-                            glider, cnum, desc=""):
+    def register_paraglider(self, pers, glider, cnum, desc=""):
         glider = glider.strip().split(' ')[0].lower()
-        self.paragliders[person_id] = dict(
-            name=name,
-            surname=surname,
-            email=email,
-            country=country,
+        self.paragliders[pers.id] = dict(
+            name=pers.name,
+            surname=pers.surname,
+            email=pers.email,
+            country=pers.country,
             glider=glider,
             contest_number=cnum,
             description=desc)
         if not self._invariants_are_correct():
-            del self.paragliders[person_id]
+            del self.paragliders[pers.id]
             raise ValueError("Paraglider must have unique contest number.")
         persistence.event_store().persist(ParagliderRegisteredOnContest(
-            person_id, self.id))
+            pers.id, self.id))
         return self
 
     def add_transport(self, transport_id):

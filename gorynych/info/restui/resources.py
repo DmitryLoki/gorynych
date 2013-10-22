@@ -471,7 +471,8 @@ class ContestTransportCollection(APIResource):
 
     def read_POST(self, cont, p=None):
         if cont:
-            return cont.transport
+            print [t_id for t_id, t_value in cont.transport.iteritems()]
+            return [t_id for t_id, t_value in cont.transport.iteritems()]
 
 
 class RaceTransportCollection(APIResource):

@@ -331,6 +331,9 @@ class PGSQLRaceRepository(BasePGSQLRepository):
 class PGSQLContestRepository(BasePGSQLRepository):
     implements(IContestRepository)
 
+    # those are repository-specific types corresponding to the same tables
+    entity_types = ['paragliders', 'transport']
+
     @defer.inlineCallbacks
     def _restore_aggregate(self, row):
         '''
@@ -350,11 +353,14 @@ class PGSQLContestRepository(BasePGSQLRepository):
 
     @defer.inlineCallbacks
     def _append_data_to_contest(self, cont):
-        paragliders = yield self.pool.runQuery(
-            pe.select('contest_paragliders', 'contest'), (cont._id,))
-        if paragliders:
-            cont = self._add_paragliders_to_contest(cont, paragliders)
-        # ...a room for transport
+        print 'restoring maself', cont, cont._id
+        for entity_type, add_method in zip(self.entity_types,
+                                           [self._add_paragliders_to_contest,
+                                            self._add_transport_to_contest]):
+            entities = yield self.pool.runQuery(pe.select(entity_type,
+                                                          'contest'), (cont._id,))
+            if entities:
+                cont = add_method(cont, entities)
         retrieve_id = yield self.pool.runQuery(
             pe.select('retrieve_id', 'contest'), (cont._id,))
         if retrieve_id:
@@ -374,9 +380,8 @@ class PGSQLContestRepository(BasePGSQLRepository):
         '''
         paragliders = dict()
         for row in rows:
-            print row
-            pid, name, surname, email, country, glider, cnum, desc, phone = row
-            paragliders[PersonID.fromstring(pid)] = dict(
+            p_id, name, surname, email, country, glider, cnum, desc, phone = row
+            paragliders[PersonID.fromstring(p_id)] = dict(
                 name=name,
                 surname=surname,
                 email=email,
@@ -388,6 +393,18 @@ class PGSQLContestRepository(BasePGSQLRepository):
         cont.paragliders = paragliders
         return cont
 
+    def _add_transport_to_contest(self, cont, rows):
+        transport = dict()
+        for row in rows:
+            t_id, title, ttype, desc, phone = row
+            transport[TransportID.fromstring(t_id)] = dict(
+                title=title,
+                type=ttype,
+                description=desc,
+                phone=phone)
+        cont.transport = transport
+        return cont
+
     @defer.inlineCallbacks
     def save(self, obj):
         values = self._extract_values_from_contest(obj)
@@ -396,44 +413,55 @@ class PGSQLContestRepository(BasePGSQLRepository):
             _list.insert(0, _id)
             return _list
 
+        def delete_participant(cur, entity_type, entities):
+            ids = tuple([x[1] for x in entities])
+            if entity_type == 'paragliders':
+                cur.execute("DELETE FROM contest_paraglider WHERE id=%s "
+                            "AND person_id IN "
+                            "(SELECT id FROM person WHERE person.person_id in %s)",
+                            (obj._id, ids))
+            elif entity_type == 'transport':
+                cur.execute("DELETE FROM contest_transport WHERE id=%s "
+                            "AND transport_id IN "
+                            "(SELECT id FROM transport WHERE transport.transport_id in %s",
+                             (obj._id, ids))
+            # other guys
+
+        def insert_participant(cur, entity_type, entities):
+            if entity_type == 'paragliders':
+                q = ','.join(cur.mogrify("(%s, (SELECT id FROM person WHERE person_id=%s), %s, %s, %s, %s, %s, %s, %s, %s)",
+                             (pitem)) for pitem in entities)
+                cur.execute("INSERT INTO contest_paraglider "
+                            "(id, person_id, name, surname, email, country, "
+                            "glider, contest_number, description, phone) "
+                            "VALUES " + q)
+            elif entity_type == 'transport':
+                q = ','.join(cur.mogrify("(%s, (SELECT id FROM transport WHERE transport.transport_id=%s), "
+                                         "%s, (SELECT id FROM transport_type WHERE transport_type=%s), "
+                                         "%s, %s)", (pitem)) for pitem in entities)
+                cur.execute("INSERT INTO contest_transport(id, transport_id, title, type, description, phone) "
+                            "VALUES " + q)
+            # same shit
+
         def save_new(cur):
             '''
             Save just created contest.
             '''
-
             i = cur.execute(pe.insert('contest'), values['contest'])
             _id = cur.fetchone()[0]
 
             if values['paragliders']:
+                insert_participant(cur, 'paragliders', values['paragliders'])
                 # Callbacks wan't work in for loop, so i insert multiple values
                 # in one query.
                 # Oh yes, executemany also wan't work in asynchronous mode.
-                q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s",
-                    (insert_id(_id, p))) for p in values['paragliders'])
-                cur.execute("INSERT into contest_paraglider values " + q)
+                # q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s",
+                #     (insert_id(_id, p))) for p in values['paragliders'])
+                # cur.execute("INSERT into contest_paraglider values " + q)
             cur.execute("INSERT INTO contest_retrieve_id values (%s, %s)",
                 (_id, obj.retrieve_id))
 
             return _id
-
-        def delete(cur, entity_type, entities):
-            ids = tuple([x[1] for x in entities])
-            if entity_type == 'paraglider':
-                cur.execute("DELETE FROM contest_paraglider WHERE id=%s "
-                            "AND person_id in "
-                            "(SELECT id FROM person WHERE person.person_id=%s)",
-                            (obj._id, ids))
-            # other guys
-
-        def insert(cur, entity_type, entities):
-            if entity_type == 'paragliders':
-                q = ','.join(cur.mogrify("(%s, (SELECT id FROM person WHERE person_id=%s), %s, %s, %s, %s, %s, %s, %s, %s)",
-                             (pitem)) for pitem in entities)
-                cur.execute("INSERT into contest_paraglider "
-                            "(id, person_id, name, surname, email, country, "
-                            "glider, contest_number, description, phone) "
-                            "values " + q)
-            # same shit
 
         def update(cur, entity_type, entities):
             cur.execute(pe.update('contest'), values['contest'])
@@ -446,22 +474,29 @@ class PGSQLContestRepository(BasePGSQLRepository):
                 to_insert = set(inobj).difference(set(indb))
                 to_delete = set(indb).difference(set(inobj))
                 if to_delete:
-                    delete(cur, entity_type, to_delete)
+                    delete_participant(cur, entity_type, to_delete)
                 if to_insert:
-                    insert(cur, entity_type, to_insert)
+                    insert_participant(cur, entity_type, to_insert)
             if obj.retrieve_id:
                 cur.execute(
                     "UPDATE contest_retrieve_id SET retrieve_id=%s where"
                             " id=%s", (obj.retrieve_id, obj._id))
-
             return obj
 
         result = None
+        print 'i save!'
         if obj._id:
-            paragliders = yield self.pool.runQuery(pe.select('contest_paragliders',
-                                                   'contest'), (obj._id,))
-            result = yield self.pool.runInteraction(update, 'paragliders', paragliders)
+            print 'got id'
+            entity_groups = []
+            for entity_type in self.entity_types:
+                items = yield self.pool.runQuery(pe.select(entity_type,
+                                                 'contest'), (obj._id,))
+                entity_groups.append(items)
+            for entity_type, entitites in zip(self.entity_types, entity_groups):
+                result = yield self.pool.runInteraction(update, entity_type, entitites)
+            print result
         else:
+            print 'none('
             c__id = yield self.pool.runInteraction(save_new)
             obj._id = c__id
             result = obj
@@ -470,15 +505,20 @@ class PGSQLContestRepository(BasePGSQLRepository):
     def _extract_values_from_contest(self, obj):
         result = dict()
         result['contest'] = (obj.title, obj.start_time, obj.end_time,
-        obj.timezone,
-        obj.address.place, obj.address.country,
-        obj.address.lat, obj.address.lon, str(obj.id))
+                             obj.timezone,
+                             obj.address.place, obj.address.country,
+                             obj.address.lat, obj.address.lon, str(obj.id))
 
         result['paragliders'] = []
         for person_id, p in obj.paragliders.iteritems():
             result['paragliders'].append([str(person_id), p['name'], p['surname'],
-                p['email'], p['country'], p.get('glider', ''),
-                p.get('contest_number', ''), p.get('description', ''), p.get('phone', '')])
+                                          p['email'], p['country'], p.get('glider', ''),
+                                          p.get('contest_number', ''), p.get('description', ''),
+                                          p.get('phone', '')])
+        result['transport'] = []
+        for transport_id, t in obj.transport.iteritems():
+            result['transport'].append([str(transport_id), t['title'], t['type'],
+                                        t.get('description', ''), t.get('phone', '')])
 
         return result
 

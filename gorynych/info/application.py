@@ -132,12 +132,18 @@ class ApplicationService(BaseApplicationService):
         yield d
         defer.returnValue(cont)
 
+    @defer.inlineCallbacks
     def add_transport_to_contest(self, params):
-        d = self.get_contest(params)
-        d.addCallback(lambda cont: cont.add_transport(params['transport_id']))
+        trns = yield self._get_aggregate(params['transport_id'], interfaces.ITransportRepository)
+        cont = yield self._get_aggregate(params['contest_id'],
+                                interfaces.IContestRepository)
+        d = defer.Deferred()
+        d.addCallback(lambda _: cont.add_transport(trns, params.get('phone', '')))
         d.addCallback(
             persistence.get_repository(interfaces.IContestRepository).save)
-        return d
+        d.callback('fire!')
+        yield d
+        defer.returnValue(cont)
 
     def get_contest_transport(self, params):
         d = self.get_contest(params)

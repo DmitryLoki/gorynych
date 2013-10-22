@@ -47,7 +47,7 @@ class Contest(AggregateRoot):
         self.address = address
         self.paragliders = dict()
         self.transport = dict()
-        self.participants = dict()
+        self._participants = dict()
         self.race_ids = set()
         self.retrieve_id = None
 
@@ -173,7 +173,7 @@ class Contest(AggregateRoot):
 
     def register_paraglider(self, pers, glider, cnum, desc=""):
         glider = glider.strip().split(' ')[0].lower()
-        self.paragliders[pers.id] = dict(
+        self.paragliders[str(pers.id)] = dict(
             name=pers.name.name,
             surname=pers.name.surname,
             email=pers.email,
@@ -189,22 +189,17 @@ class Contest(AggregateRoot):
             pers.id, self.id))
         return self
 
-    def add_transport(self, transport_id):
-        if not isinstance(transport_id, TransportID):
-            transport_id = TransportID.fromstring(transport_id)
-        if not transport_id in self._participants:
-            self._participants[transport_id] = dict(role='transport')
-            return self
-        if transport_id in self._participants and (
-                self._participants[transport_id]['role'] == 'transport'):
-            return self
-        raise DomainError("Received id already in contest and it's not "
-                          "transport id: %s" % transport_id)
+    def add_transport(self, trns, phone=""):
+        self.transport[str(trns.id)] = dict(
+            title=trns.title,
+            description=trns.description,
+            type=trns.type,
+            phone=phone)
+        return self
 
     def remove_transport(self, transport_id):
-        if str(transport_id) in self._participants and (
-                self._participants[transport_id]['role'] == 'transport'):
-            del self._participants[transport_id]
+        if transport_id in self.transport:
+            del self.transport[transport_id]
 
     def _invariants_are_correct(self):
         """

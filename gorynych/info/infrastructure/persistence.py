@@ -374,7 +374,8 @@ class PGSQLContestRepository(BasePGSQLRepository):
         '''
         paragliders = dict()
         for row in rows:
-            pid, name, surname, email, country, glider, cnum, desc = row
+            print row
+            pid, name, surname, email, country, glider, cnum, desc, phone = row
             paragliders[PersonID.fromstring(pid)] = dict(
                 name=name,
                 surname=surname,
@@ -382,7 +383,8 @@ class PGSQLContestRepository(BasePGSQLRepository):
                 country=country,
                 glider=glider,
                 contest_number=cnum,
-                description=desc)
+                description=desc,
+                phone=phone)
         cont.paragliders = paragliders
         return cont
 
@@ -406,7 +408,7 @@ class PGSQLContestRepository(BasePGSQLRepository):
                 # Callbacks wan't work in for loop, so i insert multiple values
                 # in one query.
                 # Oh yes, executemany also wan't work in asynchronous mode.
-                q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s, %s, %s",
+                q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s",
                     (insert_id(_id, p))) for p in values['paragliders'])
                 cur.execute("INSERT into contest_paraglider values " + q)
             cur.execute("INSERT INTO contest_retrieve_id values (%s, %s)",
@@ -425,11 +427,11 @@ class PGSQLContestRepository(BasePGSQLRepository):
 
         def insert(cur, entity_type, entities):
             if entity_type == 'paragliders':
-                q = ','.join(cur.mogrify("(%s, (SELECT id FROM person WHERE person_id=%s), %s, %s, %s, %s, %s, %s, %s)",
+                q = ','.join(cur.mogrify("(%s, (SELECT id FROM person WHERE person_id=%s), %s, %s, %s, %s, %s, %s, %s, %s)",
                              (pitem)) for pitem in entities)
                 cur.execute("INSERT into contest_paraglider "
                             "(id, person_id, name, surname, email, country, "
-                            "glider, contest_number, description) "
+                            "glider, contest_number, description, phone) "
                             "values " + q)
             # same shit
 
@@ -476,15 +478,7 @@ class PGSQLContestRepository(BasePGSQLRepository):
         for person_id, p in obj.paragliders.iteritems():
             result['paragliders'].append([str(person_id), p['name'], p['surname'],
                 p['email'], p['country'], p.get('glider', ''),
-                p.get('contest_number', ''), p.get('description', '')])
-
-        # result['participants'] = []
-        # for key in obj._participants:
-        #     p = obj._participants[key]
-        #     row = [str(key), p['role'], p.get('glider', ''),
-        #         p.get('contest_number', ''), p.get('description', ''),
-        #         key.__class__.__name__.lower()[:-2]]
-        #     result['participants'].append(row)
+                p.get('contest_number', ''), p.get('description', ''), p.get('phone', '')])
 
         return result
 

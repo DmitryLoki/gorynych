@@ -180,7 +180,8 @@ class Contest(AggregateRoot):
             country=pers.country,
             glider=glider,
             contest_number=cnum,
-            description=desc)
+            description=desc,
+            phone=pers.phone)
         if not self._invariants_are_correct():
             del self.paragliders[pers.id]
             raise ValueError("Paraglider must have unique contest number.")

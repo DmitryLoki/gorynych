@@ -381,7 +381,7 @@ class PGSQLContestRepository(BasePGSQLRepository):
         '''
         paragliders = dict()
         for row in rows:
-            p_id, name, surname, email, country, glider, cnum, desc, phone = row
+            c_id, p_id, name, surname, email, country, glider, cnum, desc, phone = row
             paragliders[PersonID.fromstring(p_id)] = dict(
                 name=name,
                 surname=surname,
@@ -397,7 +397,7 @@ class PGSQLContestRepository(BasePGSQLRepository):
     def _add_transport(self, cont, rows):
         transport = dict()
         for row in rows:
-            t_id, title, ttype, desc, phone = row
+            c_id, t_id, title, ttype, desc, phone = row
             transport[TransportID.fromstring(t_id)] = dict(
                 title=title,
                 type=ttype,
@@ -408,8 +408,9 @@ class PGSQLContestRepository(BasePGSQLRepository):
 
     def _add_other_participants(self, cont, rows):
         for row in rows:
-            _id, role, data = row
-            data = cPickle.loads(data)
+            c_id, _id, role, data = row
+            print data, type(data)
+            data = cPickle.loads(str(data))
             if role == 'rescuer':
                 cont.rescuers[_id] = data
             elif role == 'winddummy':
@@ -457,9 +458,8 @@ class PGSQLContestRepository(BasePGSQLRepository):
                 cur.execute("INSERT INTO contest_transport(id, transport_id, title, type, description, phone) "
                             "VALUES " + q)
             elif entity_type == 'participants':
-                q = ','.join(cur.mogrify("(%s, %s, %s)", (p_id, role, cPickle.dumps(data)))
-                             for p_id, role, data in entitites)
-                cur.execute("INSERT INTO contest_participant(id, participant_id, data) "
+                q = ','.join(cur.mogrify("(%s, %s, %s, %s)", (pitem)) for pitem in entities)
+                cur.execute("INSERT INTO contest_participant(id, participant_id, role, data) "
                             "VALUES " + q)
 
             # same shit
@@ -490,8 +490,10 @@ class PGSQLContestRepository(BasePGSQLRepository):
                 for idx, p in enumerate(inobj):
                     p.insert(0, obj._id)
                     inobj[idx] = tuple(p)
+                print inobj, indb
                 to_insert = set(inobj).difference(set(indb))
                 to_delete = set(indb).difference(set(inobj))
+                print to_insert, to_delete
                 if to_delete:
                     delete_participant(cur, entity_type, to_delete)
                 if to_insert:
@@ -508,6 +510,10 @@ class PGSQLContestRepository(BasePGSQLRepository):
             for entity_type in self.entity_types:
                 items = yield self.pool.runQuery(pe.select(entity_type,
                                                  'contest'), (obj._id,))
+                print 'ITEMS', items
+                if entity_type == 'participants':
+                    items = [(c_id, p_id, role, str(data)) for c_id, p_id, role, data in items]
+                
                 entity_groups.append(items)
             for entity_type, entitites in zip(self.entity_types, entity_groups):
                 result = yield self.pool.runInteraction(update, entity_type, entitites)
@@ -537,11 +543,13 @@ class PGSQLContestRepository(BasePGSQLRepository):
 
         result['participants'] = []
         for p_id, data in obj.rescuers.iteritems():
-            result['participants'].append([p_id, 'rescuer', data])
+            result['participants'].append([str(p_id), 'rescuer', cPickle.dumps(data)])
         for p_id, data in obj.winddummies.iteritems():
-            result['participants'].append([p_id, 'winddummy', data])
+            result['participants'].append([str(p_id), 'winddummy', cPickle.dumps(data)])
         for p_id, data in obj.organizers.iteritems():
-            result['participants'].append([p_id, 'organizer', data])
+            result['participants'].append([str(p_id), 'organizer', cPickle.dumps(data)])
+
+        print 'VALUES', result['participants']
 
         return result
 

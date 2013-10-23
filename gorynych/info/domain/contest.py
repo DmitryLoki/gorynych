@@ -201,14 +201,14 @@ class Contest(AggregateRoot):
             phone=phone)
         return self
 
-    def add_rescuer(self, r_id, title, phone="", desc=""):
+    def add_rescuer(self, r_id, title, phone="", description=""):
         self.rescuers[r_id] = dict(
             title=title,
-            description=desc,
+            description=description,
             phone=phone)
         return self
 
-    def add_winddumy(self, pers):
+    def add_winddummy(self, pers):
         self.winddummies[pers.id] = dict(
             name=pers.name.name,
             surname=pers.name.surname,

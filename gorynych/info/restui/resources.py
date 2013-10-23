@@ -174,14 +174,15 @@ class ContestWinddummyResourceCollection(APIResource):
     Resource /contest/{id}/winddummies
     """
     service_command = dict(POST='add_winddummy_to_contest',
-                           GET='get_contest_winddummies')
+                           GET='get_contest')
     name = 'contest_winddummy_collection'
 
     def _read(self, cont, request_params):
+        print cont, request_params
         result = []
         for _id, data in cont.winddummies.iteritems():
-            temp_dict = data.update(dict(id=_id))
-            result.append(temp_dict)
+            data.update(dict(id=_id))
+            result.append(data)
         return result
 
     def read_POST(self, cont, request_params=None):
@@ -191,19 +192,19 @@ class ContestWinddummyResourceCollection(APIResource):
         return self._read(cont, request_params)
 
 
-class ContestRescuersResourceCollection(APIResource):
+class ContestRescuerResourceCollection(APIResource):
     """
     Resource /contest/{id}/rescuers
     """
     service_command = dict(POST='add_rescuer_to_contest',
-                           GET='get_contest_rescuers')
+                           GET='get_contest')
     name = 'contest_rescuer_collection'
 
     def _read(self, cont, request_params):
         result = []
         for _id, data in cont.rescuers.iteritems():
-            temp_dict = data.update(dict(id=_id))
-            result.append(temp_dict)
+            data.update(dict(id=_id))
+            result.append(data)
         return result
 
     def read_POST(self, cont, request_params=None):
@@ -218,14 +219,15 @@ class ContestOrganizerResourceCollection(APIResource):
     Resource /contest/{id}/organizers
     """
     service_command = dict(POST='add_organizer_to_contest',
-                           GET='get_contest_organizers')
+                           GET='get_contest')
     name = 'contest_organizer_collection'
 
     def _read(self, cont, request_params):
+        print cont, request_params
         result = []
         for _id, data in cont.organizers.iteritems():
-            temp_dict = data.update(dict(id=_id))
-            result.append(temp_dict)
+            data.update(dict(id=_id))
+            result.append(data)
         return result
 
     def read_POST(self, cont, request_params=None):

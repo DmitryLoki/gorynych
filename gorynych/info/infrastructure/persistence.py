@@ -379,44 +379,35 @@ class PGSQLContestRepository(BasePGSQLRepository):
         @return:
         @rtype:
         '''
-        paragliders = dict()
         for row in rows:
-            c_id, p_id, name, surname, email, country, glider, cnum, desc, phone = row
-            paragliders[PersonID.fromstring(p_id)] = dict(
+            c_id, p_id, name, surname, email, country, glider, cnum, phone = row
+            cont._participants[PersonID.fromstring(p_id)] = dict(
+                role="paraglider",
                 name=name,
                 surname=surname,
                 email=email,
                 country=country,
                 glider=glider,
                 contest_number=cnum,
-                description=desc,
                 phone=phone)
-        cont.paragliders = paragliders
         return cont
 
     def _add_transport(self, cont, rows):
-        transport = dict()
         for row in rows:
             c_id, t_id, title, ttype, desc, phone = row
-            transport[TransportID.fromstring(t_id)] = dict(
+            cont._participants[TransportID.fromstring(t_id)] = dict(
+                role="transport",
                 title=title,
                 type=ttype,
                 description=desc,
                 phone=phone)
-        cont.transport = transport
         return cont
 
     def _add_other_participants(self, cont, rows):
         for row in rows:
             c_id, _id, role, data = row
-            print data, type(data)
             data = cPickle.loads(str(data))
-            if role == 'rescuer':
-                cont.rescuers[_id] = data
-            elif role == 'winddummy':
-                cont.winddummies[_id] = data
-            elif role == 'organizer':
-                cont.organizers[_id] = data
+            cont._participants[_id] = data
         return cont
 
     @defer.inlineCallbacks
@@ -445,11 +436,12 @@ class PGSQLContestRepository(BasePGSQLRepository):
 
         def insert_participant(cur, entity_type, entities):
             if entity_type == 'paragliders':
-                q = ','.join(cur.mogrify("(%s, (SELECT id FROM person WHERE person_id=%s), %s, %s, %s, %s, %s, %s, %s, %s)",
+                print [x for x in entitites]
+                q = ','.join(cur.mogrify("(%s, (SELECT id FROM person WHERE person_id=%s), %s, %s, %s, %s, %s, %s, %s)",
                              (pitem)) for pitem in entities)
                 cur.execute("INSERT INTO contest_paraglider "
                             "(id, person_id, name, surname, email, country, "
-                            "glider, contest_number, description, phone) "
+                            "glider, contest_number, phone) "
                             "VALUES " + q)
             elif entity_type == 'transport':
                 q = ','.join(cur.mogrify("(%s, (SELECT id FROM transport WHERE transport.transport_id=%s), "
@@ -490,10 +482,8 @@ class PGSQLContestRepository(BasePGSQLRepository):
                 for idx, p in enumerate(inobj):
                     p.insert(0, obj._id)
                     inobj[idx] = tuple(p)
-                print inobj, indb
                 to_insert = set(inobj).difference(set(indb))
                 to_delete = set(indb).difference(set(inobj))
-                print to_insert, to_delete
                 if to_delete:
                     delete_participant(cur, entity_type, to_delete)
                 if to_insert:
@@ -510,7 +500,6 @@ class PGSQLContestRepository(BasePGSQLRepository):
             for entity_type in self.entity_types:
                 items = yield self.pool.runQuery(pe.select(entity_type,
                                                  'contest'), (obj._id,))
-                print 'ITEMS', items
                 if entity_type == 'participants':
                     items = [(c_id, p_id, role, str(data)) for c_id, p_id, role, data in items]
                 
@@ -534,8 +523,7 @@ class PGSQLContestRepository(BasePGSQLRepository):
         for person_id, p in obj.paragliders.iteritems():
             result['paragliders'].append([str(person_id), p['name'], p['surname'],
                                           p['email'], p['country'], p.get('glider', ''),
-                                          p.get('contest_number', ''), p.get('description', ''),
-                                          p.get('phone', '')])
+                                          p.get('contest_number', ''), p.get('phone', '')])
         result['transport'] = []
         for transport_id, t in obj.transport.iteritems():
             result['transport'].append([str(transport_id), t['title'], t['type'],
@@ -548,8 +536,6 @@ class PGSQLContestRepository(BasePGSQLRepository):
             result['participants'].append([str(p_id), 'winddummy', cPickle.dumps(data)])
         for p_id, data in obj.organizers.iteritems():
             result['participants'].append([str(p_id), 'organizer', cPickle.dumps(data)])
-
-        print 'VALUES', result['participants']
 
         return result
 

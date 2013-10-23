@@ -122,10 +122,10 @@ class ApplicationService(BaseApplicationService):
         # [(type, title, desc, tracker_id, transport_id),]
         pers = yield self._get_aggregate(params['person_id'], interfaces.IPersonRepository)
         cont = yield self._get_aggregate(params['contest_id'],
-                                interfaces.IContestRepository)
+                                         interfaces.IContestRepository)
         d = defer.Deferred()
         d.addCallback(lambda _: cont.register_paraglider(pers, params['glider'],
-            params['contest_number'], params.get('description', '')))
+                                                         params['contest_number']))
         d.addCallback(
             persistence.get_repository(interfaces.IContestRepository).save)
         d.callback('fire!')
@@ -136,7 +136,7 @@ class ApplicationService(BaseApplicationService):
     def add_transport_to_contest(self, params):
         trns = yield self._get_aggregate(params['transport_id'], interfaces.ITransportRepository)
         cont = yield self._get_aggregate(params['contest_id'],
-                                interfaces.IContestRepository)
+                                         interfaces.IContestRepository)
         d = defer.Deferred()
         d.addCallback(lambda _: cont.add_transport(trns, params.get('phone', '')))
         d.addCallback(

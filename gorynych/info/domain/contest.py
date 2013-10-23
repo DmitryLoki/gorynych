@@ -171,7 +171,7 @@ class Contest(AggregateRoot):
     def title(self, value):
         self._title = value.strip()
 
-    def register_paraglider(self, pers, glider, cnum, desc=""):
+    def register_paraglider(self, pers, glider, cnum):
         paragliders_before = deepcopy(self._participants)
         glider = glider.strip().split(' ')[0].lower()
         self._participants[str(pers.id)] = dict(
@@ -182,7 +182,6 @@ class Contest(AggregateRoot):
             country=pers.country,
             glider=glider,
             contest_number=int(cnum),
-            description=desc,
             phone=pers.phone)
         if not self._invariants_are_correct():
             self._participants = paragliders_before

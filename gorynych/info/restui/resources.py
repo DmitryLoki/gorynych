@@ -148,7 +148,7 @@ class ContestParagliderResourceCollection(APIResource):
     Resource /contest/{id}/race/{id}/paraglider
     '''
     service_command = dict(POST='register_paraglider_on_contest',
-                           GET='get_contest_paragliders')
+                           GET='get_contest')
     name = 'contest_paraglider_collection'
 
     def read_POST(self, cont, request_params):
@@ -158,13 +158,13 @@ class ContestParagliderResourceCollection(APIResource):
                     contest_number=str(cont.paragliders[par_id]['contest_number']),
                     glider=cont.paragliders[par_id]['glider'])
 
-    def read_GET(self, p_dicts, request_params=None):
-        if p_dicts:
+    def read_GET(self, cont, request_params=None):
+        if cont.paragliders:
             result = []
-            for person_id in p_dicts:
+            for person_id in cont.paragliders:
                 result.append(dict(person_id=person_id,
-                                   glider=p_dicts[person_id]['glider'],
-                                   contest_number=str(p_dicts[person_id][
+                                   glider=cont.paragliders[person_id]['glider'],
+                                   contest_number=str(cont.paragliders[person_id][
                                        'contest_number'])))
             return result
 

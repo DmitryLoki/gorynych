@@ -146,8 +146,7 @@ class ApplicationService(BaseApplicationService):
         defer.returnValue(cont)
 
     @defer.inlineCallbacks
-    def add_participant_to_contest(self, params):
-        role = params.get('role')
+    def _add_participant_to_contest(self, params, role):
         if role not in contest.AVAILABLE_PARTICIPANTS:
             raise TypeError('Unexpected role ({}). Allowed: {}'.format(
                 role, contest.AVAILABLE_PARTICIPANTS))
@@ -171,8 +170,23 @@ class ApplicationService(BaseApplicationService):
         yield d
         defer.returnValue(cont)
 
+    def add_winddummy_to_contest(self, params):
+        return self._add_participant_to_contest(params, 'winddummy')
+
+    def add_rescuer_to_contest(self, params):
+        return self._add_participant_to_contest(params, 'rescuer')
+
+    def add_ogranizer_to_contest(self, params):
+        return self._add_participant_to_contest(params, 'organizer')
+
     def get_contest_transport(self, params):
         d = self.get_contest(params)
+        return d
+
+    def _get_contest_participants(self, contest_id, entity_type):
+        d = self._get_aggregate(contest_id,
+                                interfaces.IContestRepository)
+        d.addCallback(lambda cont: getattr(cont, entity_type))
         return d
 
     def get_contest_paragliders(self, params):
@@ -183,10 +197,16 @@ class ApplicationService(BaseApplicationService):
         @return:
         @rtype:
         '''
-        d = self._get_aggregate(params['contest_id'],
-                                interfaces.IContestRepository)
-        d.addCallback(lambda cont: cont.paragliders)
-        return d
+        return self._get_contest_participants(params['contest_id'], 'paragliders')
+
+    def get_contest_winddummies(self, params):
+        return self._get_contest_participants(params['contest_id'], 'winddummies')
+
+    def get_contest_rescuers(self, params):
+        return self._get_contest_participants(params['contest_id'], 'rescuers')
+
+    def get_contest_organizers(self, params):
+        return self._get_contest_participants(params['contest_id'], 'organizers')
 
     def change_paraglider(self, params):
         '''

@@ -145,6 +145,32 @@ class ApplicationService(BaseApplicationService):
         yield d
         defer.returnValue(cont)
 
+    @defer.inlineCallbacks
+    def add_participant_to_contest(self, params):
+        role = params.get('role')
+        if role not in contest.AVAILABLE_PARTICIPANTS:
+            raise TypeError('Unexpected role ({}). Allowed: {}'.format(
+                role, contest.AVAILABLE_PARTICIPANTS))
+
+        if role == 'rescuer':
+            args = dict(r_id=params['id'],
+                        title=params['title'],
+                        phone=params.get('phone', ''),
+                        description=params.get('description', ''))
+        else:
+            args = yield self._get_aggregate(params['id'], interfaces.IPersonRepository)
+
+        cont = yield self._get_aggregate(params['contest_id'],
+                                         interfaces.IContestRepository)
+        add_method = getattr(cont, 'add_' + role)
+        d = defer.Deferred()
+        d.addCallback(lambda _: add_method(args))
+        d.addCallback(
+            persistence.get_repository(interfaces.IContestRepository).save)
+        d.callback('fire!')
+        yield d
+        defer.returnValue(cont)
+
     def get_contest_transport(self, params):
         d = self.get_contest(params)
         return d

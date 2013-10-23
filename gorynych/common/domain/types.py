@@ -2,10 +2,28 @@
 Common types.
 '''
 import simplejson as json
+import re
 
 from shapely.geometry import shape
 from gorynych.common.domain.model import ValueObject
 from gorynych.common.domain.services import point_dist_calculator
+
+
+class Phone(ValueObject):
+
+    def __init__(self, phone):
+        self._number = self._validate(phone)
+
+    def _validate(self, value):
+        if re.match(r'^\+\d+', value):
+            return value
+        else:
+            raise ValueError("Incorrect phone ({}). Phone number must contain digits \
+                             and be started with plus sign".format(value))
+
+    @property
+    def number(self):
+        return self._number
 
 
 class Name(ValueObject):

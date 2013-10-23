@@ -55,6 +55,15 @@ contest:
         transport:
           leaf: ContestTransportCollection
           package: *gorynych
+        winddummies:
+          leaf: ContestWinddummyResourceCollection
+          package: *gorynych
+        rescuers:
+          leaf: ContestRescuerResourceCollection
+          package: *gorynych
+        organizers:
+          leaf: ContestOrganizerResourceCollection
+          package: *gorynych
         race:
           leaf: ContestRaceResourceCollection
           package: *gorynych

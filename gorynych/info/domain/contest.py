@@ -7,14 +7,12 @@ import pytz
 from zope.interface.interfaces import Interface
 
 from gorynych.info.domain import race
-from gorynych.common.domain.model import AggregateRoot, ValueObject
-from gorynych.common.domain.types import Address, Country, Name
+from gorynych.common.domain.model import AggregateRoot, ValueObject, DomainIdentifier
+from gorynych.common.domain.types import Address, Country, Name, Phone
 from gorynych.common.domain.events import ParagliderRegisteredOnContest
 from gorynych.common.infrastructure import persistence
 from gorynych.info.domain.ids import ContestID, PersonID, TrackerID, TransportID
 from gorynych.common.exceptions import DomainError
-
-AVAILABLE_PARTICIPANTS = ('winddummy', 'rescuer', 'organizer')
 
 
 class ContestFactory(object):
@@ -174,11 +172,9 @@ class Contest(AggregateRoot):
     def register_paraglider(self, pers, glider, cnum):
         paragliders_before = deepcopy(self._participants)
         glider = glider.strip().split(' ')[0].lower()
-        self._participants[str(pers.id)] = dict(
+        self._participants[pers.id] = dict(
             role='paraglider',
-            name=pers.name.name,
-            surname=pers.name.surname,
-            email=pers.email,
+            name=pers.name.full(),
             country=pers.country,
             glider=glider,
             contest_number=int(cnum),
@@ -190,35 +186,28 @@ class Contest(AggregateRoot):
             pers.id, self.id))
         return self
 
-    def add_transport(self, trns, phone=""):
-        self._participants[str(trns.id)] = dict(
-            role='transport',
-            title=trns.title,
-            description=trns.description,
-            type=trns.type,
-            phone=phone)
-        return self
-
-    def add_rescuer(self, r_id, title, phone="", description=""):
-        self._participants[r_id] = dict(
-            role='rescuer',
-            title=title,
-            description=description,
-            phone=phone)
-        return self
-
     def add_winddummy(self, pers):
         self._participants[pers.id] = dict(
             role='winddummy',
-            name=pers.name.name,
-            surname=pers.name.surname,
+            name=pers.name.full(),
             phone=pers.phone)
         return self
 
-    def add_organizer(self, pers):
+    def add_organizer(self, pers, description=""):
         self._participants[pers.id] = dict(
             role='organizer',
-            email=pers.email)
+            name=pers.name.full(),
+            email=pers.email,
+            description=description)
+        return self
+
+    def add_staff_member(self, staffmember):
+        self._participants[staffmember.id] = dict(
+            role='staff',
+            title=staffmember.title,
+            type=staffmember.type,
+            phone=staffmember.phone,
+            description=staffmember.description)
         return self
 
     def remove_transport(self, transport_id):
@@ -282,10 +271,6 @@ class Contest(AggregateRoot):
         return self._get_participants('paraglider')
 
     @property
-    def transport(self):
-        return self._get_participants('transport')
-
-    @property
     def winddummies(self):
         return self._get_participants('winddummy')
 
@@ -294,8 +279,8 @@ class Contest(AggregateRoot):
         return self._get_participants('organizer')
 
     @property
-    def rescuers(self):
-        return self._get_participants('rescuer')
+    def staff(self):
+        return self._get_participants('staff')
 
 
 def change(cont, params):
@@ -331,3 +316,21 @@ def change_participant(cont, participant_data):
         cont.change_participant_data(participant_data['person_id'],
                                      contest_number=participant_data['contest_number'])
     return cont
+
+
+class StaffMember(ValueObject):
+    types = ('rescuer', 'transport')
+
+    def __init__(self, title, type, description="", phone=None):
+        if type not in self.types:
+            raise TypeError('Incorrect type ({}). Avaliable types: {}'.format(
+                              type, self.types))
+        self.title = title
+        self.type = type
+        if phone:
+            self.phone = Phone(phone).number
+        else:
+            self.phone = ""
+        self.id = DomainIdentifier()
+        self.description = description
+

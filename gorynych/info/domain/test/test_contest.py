@@ -226,16 +226,40 @@ class ContestServiceTest(unittest.TestCase):
         self.assertEquals(pgl[p.id]['glider'], 'glider')
         self.assertEquals(pgl[p.id]['contest_number'], 11)
 
-    def test_add_transport(self, patched):
-        event_store = mock.Mock()
-        patched.return_value = event_store
-
+    def test_add_winddummy(self, patched):
         alone_cont = deepcopy(self.cont)
-        t = create_transport('bus')
-        populated_cont = self.cont.add_transport(t)
+        p = create_person()
+        populated_cont = self.cont.add_winddummy(p)
 
-        self.assertFalse(alone_cont.transport)
-        self.assertIn(t.id, populated_cont.transport)
+        self.assertFalse(alone_cont.winddummies)
+        self.assertIn(p.id, populated_cont.winddummies)
+
+    def test_add_organizer(self, patched):
+        alone_cont = deepcopy(self.cont)
+        p = create_person()
+        populated_cont = self.cont.add_organizer(p, description='some guy')
+
+        self.assertFalse(alone_cont.organizers)
+        self.assertIn(p.id, populated_cont.organizers)
+        self.assertEquals(populated_cont.organizers[p.id]['description'], 'some guy')
+
+    def test_add_transport_staffmember(self, patched):
+        alone_cont = deepcopy(self.cont)
+        t = contest.StaffMember(title='t', type='transport')
+        populated_cont = self.cont.add_staff_member(t)
+
+        self.assertFalse(alone_cont.staff)
+        self.assertIn(t.id, populated_cont.staff)
+        self.assertEquals(populated_cont.staff[t.id]['type'], 'transport')
+
+    def test_add_rescuer_staffmember(self, patched):
+        alone_cont = deepcopy(self.cont)
+        r = contest.StaffMember(title='r', type='rescuer')
+        populated_cont = self.cont.add_staff_member(r)
+
+        self.assertFalse(alone_cont.staff)
+        self.assertIn(r.id, populated_cont.staff)
+        self.assertEquals(populated_cont.staff[r.id]['type'], 'rescuer')
 
     def test_change_paraglider(self, patched):
         event_store = mock.Mock()
@@ -254,3 +278,29 @@ class ContestServiceTest(unittest.TestCase):
         self.assertEquals(pgl.keys()[0], p.id)
         self.assertEquals(pgl[p.id]['glider'], 'noglider')
         self.assertEquals(pgl[p.id]['contest_number'], 21)
+
+
+class StaffMemberTest(unittest.TestCase):
+    def test_type(self):
+        self.assertRaises(TypeError, contest.StaffMember,
+                          title='Scruffy the janitor', type='janitor',
+                          description="Don't know who that guy is")
+        sm = contest.StaffMember(title="Chip'n'Dale", type='rescuer',
+                                 description='rescue ranger!')
+        self.assertIsInstance(sm, contest.StaffMember)
+        self.assertEquals(sm.title, "Chip'n'Dale")
+        self.assertEquals(sm.type, "rescuer")
+        self.assertEquals(sm.description, "rescue ranger!")
+        self.assertFalse(sm.phone)
+
+    def test_phone(self):
+        self.assertRaises(ValueError, contest.StaffMember,
+                          title='Serenity', type='transport',
+                          description='firefly-class starship', phone='nope')
+        sm = contest.StaffMember(title='Millenium Falcon', type='transport',
+                                 description='piece of junk', phone='+3456324433')
+        self.assertIsInstance(sm, contest.StaffMember)
+        self.assertEquals(sm.title, "Millenium Falcon")
+        self.assertEquals(sm.type, "transport")
+        self.assertEquals(sm.description, "piece of junk")
+        self.assertEquals(sm.phone, '+3456324433')

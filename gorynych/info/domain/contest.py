@@ -47,7 +47,9 @@ class Contest(AggregateRoot):
         self.address = address
         self.paragliders = dict()
         self.transport = dict()
-        self._participants = dict()
+        self.rescuers = dict()
+        self.winddummies = dict()
+        self.organizers = dict()
         self.race_ids = set()
         self.retrieve_id = None
 
@@ -195,6 +197,24 @@ class Contest(AggregateRoot):
             description=trns.description,
             type=trns.type,
             phone=phone)
+        return self
+
+    def add_rescuer(self, r_id, title, phone="", desc=""):
+        self.rescuers[r_id] = dict(
+            title=title,
+            description=desc,
+            phone=phone)
+        return self
+
+    def add_winddumy(self, pers):
+        self.winddummies[pers.id] = dict(
+            name=pers.name.name,
+            surname=pers.name.surname,
+            phone=pers.phone)
+        return self
+
+    def add_organizer(self, pers):
+        self.organizers[pers.id] = dict(email=pers.email)
         return self
 
     def remove_transport(self, transport_id):

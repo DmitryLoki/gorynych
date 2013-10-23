@@ -169,7 +169,21 @@ class ContestParagliderResourceCollection(APIResource):
             return result
 
 
-class ContestWinddummyResourceCollection(APIResource):
+class ParticipantMixin(object):
+    """
+    Helper class for various participant types
+    """
+
+    def _read(self, entities, request_params):
+        result = []
+        for _id, data in entities.iteritems():
+            data.update(dict(id=_id))
+            del data['role']
+            result.append(data)
+        return result
+
+
+class ContestWinddummyResourceCollection(APIResource, ParticipantMixin):
     """
     Resource /contest/{id}/winddummies
     """
@@ -177,44 +191,14 @@ class ContestWinddummyResourceCollection(APIResource):
                            GET='get_contest')
     name = 'contest_winddummy_collection'
 
-    def _read(self, cont, request_params):
-        print cont, request_params
-        result = []
-        for _id, data in cont.winddummies.iteritems():
-            data.update(dict(id=_id))
-            result.append(data)
-        return result
-
     def read_POST(self, cont, request_params=None):
-        return self._read(cont, request_params)
+        return self._read(cont.winddummies, request_params)
 
     def read_GET(self, cont, request_params=None):
-        return self._read(cont, request_params)
+        return self._read(cont.winddummies, request_params)
 
 
-class ContestRescuerResourceCollection(APIResource):
-    """
-    Resource /contest/{id}/rescuers
-    """
-    service_command = dict(POST='add_rescuer_to_contest',
-                           GET='get_contest')
-    name = 'contest_rescuer_collection'
-
-    def _read(self, cont, request_params):
-        result = []
-        for _id, data in cont.rescuers.iteritems():
-            data.update(dict(id=_id))
-            result.append(data)
-        return result
-
-    def read_POST(self, cont, request_params=None):
-        return self._read(cont, request_params)
-
-    def read_GET(self, cont, request_params=None):
-        return self._read(cont, request_params)
-
-
-class ContestOrganizerResourceCollection(APIResource):
+class ContestOrganizerResourceCollection(APIResource, ParticipantMixin):
     """
     Resource /contest/{id}/organizers
     """
@@ -222,10 +206,24 @@ class ContestOrganizerResourceCollection(APIResource):
                            GET='get_contest')
     name = 'contest_organizer_collection'
 
+    def read_POST(self, cont, request_params=None):
+        return self._read(cont.organizers, request_params)
+
+    def read_GET(self, cont, request_params=None):
+        return self._read(cont.organizers, request_params)
+
+
+class ContestStaffResourceCollection(APIResource):
+    """
+    Resource /contest/{id}/staff
+    """
+    service_command = dict(POST='add_staff_member_to_contest',
+                           GET='get_contest')
+    name = 'contest_staff_collection'
+
     def _read(self, cont, request_params):
-        print cont, request_params
         result = []
-        for _id, data in cont.organizers.iteritems():
+        for _id, data in cont.staff.iteritems():
             data.update(dict(id=_id))
             result.append(data)
         return result

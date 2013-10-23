@@ -176,6 +176,7 @@ class Contest(AggregateRoot):
         self._title = value.strip()
 
     def register_paraglider(self, pers, glider, cnum, desc=""):
+        paragliders_before = deepcopy(self.paragliders)
         glider = glider.strip().split(' ')[0].lower()
         self.paragliders[str(pers.id)] = dict(
             name=pers.name.name,
@@ -187,7 +188,7 @@ class Contest(AggregateRoot):
             description=desc,
             phone=pers.phone)
         if not self._invariants_are_correct():
-            del self.paragliders[pers.id]
+            self.paragliders = paragliders_before
             raise ValueError("Paraglider must have unique contest number.")
         persistence.event_store().persist(ParagliderRegisteredOnContest(
             pers.id, self.id))

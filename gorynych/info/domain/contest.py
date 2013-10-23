@@ -14,6 +14,8 @@ from gorynych.common.infrastructure import persistence
 from gorynych.info.domain.ids import ContestID, PersonID, TrackerID, TransportID
 from gorynych.common.exceptions import DomainError
 
+AVAILABLE_PARTICIPANTS = ('winddummy', 'rescuer', 'organizer')
+
 
 class ContestFactory(object):
 

@@ -169,6 +169,72 @@ class ContestParagliderResourceCollection(APIResource):
             return result
 
 
+class ContestWinddummyResourceCollection(APIResource):
+    """
+    Resource /contest/{id}/winddummies
+    """
+    service_command = dict(POST='add_winddummy_to_contest',
+                           GET='get_contest_winddummies')
+    name = 'contest_winddummy_collection'
+
+    def _read(self, cont, request_params):
+        result = []
+        for _id, data in cont.winddummies.iteritems():
+            temp_dict = data.update(dict(id=_id))
+            result.append(temp_dict)
+        return result
+
+    def read_POST(self, cont, request_params=None):
+        return self._read(cont, request_params)
+
+    def read_GET(self, cont, request_params=None):
+        return self._read(cont, request_params)
+
+
+class ContestRescuersResourceCollection(APIResource):
+    """
+    Resource /contest/{id}/rescuers
+    """
+    service_command = dict(POST='add_rescuer_to_contest',
+                           GET='get_contest_rescuers')
+    name = 'contest_rescuer_collection'
+
+    def _read(self, cont, request_params):
+        result = []
+        for _id, data in cont.rescuers.iteritems():
+            temp_dict = data.update(dict(id=_id))
+            result.append(temp_dict)
+        return result
+
+    def read_POST(self, cont, request_params=None):
+        return self._read(cont, request_params)
+
+    def read_GET(self, cont, request_params=None):
+        return self._read(cont, request_params)
+
+
+class ContestOrganizerResourceCollection(APIResource):
+    """
+    Resource /contest/{id}/organizers
+    """
+    service_command = dict(POST='add_organizer_to_contest',
+                           GET='get_contest_organizers')
+    name = 'contest_organizer_collection'
+
+    def _read(self, cont, request_params):
+        result = []
+        for _id, data in cont.organizers.iteritems():
+            temp_dict = data.update(dict(id=_id))
+            result.append(temp_dict)
+        return result
+
+    def read_POST(self, cont, request_params=None):
+        return self._read(cont, request_params)
+
+    def read_GET(self, cont, request_params=None):
+        return self._read(cont, request_params)
+
+
 class ContestParagliderResource(APIResource):
     '''
     Resource /contest/{id}/race/{id}/paraglider/{id} or

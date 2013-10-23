@@ -6,6 +6,7 @@ import json
 import time
 import random
 import unittest
+import string
 
 import requests
 # from twisted.trial import unittest
@@ -843,6 +844,7 @@ class ContestTransportTest(ValidatedTransportTestCase):
     def test_add_transport_to_contest(self):
         r = requests.post('/'.join((self.url, self.c_id, 'transport')),
             data=dict(transport_id=self.tr_id))
+        print r.json()
         self.validate(r.json(), self.add_to_contest_format)
         self.assertEqual(r.status_code, 201)
         self.assertIn(self.tr_id, r.json())
@@ -886,6 +888,100 @@ class ContestTransportTest(ValidatedTransportTestCase):
         self.assertEqual(self.tr_id, res[0]['id'])
 
 
+class ValidatedParticipantsTestCase(ValidatedTestCase):
+    """
+    Common testcase class for winddummies, organizers and rescuers.
+    """
+
+    # POST/GET /contest/{id}/winddummies
+    winddummies_format = (list, {
+        'phone': unicode,
+        'name': unicode,
+        'surname': unicode,
+        'id': unicode
+    })
+
+    # POST/GET /contest/{id}/organizers
+    organizers_format = (list, {
+        'id': unicode,
+        'email': unicode
+    })
+
+    # POST/GET /contest/{id}/rescuers
+    rescuers_format = (list, {
+        'id': unicode,
+        'phone': unicode,
+        'description': unicode,
+        'title': unicode
+    })
+
+
+class ContestParticipantsTest(ValidatedParticipantsTestCase):
+    url = URL + '/contest'
+
+    def setUp(self):
+        try:
+            c_, t_ = create_contest(title='Contest with participants')
+        except:
+            raise unittest.SkipTest("I need contest for test")
+        self.c_id = c_.json()['id']
+
+    def tearDown(self):
+        del self.c_id
+
+    def _get_person_id(self):
+        r, email = create_persons()
+        return r.json()['id']
+
+    # winddummies
+
+    def test_get_winddummies(self):
+        r = requests.get('/'.join((URL, 'contest', self.c_id,
+                                   'winddummies')))
+        self.validate(r.json(), self.winddummies_format)
+
+    def test_add_winddummy_to_contest(self):
+        p_id = self._get_person_id()
+        r = requests.post('/'.join((self.url, self.c_id, 'winddummies')),
+                          data=dict(id=p_id))
+        self.validate(r.json(), self.winddummies_format)
+        self.assertEqual(r.status_code, 201)
+        self.assertTrue(r.json()[0]['id'] == p_id)
+
+    # organizers
+
+    def test_get_organizers(self):
+        r = requests.get('/'.join((URL, 'contest', self.c_id,
+                                   'organizers')))
+        self.validate(r.json(), self.organizers_format)
+
+    def test_add_organizer_to_contest(self):
+        p_id = self._get_person_id()
+        r = requests.post('/'.join((self.url, self.c_id, 'organizers')),
+                          data=dict(id=p_id))
+        self.validate(r.json(), self.organizers_format)
+        self.assertEqual(r.status_code, 201)
+        self.assertTrue(r.json()[0]['id'] == p_id)
+
+    # rescuers
+
+    def test_get_rescuers(self):
+        r = requests.get('/'.join((URL, 'contest', self.c_id,
+                                   'rescuers')))
+        self.validate(r.json(), self.rescuers_format)
+
+    def test_add_rescuers_to_contest(self):
+        r_id = ''.join([random.choice(string.digits + string.letters) for i in xrange(10)])
+        data = dict(
+            id=r_id,
+            phone='+76542345566',
+            title='RescueRanger',
+            description="Chip-Chip-Chip-Chip 'n Dale!")
+        r = requests.post('/'.join((self.url, self.c_id, 'rescuers')),
+                          data=data)
+        self.validate(r.json(), self.rescuers_format)
+        self.assertEqual(r.status_code, 201)
+        self.assertTrue(r.json()[0]['id'] == r_id)
 
 if __name__ == '__main__':
     unittest.main()

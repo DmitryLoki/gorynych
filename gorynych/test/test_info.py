@@ -897,19 +897,21 @@ class ValidatedParticipantsTestCase(ValidatedTestCase):
     winddummies_format = (list, {
         'phone': unicode,
         'name': unicode,
-        'surname': unicode,
-        'id': unicode
+        'person_id': unicode
     })
 
     # POST/GET /contest/{id}/organizers
     organizers_format = (list, {
-        'id': unicode,
-        'email': unicode
+        'person_id': unicode,
+        'email': unicode,
+        'name': unicode,
+        'description': unicode
     })
 
     # POST/GET /contest/{id}/rescuers
-    rescuers_format = (list, {
+    staff_format = (list, {
         'id': unicode,
+        'type': unicode,
         'phone': unicode,
         'description': unicode,
         'title': unicode
@@ -943,10 +945,10 @@ class ContestParticipantsTest(ValidatedParticipantsTestCase):
     def test_add_winddummy_to_contest(self):
         p_id = self._get_person_id()
         r = requests.post('/'.join((self.url, self.c_id, 'winddummies')),
-                          data=dict(id=p_id))
+                          data=dict(person_id=p_id))
         self.validate(r.json(), self.winddummies_format)
         self.assertEqual(r.status_code, 201)
-        self.assertTrue(r.json()[0]['id'] == p_id)
+        self.assertTrue(r.json()[0]['person_id'] == p_id)
 
     # organizers
 
@@ -958,30 +960,39 @@ class ContestParticipantsTest(ValidatedParticipantsTestCase):
     def test_add_organizer_to_contest(self):
         p_id = self._get_person_id()
         r = requests.post('/'.join((self.url, self.c_id, 'organizers')),
-                          data=dict(id=p_id))
+                          data=dict(person_id=p_id))
         self.validate(r.json(), self.organizers_format)
         self.assertEqual(r.status_code, 201)
-        self.assertTrue(r.json()[0]['id'] == p_id)
+        self.assertTrue(r.json()[0]['person_id'] == p_id)
 
-    # rescuers
+    # staff
 
-    def test_get_rescuers(self):
+    def test_get_staff(self):
         r = requests.get('/'.join((URL, 'contest', self.c_id,
-                                   'rescuers')))
-        self.validate(r.json(), self.rescuers_format)
+                                   'staff')))
+        self.validate(r.json(), self.staff_format)
 
-    def test_add_rescuers_to_contest(self):
-        r_id = ''.join([random.choice(string.digits + string.letters) for i in xrange(10)])
+    def test_add_staff_rescuer_to_contest(self):
         data = dict(
-            id=r_id,
             phone='+76542345566',
             title='RescueRanger',
-            description="Chip-Chip-Chip-Chip 'n Dale!")
-        r = requests.post('/'.join((self.url, self.c_id, 'rescuers')),
+            description="Chip-Chip-Chip-Chip 'n Dale!",
+            type='rescuer')
+        r = requests.post('/'.join((self.url, self.c_id, 'staff')),
                           data=data)
-        self.validate(r.json(), self.rescuers_format)
+        self.validate(r.json(), self.staff_format)
         self.assertEqual(r.status_code, 201)
-        self.assertTrue(r.json()[0]['id'] == r_id)
+
+    def test_add_staff_transport_to_contest(self):
+        data = dict(
+            phone='+76542345566',
+            title='Battlestar Galactica',
+            description="some series I haven't seen yet",
+            type='transport')
+        r = requests.post('/'.join((self.url, self.c_id, 'staff')),
+                          data=data)
+        self.validate(r.json(), self.staff_format)
+        self.assertEqual(r.status_code, 201)
 
 if __name__ == '__main__':
     unittest.main()

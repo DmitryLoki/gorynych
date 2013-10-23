@@ -121,10 +121,10 @@ class ApplicationService(BaseApplicationService):
         return self._add_person_participant_to_contest(params, 'paraglider')
 
     def add_winddummy_to_contest(self, params):
-        return self._add_participant_to_contest(params, 'winddummy')
+        return self._add_person_participant_to_contest(params, 'winddummy')
 
     def add_organizer_to_contest(self, params):
-        return self._add_participant_to_contest(params, 'organizer')
+        return self._add_person_participant_to_contest(params, 'organizer')
 
     @defer.inlineCallbacks
     def add_transport_to_contest(self, params):

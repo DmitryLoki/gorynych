@@ -118,19 +118,13 @@ class ApplicationService(BaseApplicationService):
         @return: Contest with registered paraglider wrapped in Deferred.
         @rtype: C{Contest}
         '''
-        # TODO: do in domain model style. Think before.
-        # [(type, title, desc, tracker_id, transport_id),]
-        pers = yield self._get_aggregate(params['person_id'], interfaces.IPersonRepository)
-        cont = yield self._get_aggregate(params['contest_id'],
-                                         interfaces.IContestRepository)
-        d = defer.Deferred()
-        d.addCallback(lambda _: cont.register_paraglider(pers, params['glider'],
-                                                         params['contest_number']))
-        d.addCallback(
-            persistence.get_repository(interfaces.IContestRepository).save)
-        d.callback('fire!')
-        yield d
-        defer.returnValue(cont)
+        return self._add_person_participant_to_contest(params, 'paraglider')
+
+    def add_winddummy_to_contest(self, params):
+        return self._add_participant_to_contest(params, 'winddummy')
+
+    def add_organizer_to_contest(self, params):
+        return self._add_participant_to_contest(params, 'organizer')
 
     @defer.inlineCallbacks
     def add_transport_to_contest(self, params):
@@ -146,40 +140,34 @@ class ApplicationService(BaseApplicationService):
         defer.returnValue(cont)
 
     @defer.inlineCallbacks
-    def _add_participant_to_contest(self, params, role):
-        print params, role
-        if role not in contest.AVAILABLE_PARTICIPANTS:
-            raise TypeError('Unexpected role ({}). Allowed: {}'.format(
-                role, contest.AVAILABLE_PARTICIPANTS))
-
-        if role == 'rescuer':
-            args = dict(r_id=params['id'],
-                        title=params['title'],
-                        phone=params.get('phone', ''),
-                        description=params.get('description', ''))
-        else:
-            pers = yield self._get_aggregate(params['id'], interfaces.IPersonRepository)
-            args = dict(pers=pers)
-
+    def _add_person_participant_to_contest(self, params, role):
+        pers = yield self._get_aggregate(params['person_id'], interfaces.IPersonRepository)
         cont = yield self._get_aggregate(params['contest_id'],
                                          interfaces.IContestRepository)
-        add_method = getattr(cont, 'add_' + role)
         d = defer.Deferred()
-        d.addCallback(lambda _: add_method(**args))
+        if role == 'winddummy':
+            d.addCallback(lambda _: cont.add_winddummy(pers))
+        elif role == 'organizer':
+            d.addCallback(lambda _: cont.add_organizer(pers, params.get('description', "")))
+        elif role == 'paraglider':
+            d.addCallback(lambda _: cont.register_paraglider(pers, params['glider'],
+                                                 params['contest_number']))
         d.addCallback(
             persistence.get_repository(interfaces.IContestRepository).save)
         d.callback('fire!')
         yield d
         defer.returnValue(cont)
 
-    def add_winddummy_to_contest(self, params):
-        return self._add_participant_to_contest(params, 'winddummy')
-
-    def add_rescuer_to_contest(self, params):
-        return self._add_participant_to_contest(params, 'rescuer')
-
-    def add_organizer_to_contest(self, params):
-        return self._add_participant_to_contest(params, 'organizer')
+    def add_staff_member_to_contest(self, params):
+        sm = contest.StaffMember(title=params['title'],
+                                 type=params['type'],
+                                 description=params.get('description', ''),
+                                 phone=params.get('phone', ''))
+        d = self.get_contest(params)
+        d.addCallback(lambda cont: cont.add_staff_member(sm))
+        d.addCallback(
+            persistence.get_repository(interfaces.IContestRepository).save)
+        return d
 
     def get_contest_transport(self, params):
         d = self.get_contest(params)

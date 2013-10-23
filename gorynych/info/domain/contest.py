@@ -47,11 +47,7 @@ class Contest(AggregateRoot):
         self._start_time = start_time
         self._end_time = end_time
         self.address = address
-        self.paragliders = dict()
-        self.transport = dict()
-        self.rescuers = dict()
-        self.winddummies = dict()
-        self.organizers = dict()
+        self._participants = dict()
         self.race_ids = set()
         self.retrieve_id = None
 
@@ -176,26 +172,28 @@ class Contest(AggregateRoot):
         self._title = value.strip()
 
     def register_paraglider(self, pers, glider, cnum, desc=""):
-        paragliders_before = deepcopy(self.paragliders)
+        paragliders_before = deepcopy(self._participants)
         glider = glider.strip().split(' ')[0].lower()
-        self.paragliders[str(pers.id)] = dict(
+        self._participants[str(pers.id)] = dict(
+            role='paraglider',
             name=pers.name.name,
             surname=pers.name.surname,
             email=pers.email,
             country=pers.country,
             glider=glider,
-            contest_number=cnum,
+            contest_number=int(cnum),
             description=desc,
             phone=pers.phone)
         if not self._invariants_are_correct():
-            self.paragliders = paragliders_before
+            self._participants = paragliders_before
             raise ValueError("Paraglider must have unique contest number.")
         persistence.event_store().persist(ParagliderRegisteredOnContest(
             pers.id, self.id))
         return self
 
     def add_transport(self, trns, phone=""):
-        self.transport[str(trns.id)] = dict(
+        self._participants[str(trns.id)] = dict(
+            role='transport',
             title=trns.title,
             description=trns.description,
             type=trns.type,
@@ -203,21 +201,25 @@ class Contest(AggregateRoot):
         return self
 
     def add_rescuer(self, r_id, title, phone="", description=""):
-        self.rescuers[r_id] = dict(
+        self._participants[r_id] = dict(
+            role='rescuer',
             title=title,
             description=description,
             phone=phone)
         return self
 
     def add_winddummy(self, pers):
-        self.winddummies[pers.id] = dict(
+        self._participants[pers.id] = dict(
+            role='winddummy',
             name=pers.name.name,
             surname=pers.name.surname,
             phone=pers.phone)
         return self
 
     def add_organizer(self, pers):
-        self.organizers[pers.id] = dict(email=pers.email)
+        self._participants[pers.id] = dict(
+            role='organizer',
+            email=pers.email)
         return self
 
     def remove_transport(self, transport_id):
@@ -253,9 +255,9 @@ class Contest(AggregateRoot):
         if not kwargs:
             raise ValueError("No new data has been received.")
         try:
-            old_person = deepcopy(self._participants[person_id])
+            old_participant = deepcopy(self._participants[person_id])
         except KeyError:
-            raise ValueError("No person with such id.")
+            raise ValueError("No participant with such id.")
 
         for key in kwargs.keys():
             if key == 'contest_number':
@@ -266,8 +268,35 @@ class Contest(AggregateRoot):
             self._participants[person_id][key] = kwargs[key]
 
         if not self._invariants_are_correct():
-            self._participants[person_id] = old_person
+            self._participants[person_id] = old_participant
             raise ValueError("Contest invariants violated.")
+
+    def _get_participants(self, role):
+        result = dict()
+        for key in self._participants:
+            if self._participants[key]['role'] == role:
+                result[key] = self._participants[key]
+        return result
+
+    @property
+    def paragliders(self):
+        return self._get_participants('paraglider')
+
+    @property
+    def transport(self):
+        return self._get_participants('transport')
+
+    @property
+    def winddummies(self):
+        return self._get_participants('winddummy')
+
+    @property
+    def organizers(self):
+        return self._get_participants('organizer')
+
+    @property
+    def rescuers(self):
+        return self._get_participants('rescuer')
 
 
 def change(cont, params):

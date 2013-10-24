@@ -297,6 +297,9 @@ class StaffMemberTest(unittest.TestCase):
         self.assertRaises(ValueError, contest.StaffMember,
                           title='Serenity', type='ambulance',
                           description='firefly-class starship', phone='nope')
+        self.assertRaises(TypeError, contest.StaffMember,
+                          title='Serenity', type='ambulance',
+                          description='firefly-class starship', phone=1)
         sm = contest.StaffMember(title='Millenium Falcon', type='ambulance',
                                  description='piece of junk', phone='+3456324433')
         self.assertIsInstance(sm, contest.StaffMember)

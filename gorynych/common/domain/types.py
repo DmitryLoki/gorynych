@@ -15,11 +15,14 @@ class Phone(ValueObject):
         self._number = self._validate(phone)
 
     def _validate(self, value):
-        if re.match(r'^\+\d+', value):
-            return value
-        else:
-            raise ValueError("Incorrect phone ({}). Phone number must contain digits \
-                             and be started with plus sign".format(value))
+        try:
+            if re.match(r'^\+\d+', value):
+                return value
+            else:
+                raise ValueError("Incorrect phone ({}). Phone number must contain digits \
+                                 and be started with plus sign".format(value))
+        except TypeError:
+            raise TypeError('Phone must be string, not {}'.format(type(value)))
 
     @property
     def number(self):

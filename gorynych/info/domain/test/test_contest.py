@@ -245,12 +245,12 @@ class ContestServiceTest(unittest.TestCase):
 
     def test_add_transport_staffmember(self, patched):
         alone_cont = deepcopy(self.cont)
-        t = contest.StaffMember(title='t', type='transport')
+        t = contest.StaffMember(title='t', type='bus')
         populated_cont = self.cont.add_staff_member(t)
 
         self.assertFalse(alone_cont.staff)
         self.assertIn(t.id, populated_cont.staff)
-        self.assertEquals(populated_cont.staff[t.id]['type'], 'transport')
+        self.assertEquals(populated_cont.staff[t.id]['type'], 'bus')
 
     def test_add_rescuer_staffmember(self, patched):
         alone_cont = deepcopy(self.cont)
@@ -295,12 +295,12 @@ class StaffMemberTest(unittest.TestCase):
 
     def test_phone(self):
         self.assertRaises(ValueError, contest.StaffMember,
-                          title='Serenity', type='transport',
+                          title='Serenity', type='ambulance',
                           description='firefly-class starship', phone='nope')
-        sm = contest.StaffMember(title='Millenium Falcon', type='transport',
+        sm = contest.StaffMember(title='Millenium Falcon', type='ambulance',
                                  description='piece of junk', phone='+3456324433')
         self.assertIsInstance(sm, contest.StaffMember)
         self.assertEquals(sm.title, "Millenium Falcon")
-        self.assertEquals(sm.type, "transport")
+        self.assertEquals(sm.type, "ambulance")
         self.assertEquals(sm.description, "piece of junk")
         self.assertEquals(sm.phone, '+3456324433')

@@ -6,7 +6,7 @@ from copy import deepcopy
 import pytz
 from zope.interface.interfaces import Interface
 
-from gorynych.info.domain import race
+from gorynych.info.domain import race, transport
 from gorynych.common.domain.model import AggregateRoot, ValueObject, DomainIdentifier
 from gorynych.common.domain.types import Address, Country, Name, Phone
 from gorynych.common.domain.events import ParagliderRegisteredOnContest
@@ -319,7 +319,7 @@ def change_participant(cont, participant_data):
 
 
 class StaffMember(ValueObject):
-    types = ('rescuer', 'transport')
+    types = frozenset(['rescuer', 'ambulance']).union(transport.TYPES)
 
     def __init__(self, title, type, description="", phone=None):
         if type not in self.types:

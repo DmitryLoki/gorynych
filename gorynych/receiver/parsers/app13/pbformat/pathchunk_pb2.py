@@ -11,7 +11,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = descriptor.FileDescriptor(
   name='pathchunk.proto',
   package='',
-  serialized_pb='\n\x0fpathchunk.proto\"\xd5\x02\n\x08PathCunk\x12\n\n\x02id\x18\x01 \x01(\t\x12\r\n\x05index\x18\x06 \x01(\x04\x12\x0f\n\x07session\x18\x07 \x01(\x04\x12\x11\n\ttime_base\x18\x02 \x01(\r\x12\x10\n\x08lat_base\x18\x03 \x01(\x02\x12\x11\n\tlong_base\x18\x04 \x01(\x02\x12\x10\n\x08\x61lt_base\x18\x05 \x01(\r\x12\x15\n\tangle_div\x18\x10 \x01(\r:\x02\x31\x36\x12\x14\n\ttime_step\x18\x11 \x01(\r:\x01\x31\x12\"\n\x05point\x18\n \x03(\x0b\x32\x13.PathCunk.CunkPoint\x1a\x81\x01\n\tCunkPoint\x12\x12\n\x06packed\x18\x01 \x03(\x11\x42\x02\x10\x01\x12\x10\n\x08\x61lt_base\x18\x02 \x01(\x11\"N\n\x0cPackedFields\x12\x08\n\x04TIME\x10\x00\x12\x07\n\x03LAT\x10\x01\x12\x08\n\x04LONG\x10\x02\x12\x07\n\x03\x41LT\x10\x03\x12\x18\n\x14PACKED_FIELDS_NUMBER\x10\x04\"3\n\x0cPathCunkConf\x12\x12\n\nlast_index\x18\x01 \x01(\x04\x12\x0f\n\x07session\x18\x02 \x01(\x04')
+  serialized_pb='\n\x0fpathchunk.proto\"\xc6\x03\n\x08PathCunk\x12\n\n\x02id\x18\x01 \x01(\t\x12\r\n\x05index\x18\x06 \x01(\x04\x12\x0f\n\x07session\x18\x07 \x01(\x04\x12\x11\n\ttime_base\x18\x02 \x01(\r\x12\x10\n\x08lat_base\x18\x03 \x01(\x02\x12\x11\n\tlong_base\x18\x04 \x01(\x02\x12\x10\n\x08\x61lt_base\x18\x05 \x01(\r\x12\x0f\n\x07h_speed\x18\x08 \x01(\r\x12\x0f\n\x07v_speed\x18\t \x01(\x11\x12\x15\n\rpacked_fields\x18\x0b \x01(\r\x12\x15\n\tangle_div\x18\x10 \x01(\r:\x02\x31\x36\x12\x18\n\rtime_interval\x18\x0f \x01(\r:\x01\x31\x12\x18\n\ttime_step\x18\x11 \x01(\r:\x01\x31\x42\x02\x18\x01\x12\"\n\x05point\x18\n \x03(\x0b\x32\x13.PathCunk.CunkPoint\x1a\x9b\x01\n\tCunkPoint\x12\x12\n\x06packed\x18\x01 \x03(\x11\x42\x02\x10\x01\x12\x10\n\x08\x61lt_base\x18\x02 \x01(\x11\"h\n\x0cPackedFields\x12\x08\n\x04TIME\x10\x00\x12\x07\n\x03LAT\x10\x01\x12\x08\n\x04LONG\x10\x02\x12\x07\n\x03\x41LT\x10\x03\x12\x0b\n\x07H_SPEED\x10\x04\x12\x0b\n\x07V_SPEED\x10\x05\x12\x18\n\x14PACKED_FIELDS_NUMBER\x10\x06\"3\n\x0cPathCunkConf\x12\x12\n\nlast_index\x18\x01 \x01(\x04\x12\x0f\n\x07session\x18\x02 \x01(\x04')
 
 
 
@@ -38,14 +38,22 @@ _PATHCUNK_CUNKPOINT_PACKEDFIELDS = descriptor.EnumDescriptor(
       options=None,
       type=None),
     descriptor.EnumValueDescriptor(
-      name='PACKED_FIELDS_NUMBER', index=4, number=4,
+      name='H_SPEED', index=4, number=4,
+      options=None,
+      type=None),
+    descriptor.EnumValueDescriptor(
+      name='V_SPEED', index=5, number=5,
+      options=None,
+      type=None),
+    descriptor.EnumValueDescriptor(
+      name='PACKED_FIELDS_NUMBER', index=6, number=6,
       options=None,
       type=None),
   ],
   containing_type=None,
   options=None,
-  serialized_start=283,
-  serialized_end=361,
+  serialized_start=370,
+  serialized_end=474,
 )
 
 
@@ -80,8 +88,8 @@ _PATHCUNK_CUNKPOINT = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=232,
-  serialized_end=361,
+  serialized_start=319,
+  serialized_end=474,
 )
 
 _PATHCUNK = descriptor.Descriptor(
@@ -141,21 +149,49 @@ _PATHCUNK = descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       options=None),
     descriptor.FieldDescriptor(
-      name='angle_div', full_name='PathCunk.angle_div', index=7,
+      name='h_speed', full_name='PathCunk.h_speed', index=7,
+      number=8, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    descriptor.FieldDescriptor(
+      name='v_speed', full_name='PathCunk.v_speed', index=8,
+      number=9, type=17, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    descriptor.FieldDescriptor(
+      name='packed_fields', full_name='PathCunk.packed_fields', index=9,
+      number=11, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    descriptor.FieldDescriptor(
+      name='angle_div', full_name='PathCunk.angle_div', index=10,
       number=16, type=13, cpp_type=3, label=1,
       has_default_value=True, default_value=16,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     descriptor.FieldDescriptor(
-      name='time_step', full_name='PathCunk.time_step', index=8,
-      number=17, type=13, cpp_type=3, label=1,
+      name='time_interval', full_name='PathCunk.time_interval', index=11,
+      number=15, type=13, cpp_type=3, label=1,
       has_default_value=True, default_value=1,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     descriptor.FieldDescriptor(
-      name='point', full_name='PathCunk.point', index=9,
+      name='time_step', full_name='PathCunk.time_step', index=12,
+      number=17, type=13, cpp_type=3, label=1,
+      has_default_value=True, default_value=1,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=descriptor._ParseOptions(descriptor_pb2.FieldOptions(), '\030\001')),
+    descriptor.FieldDescriptor(
+      name='point', full_name='PathCunk.point', index=13,
       number=10, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
@@ -171,7 +207,7 @@ _PATHCUNK = descriptor.Descriptor(
   is_extendable=False,
   extension_ranges=[],
   serialized_start=20,
-  serialized_end=361,
+  serialized_end=474,
 )
 
 
@@ -205,8 +241,8 @@ _PATHCUNKCONF = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=363,
-  serialized_end=414,
+  serialized_start=476,
+  serialized_end=527,
 )
 
 _PATHCUNK_CUNKPOINT.containing_type = _PATHCUNK;

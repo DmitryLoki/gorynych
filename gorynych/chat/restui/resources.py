@@ -60,12 +60,10 @@ class ChatResource(resource.Resource):
             msg = get_message_from_request(request)
         except Exception as e:
             request.setResponseCode(400)
-            request.write("Error in request processing: %r", e)
+            request.write("Error in request processing: %r" % e)
             request.finish()
             return server.NOT_DONE_YET
         request.setResponseCode(201)
-        request.setHeader('Access-Control-Allow-Origin', '*')
-        request.setHeader('Access-Control-Allow-Credentials', 'true')
         request.setHeader('Content-Type', 'application/json')
         d = self.service.post_message(self.chatroom, msg)
         d.addCallback(request.write)

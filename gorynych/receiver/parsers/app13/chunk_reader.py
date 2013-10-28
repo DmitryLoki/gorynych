@@ -24,7 +24,7 @@ class ChunkReader(object):
         return dict(zip(self.format, args))
 
     def _kmh2ms(self, value):
-        return round((value * 1000.0) / 3600.0, 2)
+        return round((value * 1000.0) / 3600.0, 1)
 
     def _get_base_point(self):
         self.base_lat = getattr(self.chunk, BasePointProto.LAT)

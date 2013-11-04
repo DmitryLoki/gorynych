@@ -95,14 +95,14 @@ class MobileReceivingProtocol(protocol.Protocol):
             data, proto='TCP', device_type=self.device_type)
 
 
-class App13ProtobuffMobileProtocol(protocol.Protocol):
+class App13ProtobuffMobileProtocol(basic.LineOnlyReceiver):
 
     """
     New mobile application protocol, is also used by a satellite modem.
     """
     device_type = 'app13'
 
-    def dataReceived(self, data):
+    def lineReceived(self, data):
         resp_list = self.factory.service.parsers[
             self.device_type].get_response(data)
         for response in resp_list:

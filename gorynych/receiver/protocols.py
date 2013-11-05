@@ -8,6 +8,8 @@ from twisted.protocols import basic
 from twisted.python import log
 from twisted.web.resource import Resource
 
+from gorynych.receiver.parsers.app13.parser import Frame
+
 
 def check_device_type(msg):
     if msg[0] == 'G':
@@ -95,20 +97,47 @@ class MobileReceivingProtocol(protocol.Protocol):
             data, proto='TCP', device_type=self.device_type)
 
 
-class App13ProtobuffMobileProtocol(basic.LineOnlyReceiver):
+class App13ProtobuffMobileProtocol(protocol.Protocol):
 
     """
     New mobile application protocol, is also used by a satellite modem.
     """
     device_type = 'app13'
 
-    def lineReceived(self, data):
-        resp_list = self.factory.service.parsers[
-            self.device_type].get_response(data)
-        for response in resp_list:
-            self.transport.write(response)
-        self.factory.service.handle_message(
-            data, proto='TCP', device_type=self.device_type)
+    def __init__(self, *args, **kwargs):
+        protocol.Protocol.__init__(self, *args, **kwargs)
+        self._reset()
+
+    def _reset(self):
+        self.parser = self.factory.service.parsers[self.device_type]
+        self._buffer = ''
+        self.frames = []
+        self.cursor = 0
+
+    def dataReceived(self, data):
+        self._buffer += data
+        if len(self._buffer) < self.parser.HEADER.size:
+            return
+        try:
+            magic, frame_id, frame_len = self.parser.HEADER.unpack_from(self._buffer, self.cursor)
+        except:
+            self._reset()
+            raise ValueError('Unrecognized header')
+        if magic != self.parser.MAGIC_BYTE:
+            self._reset()
+            raise ValueError('Magic byte mismatch')
+        frame_len += self.parser.HEADER.size
+        if len(self._buffer) < frame_len:  # keep accumulating
+            return
+        msg = self._buffer[self.cursor+self.parser.HEADER.size: self.cursor+frame_len]
+        self.cursor += frame_len
+
+        # go to the parser
+        data = Frame(frame_id, msg)
+        resp = self.parser.get_response(data)
+        self.transport.write(resp)
+        self.factory.service.handle_message(data, proto='TCP',
+            device_type=self.device_type)
 
 
 class IridiumSBDProtocol(protocol.Protocol):

@@ -118,7 +118,6 @@ class App13ProtobuffMobileProtocol(protocol.Protocol):
                 break
             if cursor >= len(self._buffer):
                 break
-            print self.parser._framebuffer
             try:
                 magic, frame_id, payload_len = self.parser.HEADER.unpack_from(self._buffer, cursor)
             except:

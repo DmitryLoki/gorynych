@@ -1,7 +1,6 @@
 # encoding: utf-8
 
 from struct import Struct
-from collection import deque
 
 from gorynych.receiver.parsers import IParseMessage
 from zope.interface import implementer
@@ -17,10 +16,8 @@ class App13Parser(object):
     '''
     HEADER = Struct('!BBH')
     MAGIC_BYTE = 0xBA
-    BUFFERED_FRAMES = 20
 
     def __init__(self):
-        self._framebuffer = deque(maxlen=self.BUFFERED_FRAMES)
         self.imei = None
         self.points = []
         self.handlers = {
@@ -41,9 +38,6 @@ class App13Parser(object):
             raise ValueError('Unexpected path frame (session must be \
                 initialized with ID frame first)')
         reader = ChunkReader(msg)
-        if reader.chunk.index in self._framebuffer:
-            return
-        self._framebuffer.append(reader.chunk.index)
         for point in reader.unpack():
             point['imei'] = self.imei
             self.points.append(point)
@@ -57,17 +51,24 @@ class App13Parser(object):
         return msg
 
     def get_response(self, frame):
-        if frame.id == FrameId.PATHCHUNK:
+        if frame.id in [FrameId.PATHCHUNK, FrameId.PATHCHUNK_ZIPPED]:
             reader = ChunkReader(frame.msg)
             response = Frame(
                 FrameId.PATHCHUNK_CONF, reader.make_response())
-        return response
+            return response.serialize()
+
+    def parse(self, data):
+        self.parse_frame(data)
+        if not self.imei or not self.points:
+            return []
+        return self.read()
 
     def read(self):
         if not self.imei or not self.points:
             return []
         pts = self.points[:]
         self.points = []
+        print pts
         return pts
 
 

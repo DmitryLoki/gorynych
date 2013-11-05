@@ -37,6 +37,8 @@ class ChunkReader(object):
         self.base_alt = getattr(self.chunk, BasePointProto.ALT, 0)
         self.base_h_speed = getattr(self.chunk, BasePointProto.H_SPEED, 0)
         self.base_v_speed = self._kmh2ms(getattr(self.chunk, BasePointProto.V_SPEED, 0))
+        self.base_lat = round(self.base_lat, self.precision)
+        self.base_lon = round(self.base_lon, self.precision)
 
         return self.base_lat, self.base_lon, self.base_ts, self.base_alt, \
             self.base_h_speed, self.base_v_speed

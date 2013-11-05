@@ -65,6 +65,32 @@ class App13Parser(object):
         return pts
 
 
+@implementer(IParseMessage)
+class SBDParser(App13Parser):
+    """
+    Method 'parse' is a little bit different: simple-packed case is allowed,
+    and message is a dict, not a string.
+    """
+
+    def parse(self, msg):
+        # if no imei encountered, raise error
+        if not msg['imei']:
+            raise ValueError('Orphan message; no imei found')
+        self.points = []
+
+        if ord(msg['data'][0]) != self.MAGIC_BYTE:  # simple-packed frame, no collection
+            self._parse_frame(ord(msg['data'][0]), msg['data'][1:])
+        else:
+            self._parse_collection(msg['data'])
+
+        for point in self.points:
+            point['imei'] = msg.imei
+
+        response = self.points
+        del self.points
+        return response
+
+
 class Frame(object):
 
     def __init__(self, frame_id, frame_msg):

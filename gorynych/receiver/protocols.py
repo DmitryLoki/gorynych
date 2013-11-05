@@ -8,7 +8,7 @@ from twisted.protocols import basic
 from twisted.python import log
 from twisted.web.resource import Resource
 
-from gorynych.receiver.parsers.app13.parser import Frame
+from gorynych.receiver.parsers.app13.parser import Frame, App13Parser
 
 
 def check_device_type(msg):
@@ -103,41 +103,44 @@ class App13ProtobuffMobileProtocol(protocol.Protocol):
     New mobile application protocol, is also used by a satellite modem.
     """
     device_type = 'app13'
-
-    def __init__(self, *args, **kwargs):
-        protocol.Protocol.__init__(self, *args, **kwargs)
-        self._reset()
+    parser = App13Parser()
+    _buffer = ''
 
     def _reset(self):
-        self.parser = self.factory.service.parsers[self.device_type]
+        self.parser = App13Parser()
         self._buffer = ''
-        self.frames = []
-        self.cursor = 0
+
 
     def dataReceived(self, data):
         self._buffer += data
-        if len(self._buffer) < self.parser.HEADER.size:
-            return
-        try:
-            magic, frame_id, frame_len = self.parser.HEADER.unpack_from(self._buffer, self.cursor)
-        except:
-            self._reset()
-            raise ValueError('Unrecognized header')
-        if magic != self.parser.MAGIC_BYTE:
-            self._reset()
-            raise ValueError('Magic byte mismatch')
-        frame_len += self.parser.HEADER.size
-        if len(self._buffer) < frame_len:  # keep accumulating
-            return
-        msg = self._buffer[self.cursor+self.parser.HEADER.size: self.cursor+frame_len]
-        self.cursor += frame_len
+        cursor = 0
+        while True:
+            if len(self._buffer) < self.parser.HEADER.size:
+                break
+            if cursor >= len(self._buffer):
+                break
+            try:
+                magic, frame_id, payload_len = self.parser.HEADER.unpack_from(self._buffer, cursor)
+            except Exception as e:
+                self._reset()
+                raise ValueError('Unrecognized header')
+            if magic != self.parser.MAGIC_BYTE:
+                self._reset()
+                raise ValueError('Magic byte mismatch')
+            frame_len = payload_len + self.parser.HEADER.size
+            if len(self._buffer) < frame_len:  # keep accumulating
+                break
+            msg = self._buffer[cursor+self.parser.HEADER.size: cursor+frame_len]
+            cursor += frame_len
 
-        # go to the parser
-        data = Frame(frame_id, msg)
-        resp = self.parser.get_response(data)
-        self.transport.write(resp)
-        self.factory.service.handle_message(data, proto='TCP',
-            device_type=self.device_type)
+            # go to the parser
+            data = Frame(frame_id, msg)
+            resp = self.parser.get_response(data)
+            self.transport.write(resp)
+            self.factory.service.handle_message(data, proto='TCP',
+                device_type=self.device_type)
+
+        self._buffer = self._buffer[cursor:]
 
 
 class IridiumSBDProtocol(protocol.Protocol):

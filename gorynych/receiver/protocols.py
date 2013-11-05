@@ -110,7 +110,6 @@ class App13ProtobuffMobileProtocol(protocol.Protocol):
         self.parser = App13Parser()
         self._buffer = ''
 
-
     def dataReceived(self, data):
         self._buffer += data
         cursor = 0
@@ -119,9 +118,10 @@ class App13ProtobuffMobileProtocol(protocol.Protocol):
                 break
             if cursor >= len(self._buffer):
                 break
+            print self.parser._framebuffer
             try:
                 magic, frame_id, payload_len = self.parser.HEADER.unpack_from(self._buffer, cursor)
-            except Exception as e:
+            except:
                 self._reset()
                 raise ValueError('Unrecognized header')
             if magic != self.parser.MAGIC_BYTE:

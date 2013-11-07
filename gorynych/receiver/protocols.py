@@ -10,7 +10,7 @@ from twisted.web.resource import Resource
 
 from gorynych.receiver.parsers.app13.parser import Frame
 from gorynych.receiver.parsers.app13.constants import HEADER, MAGIC_BYTE, FrameId
-from gorynych.receiver.parsers.app13.session import App13Session
+from gorynych.receiver.parsers.app13.session import PathMakerSession
 
 
 def check_device_type(msg):
@@ -126,7 +126,7 @@ class PathMakerProtocol(protocol.Protocol):
         self._reset()
 
     def _reset(self):
-        self.session = App13Session()  # let's start new session
+        self.session = PathMakerSession()  # let's start new session
         self._buffer = ''
 
     def dataReceived(self, data):

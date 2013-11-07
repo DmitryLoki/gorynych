@@ -1,5 +1,5 @@
 
-class App13Session(object):
+class PathMakerSession(object):
     fields = ['imei']
     params = None
 

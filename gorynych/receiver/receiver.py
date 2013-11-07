@@ -17,10 +17,10 @@ from pika.adapters.twisted_connection import TwistedProtocolConnection
 
 from gorynych.receiver.parsers import GlobalSatTR203, TeltonikaGH3000UDP,\
                                       MobileTracker, App13Parser, SBDParser, \
-                                      RedViewGT60
+                                      RedViewGT60, PathMakerParser
 from gorynych.receiver.protocols import TR203ReceivingProtocol, MobileReceivingProtocol,\
                                         App13ProtobuffMobileProtocol, IridiumSBDProtocol, \
-                                        RedViewGT60Protocol
+                                        RedViewGT60Protocol, PathMakerProtocol
 
 ################### Network part ##########################################
 
@@ -69,6 +69,14 @@ class SBDMobileReceivingFactory(protocol.ServerFactory):
 class GT60ReceivingFactory(protocol.ServerFactory):
 
     protocol = RedViewGT60Protocol
+
+    def __init__(self, service):
+        self.service = service
+
+
+class PmtrackerReceivingFactory(protocol.ServerFactory):
+
+    protocol = PathMakerProtocol
 
     def __init__(self, service):
         self.service = service
@@ -318,7 +326,8 @@ class ReceiverRabbitService(RabbitMQService):
 class ReceiverService(Service):
     parsers = dict(tr203=GlobalSatTR203(), telt_gh3000=TeltonikaGH3000UDP(),
                    mobile=MobileTracker(), app13=App13Parser(),
-                   new_mobile_sbd=SBDParser(), gt60=RedViewGT60())
+                   new_mobile_sbd=SBDParser(), gt60=RedViewGT60(),
+                   pmtracker=PathMakerParser())
 
     def __init__(self, sender, audit_log):
         self.sender = sender
@@ -328,11 +337,9 @@ class ReceiverService(Service):
         self.messages = dict()
         self.coords = dict()
 
-    def handle_message(self, msg, **kw):
+    def check_message(self, msg, **kw):
         '''
-        Parse received message.
-        Write a message to AuditLog.
-        Send a message further.
+        Checks message correctness. If correct, logs it, else logs the error.
         '''
         receiving_time = time.time()
         device_type = kw.get('device_type', 'tr203')
@@ -348,28 +355,37 @@ class ReceiverService(Service):
             errbackKeywords={'data': msg, 'time': receiving_time,
                 'proto': kw.get('proto', 'Unknown'),
                 'device':kw.get('device_type', 'Unknown')})
-        def handle_list(message):
-            d2 = defer.Deferred()
-            if isinstance(message, list):
-                for item in message:
-                    # item=item magic is required by lambda to grab item correctly
-                    # otherwise item is always message[-1]. Do not modify!
-                    d2.addCallback(lambda _, item=item: self.sender.write(item))
-                    self._save_coords_for_checker(item)
-            else:
-                d2.addCallback(lambda _: self.sender.write(message))
-                self._save_coords_for_checker(message)
-
-            d2.callback('go!')
-            return d2
-        if self.sender.running:
-            d.addCallback(self.parsers[device_type].parse)
-            d.addCallback(handle_list)
-        else:
+        if not self.sender.running:
             log.msg("Received but not sent: %s" % msg)
         d.addErrback(self._handle_error)
         d.addErrback(log.err)
         return d
+
+    def store_point(self, message):
+        d = defer.Deferred()
+        if isinstance(message, list):
+            for item in message:
+                # item=item magic is required by lambda to grab item correctly
+                # otherwise item is always message[-1]. Do not modify!
+                d.addCallback(lambda _, item=item: self.sender.write(item))
+                self._save_coords_for_checker(item)
+        else:
+            d.addCallback(lambda _: self.sender.write(message))
+            self._save_coords_for_checker(message)
+
+        d.callback('go!')
+        return d
+
+    def handle_message(self, msg, **kw):
+        """
+        Backwards compatible method: checks message, parses it, assumes
+        that result is a point and stores it.
+        """
+        dev_type = kw.get('device_type', 'tr203')
+        result = self.check_message(msg, **kw)
+        result.addCallback(self.parsers[dev_type].parse)
+        result.addCallback(self.store_point)
+        return result
 
     def _save_coords_for_checker(self, parsed):
         self.messages[parsed['imei']] = int(time.time())

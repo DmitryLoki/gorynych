@@ -34,5 +34,5 @@ from tr203 import GlobalSatTR203
 from logonly_tr203 import LogOnlyGlobalSatTR203
 from telt_gh3000 import TeltonikaGH3000UDP
 from old_mobile import MobileTracker
-from app13.parser import App13Parser, SBDParser
+from app13.parser import App13Parser, PathMakerParser, SBDParser
 from gt60 import RedViewGT60

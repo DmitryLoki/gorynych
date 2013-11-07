@@ -8,7 +8,9 @@ from twisted.protocols import basic
 from twisted.python import log
 from twisted.web.resource import Resource
 
-from gorynych.receiver.parsers.app13.parser import Frame, App13Parser
+from gorynych.receiver.parsers.app13.parser import Frame
+from gorynych.receiver.parsers.app13.constants import HEADER, MAGIC_BYTE, FrameId
+from gorynych.receiver.parsers.app13.session import App13Session
 
 
 def check_device_type(msg):
@@ -103,41 +105,71 @@ class App13ProtobuffMobileProtocol(protocol.Protocol):
     New mobile application protocol, is also used by a satellite modem.
     """
     device_type = 'app13'
-    parser = App13Parser()
-    _buffer = ''
+
+    def dataReceived(self, data):
+        resp_list = self.factory.service.parsers[
+            self.device_type].get_response(data)
+        for response in resp_list:
+            self.transport.write(response)
+        self.factory.service.handle_message(
+            data, proto='TCP', device_type=self.device_type)
+
+
+class PathMakerProtocol(protocol.Protocol):
+
+    """
+    New mobile application protocol, is also used by a satellite modem.
+    """
+    device_type = 'pmtracker'
+
+    def __init__(self, *args, **kwargs):
+        self._reset()
 
     def _reset(self):
-        self.parser = App13Parser()
+        self.session = App13Session()  # let's start new session
         self._buffer = ''
 
     def dataReceived(self, data):
         self._buffer += data
         cursor = 0
         while True:
-            if len(self._buffer) < self.parser.HEADER.size:
+            if len(self._buffer) < HEADER.size:
                 break
             if cursor >= len(self._buffer):
                 break
             try:
-                magic, frame_id, payload_len = self.parser.HEADER.unpack_from(self._buffer, cursor)
+                magic, frame_id, payload_len = HEADER.unpack_from(self._buffer, cursor)
             except:
                 self._reset()
                 raise ValueError('Unrecognized header')
-            if magic != self.parser.MAGIC_BYTE:
+            if magic != MAGIC_BYTE:
                 self._reset()
                 raise ValueError('Magic byte mismatch')
-            frame_len = payload_len + self.parser.HEADER.size
+            frame_len = payload_len + HEADER.size
             if len(self._buffer) < frame_len:  # keep accumulating
                 break
-            msg = self._buffer[cursor+self.parser.HEADER.size: cursor+frame_len]
+            msg = self._buffer[cursor+HEADER.size: cursor+frame_len]
             cursor += frame_len
 
             # go to the parser
+            result = self.factory.service.check_message(data, proto='TCP',
+                                                        device_type=self.device_type)
             data = Frame(frame_id, msg)
-            resp = self.parser.get_response(data)
-            self.transport.write(resp)
-            self.factory.service.handle_message(data, proto='TCP',
-                device_type=self.device_type)
+            resp = self.factory.service.parsers[self.device_type].get_response(data)
+            if resp:
+                self.transport.write(resp)
+            parsed = self.factory.service.parsers[self.device_type].parse(data)
+
+            if frame_id == FrameId.MOBILEID:
+                self.session.init(parsed)
+            else:
+                if self.session.is_valid():
+                    for item in parsed:
+                        item.update(self.session.params)
+                    result.addCallback(lambda _: self.factory.service.store_point(parsed))
+                else:
+                    self._reset()
+                    raise ValueError('Bad session: {}'.format(self.session.params))
 
         self._buffer = self._buffer[cursor:]
 

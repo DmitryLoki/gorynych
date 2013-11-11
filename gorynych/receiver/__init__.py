@@ -14,6 +14,13 @@ class Options(BaseOptions):
 
 
 def makeService(config):
+    '''
+    Create service tree.
+    @param config: instance of an Options class with configuration parameters.
+    @type config: C{twisted.python.usage.Options}
+    @return: service collection
+    @rtype: C{twisted.application.service.IServiceCollection}
+    '''
     from gorynych.receiver.receiver import ReceiverRabbitService, ReceiverService, AuditFileLog,\
                                            TR203ReceivingFactory, MobileReceivingFactory, \
                                            App13ReceivingFactory, SBDMobileReceivingFactory, \
@@ -30,8 +37,10 @@ def makeService(config):
     audit_log = AuditFileLog('audit_log')
     sender = ReceiverRabbitService(host='localhost', port=5672,
         exchange='receiver', exchange_type='fanout')
-    receiver_service = ReceiverService(sender, audit_log)
+    sender.setName('ReceiverRabbitService')
     sender.setServiceParent(sc)
+    receiver_service = ReceiverService(sender, audit_log)
+    receiver_service.setName('ReceiverService')
     receiver_service.setServiceParent(sc)
 
     # Prepare tracker's protocols and servers.
@@ -41,16 +50,19 @@ def makeService(config):
     if config['tracker'] == 'tr203':
         tr203_tcp = internet.TCPServer(
             config['port'], TR203ReceivingFactory(receiver_service))
+        tr203_tcp.setName('tr203_tcp')
         tr203_tcp.setServiceParent(sc)
 
         tr203_udp = UDPTR203Protocol(receiver_service)
         tr203_udp_receiver = internet.UDPServer(
             config['port'], tr203_udp)
+        tr203_udp_receiver.setName('tr203_udp')
         tr203_udp_receiver.setServiceParent(sc)
 
     elif config['tracker'] == 'telt_gh3000':
         telt_udp = UDPTeltonikaGH3000Protocol(receiver_service)
         telt_udp_receiver = internet.UDPServer(config['port'], telt_udp)
+        telt_udp_receiver.setName('telt_gh3000_udp')
         telt_udp_receiver.setServiceParent(sc)
 
     elif config['tracker'] == 'mobile':
@@ -61,6 +73,7 @@ def makeService(config):
     elif config['tracker'] == 'app13':
         mob_tcp = internet.TCPServer(
             config['port'], App13ReceivingFactory(receiver_service))
+        mob_tcp.setName('app13_tcp')
         mob_tcp.setServiceParent(sc)
 
     elif config['tracker'] == 'new_mobile_sbd':
@@ -76,6 +89,7 @@ def makeService(config):
     elif config['tracker'] == 'gt60':
         mob_tcp = internet.TCPServer(
             config['port'], GT60ReceivingFactory(receiver_service))
+        mob_tcp.setName('gt60_tcp')
         mob_tcp.setServiceParent(sc)
 
     elif config['tracker'] == 'pmtracker':
@@ -84,6 +98,8 @@ def makeService(config):
         mob_tcp.setServiceParent(sc)
 
     root = RetreiveJSON(receiver_service)
-    internet.TCPServer(config['webport'], Site(root)).setServiceParent(sc)
+    web_server = internet.TCPServer(config['webport'], Site(root))
+    web_server.setName('WebLog')
+    web_server.setServiceParent(sc)
 
     return sc

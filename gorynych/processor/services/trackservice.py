@@ -12,8 +12,7 @@ from gorynych.common.infrastructure import persistence as pe
 from gorynych.processor.domain import TrackArchive, track
 from gorynych.common.application import EventPollingService
 from gorynych.common.domain.services import APIAccessor
-
-from gorynych.receiver.receiver import RabbitMQService
+from gorynych.common.infrastructure.messaging import RabbitMQService
 
 API = APIAccessor()
 
@@ -220,6 +219,7 @@ class OnlineTrashService(RabbitMQService):
         # {race_id:{track_id:Track}}
         self.tracks = defaultdict(dict)
         self.processor = task.LoopingCall(self.process)
+        # TODO: remove this from constructor.
         self.processor.start(60, False)
         # device_id:(race_id, contest_number, time)
         self.devices = dict()

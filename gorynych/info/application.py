@@ -3,17 +3,15 @@
 Application Services for info context.
 '''
 import cPickle
-import simplejson as json
 
 from twisted.internet import defer, task
 from twisted.python import log
 
 from gorynych.info.domain import contest, person, race, tracker, transport, interfaces
 from gorynych.common.infrastructure import persistence
-from gorynych.common.domain.types import checkpoint_from_geojson
 from gorynych.common.domain.events import ContestRaceCreated
 from gorynych.common.application import DBPoolService
-from gorynych.receiver.receiver import RabbitMQService
+from gorynych.common.infrastructure.messaging import RabbitMQService
 
 
 class BaseApplicationService(DBPoolService):

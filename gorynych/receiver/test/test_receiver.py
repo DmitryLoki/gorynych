@@ -1,5 +1,7 @@
 from twisted.trial.unittest import TestCase
-from gorynych.receiver.receiver import FakeRabbitMQService, ReceiverRabbitService
+
+from gorynych.receiver.receiver import ReceiverRabbitService
+from gorynych.common.infrastructure.messaging import FakeRabbitMQService
 
 
 class TestReceiverRabbitService(TestCase):

@@ -9,12 +9,11 @@ from pytz.exceptions import UnknownTimeZoneError
 
 from twisted.trial import unittest
 from twisted.internet import defer
-from gorynych.info.domain.test.helpers import create_checkpoints
 
+from gorynych.info.domain.test.helpers import create_checkpoints
 from gorynych.info.application import ApplicationService
 from gorynych.common.domain.types import Checkpoint
-
-from gorynych.receiver.receiver import FakeRabbitMQService
+from gorynych.common.infrastructure.messaging import FakeRabbitMQService
 from gorynych.info.application import LastPointApplication
 
 

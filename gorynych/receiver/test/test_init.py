@@ -152,6 +152,10 @@ class TestOptions(unittest.TestCase):
         self.assertEqual(self.options['port'], 8888)
         self.assertEqual(self.options['tracker'], 'dumb')
 
+    def test_no_protocols(self):
+        command_line = '--tracker=dumb -P 8888'.split()
+        self.assertRaises(SystemExit, self.options.parseOptions, command_line)
+
 
 if __name__ == '__main__':
     unittest.main()

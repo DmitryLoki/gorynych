@@ -7,7 +7,7 @@ from gorynych import BaseOptions
 class Options(BaseOptions):
     optParameters = [
         ['protocols', '', None, 'Transport protocol separated by comma. '
-                                'TCP or UDP allowed.'],
+                                'TCP or/and UDP allowed.'],
         ['tracker', '', None],
         ['port', 'P', 9999, None, int]
     ]
@@ -18,6 +18,8 @@ class Options(BaseOptions):
     def postOptions(self):
         if self['tracker'] is None:
             raise SystemExit("Tracker type missed.")
+        if self['protocols'] is None:
+            raise SystemExit("No protocol specified.")
         for proto in self['protocols']:
             if proto not in ['tcp', 'udp']:
                 raise SystemExit("Protocol %s not allowed." % proto)

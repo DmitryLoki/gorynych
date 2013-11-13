@@ -18,68 +18,6 @@ from pika.adapters.twisted_connection import TwistedProtocolConnection
 from gorynych.receiver.parsers import GlobalSatTR203, TeltonikaGH3000UDP,\
                                       MobileTracker, App13Parser, SBDParser, \
                                       RedViewGT60, PathMakerParser
-from gorynych.receiver.protocols import TR203ReceivingProtocol, MobileReceivingProtocol,\
-                                        App13ProtobuffMobileProtocol, IridiumSBDProtocol, \
-                                        RedViewGT60Protocol, PathMakerProtocol
-
-################### Network part ##########################################
-
-
-class TR203ReceivingFactory(protocol.ServerFactory):
-
-    protocol = TR203ReceivingProtocol
-
-    def __init__(self, service):
-        self.service = service
-
-
-class MobileReceivingFactory(protocol.ServerFactory):
-    '''
-    Factory for old mobile application which is not used.
-    '''
-
-    protocol = MobileReceivingProtocol
-
-    def __init__(self, service):
-        self.service = service
-
-
-class App13ReceivingFactory(protocol.ServerFactory):
-    '''
-    Factory for mobile application which sends data in protocol buffer format.
-    '''
-
-    protocol = App13ProtobuffMobileProtocol
-
-    def __init__(self, service):
-        self.service = service
-
-
-class SBDMobileReceivingFactory(protocol.ServerFactory):
-    '''
-    Factory for satellite hybrid tracker.
-    '''
-
-    protocol = IridiumSBDProtocol
-
-    def __init__(self, service):
-        self.service = service
-
-
-class GT60ReceivingFactory(protocol.ServerFactory):
-
-    protocol = RedViewGT60Protocol
-
-    def __init__(self, service):
-        self.service = service
-
-
-class PmtrackerReceivingFactory(protocol.ServerFactory):
-
-    protocol = PathMakerProtocol
-
-    def __init__(self, service):
-        self.service = service
 
 
 ###################### Different receivers ################################
@@ -287,7 +225,7 @@ class RabbitMQService(Service):
         return d.addCallback(lambda  ret: self.handle_payload(queue_name,
             *ret))
 
-    def handle_payload(self, queue_name, channel, method_frame, header_frame, \
+    def handle_payload(self, queue_name, channel, method_frame, header_frame,
             body):
         '''Override this method for doing something usefull.'''
         log.msg("Message received from queue %s: %s" % (queue_name,body))

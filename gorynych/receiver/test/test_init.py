@@ -113,5 +113,45 @@ class TestMakeGT60(TestTrackerServices, _TCPTrackerMixin):
     tcp_proto_class = 'RedViewGT60Protocol'
 
 
+class TestOptions(unittest.TestCase):
+    def setUp(self):
+        self.options = Options()
+
+    def tearDown(self):
+        del self.options
+
+    def test_no_tracker(self):
+        command_line = []
+        self.assertRaises(SystemExit, self.options.parseOptions, command_line)
+
+    def test_one_allowed_case_insensitive_protocol(self):
+        command_line = '--protocols=Tcp --tracker=dumb_tracker'.split()
+        self.options.parseOptions(command_line)
+        self.assertIsInstance(self.options['protocols'], list)
+        self.assertIn('tcp', self.options['protocols'])
+
+    def test_one_disallowed_protocol(self):
+        command_line = '--protocols=disallowed --tracker=dumb_tracker'.split()
+        self.assertRaises(SystemExit, self.options.parseOptions, command_line)
+
+    def test_two_allowed_protocols(self):
+        command_line = '--protocols=Tcp,udP --tracker=dumb_tracker'.split()
+        self.options.parseOptions(command_line)
+        self.assertIsInstance(self.options['protocols'], list)
+        self.assertIn('tcp', self.options['protocols'])
+        self.assertIn('udp', self.options['protocols'])
+
+    def test_allowed_and_disallowed_protocols(self):
+        command_line = '--protocols=Tcp,abc --tracker=dumb_tracker'.split()
+        self.assertRaises(SystemExit, self.options.parseOptions, command_line)
+
+    def test_all_options(self):
+        command_line = '--protocols=tcp,udp --tracker=dumb -P 8888'.split()
+        self.options.parseOptions(command_line)
+        self.assertListEqual(self.options['protocols'], ['udp', 'tcp'])
+        self.assertEqual(self.options['port'], 8888)
+        self.assertEqual(self.options['tracker'], 'dumb')
+
+
 if __name__ == '__main__':
     unittest.main()

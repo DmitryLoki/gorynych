@@ -6,11 +6,21 @@ from gorynych import BaseOptions
 
 class Options(BaseOptions):
     optParameters = [
-        ['protocol', 'p', 'UDP'],
-        ['tracker', 't', None],
-        ['port', 'P', 9999, None, int],
-        ['webport', 'wb', 8084, None, int]
+        ['protocols', '', None, 'Transport protocol separated by comma. '
+                                'TCP or UDP allowed.'],
+        ['tracker', '', None],
+        ['port', 'P', 9999, None, int]
     ]
+
+    def opt_protocols(self, proto):
+        self['protocols'] = list(set(proto.lower().split(',')))
+
+    def postOptions(self):
+        if self['tracker'] is None:
+            raise SystemExit("Tracker type missed.")
+        for proto in self['protocols']:
+            if proto not in ['tcp', 'udp']:
+                raise SystemExit("Protocol %s not allowed." % proto)
 
 
 def makeService(config):

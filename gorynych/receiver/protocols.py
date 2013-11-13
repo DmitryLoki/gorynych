@@ -242,3 +242,9 @@ class RedViewGT60Protocol(protocol.Protocol):
     def dataReceived(self, data):
         self.factory.service.handle_message(
             data, proto='TCP', device_type=self.device_type)
+
+tr203_tcp_protocol = TR203ReceivingProtocol
+tr203_udp_protocol = UDPTR203Protocol
+telt_gh3000_udp_protocol = UDPTeltonikaGH3000Protocol
+app13_tcp_protocol = App13ProtobuffMobileProtocol
+gt60_tcp_protocol = RedViewGT60Protocol

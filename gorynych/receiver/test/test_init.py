@@ -10,10 +10,6 @@ from gorynych.receiver import makeService, Options
 
 DEFAULT_PORT = 9999
 
-class TestMakeServiceErrors(unittest.TestCase):
-    def test_missed_tracker_type(self):
-        self.assertRaises(SystemExit, makeService, Options())
-
 class _TCPTrackerMixin(unittest.TestCase):
     def test_tcp(self):
         if not hasattr(self, 'check_tcp'):
@@ -36,6 +32,7 @@ class TestTrackerServices(unittest.TestCase):
     def setUp(self):
         self.options = Options()
         self.options['tracker'] = self.tracker
+        self.options['protocols'] = self._get_protocols()
         self.service = makeService(self.options)
         self.sc = []
         for s in self.service:
@@ -48,7 +45,7 @@ class TestTrackerServices(unittest.TestCase):
 
     def _get_port(self, name):
         '''
-
+        Get all intersting information from service by name.
         @param name: service name
         @type name: C{str}
         @return: method ('TCP' or 'UDP'), port number, factory or protocol (
@@ -78,14 +75,21 @@ class TestTrackerServices(unittest.TestCase):
         self.assertEqual(self.tcp_proto_class,
             obj.protocol().__class__.__name__)
 
+    def _get_protocols(self):
+        result = []
+        if issubclass(self.__class__, _UDPTrackerMixin):
+            result.append('udp')
+        if issubclass(self.__class__, _TCPTrackerMixin):
+            result.append('tcp')
+        return result
+
 
 class TestMakeService(TestTrackerServices):
 
     def test_collection_without_track(self):
-        self.assertIn('ReceiverRabbitService', self.sc)
+        self.assertIn('RabbitMQReceiverService', self.sc)
         self.assertIn('ReceiverService', self.sc)
-        self.assertIn('WebLog', self.sc)
-        self.assertEqual(len(self.sc), 3)
+        self.assertEqual(len(self.sc), 2)
 
 
 class TestMakeServiceTR203(TestTrackerServices, _TCPTrackerMixin,
@@ -93,7 +97,7 @@ class TestMakeServiceTR203(TestTrackerServices, _TCPTrackerMixin,
     tracker = 'tr203'
     udp_proto_class = 'UDPTR203Protocol'
     tcp_proto_class = 'TR203ReceivingProtocol'
-    tcp_proto_factory = 'TR203ReceivingFactory'
+    tcp_proto_factory = 'ReceivingFactory'
 
 
 class TestMakeTeltonikaGH3000(TestTrackerServices, _UDPTrackerMixin):
@@ -103,14 +107,22 @@ class TestMakeTeltonikaGH3000(TestTrackerServices, _UDPTrackerMixin):
 
 class TestMakeApp13(TestTrackerServices, _TCPTrackerMixin):
     tracker = 'app13'
-    tcp_proto_factory = 'App13ReceivingFactory'
+    tcp_proto_factory = 'ReceivingFactory'
     tcp_proto_class = 'App13ProtobuffMobileProtocol'
 
 
 class TestMakeGT60(TestTrackerServices, _TCPTrackerMixin):
     tracker = 'gt60'
-    tcp_proto_factory = 'GT60ReceivingFactory'
+    tcp_proto_factory = 'ReceivingFactory'
     tcp_proto_class = 'RedViewGT60Protocol'
+
+
+class TestNonesixtentTracker(unittest.TestCase):
+    def test_exception(self):
+        o = Options()
+        o['tracker'] = 'not_exist'
+        o['protocols'] = ['tcp', 'udp']
+        self.assertRaises(AttributeError, makeService, o)
 
 
 class TestOptions(unittest.TestCase):

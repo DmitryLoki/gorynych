@@ -6,10 +6,6 @@ from struct import Struct
 from twisted.internet import protocol
 from twisted.protocols import basic
 
-from gorynych.receiver.parsers.app13.parser import Frame
-from gorynych.receiver.parsers.app13.constants import HEADER, MAGIC_BYTE, FrameId
-from gorynych.receiver.parsers.app13.session import PathMakerSession
-
 
 class TR203ReceivingProtocol(basic.LineOnlyReceiver):
     '''
@@ -81,10 +77,13 @@ class PathMakerProtocol(protocol.Protocol):
         self._reset()
 
     def _reset(self):
+        from gorynych.receiver.parsers.app13.session import PathMakerSession
         self.session = PathMakerSession()  # let's start new session
         self._buffer = ''
 
     def dataReceived(self, data):
+        from gorynych.receiver.parsers.app13.parser import Frame
+        from gorynych.receiver.parsers.app13.constants import HEADER, MAGIC_BYTE, FrameId
         self._buffer += data
         cursor = 0
         while True:

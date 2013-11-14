@@ -80,9 +80,9 @@ class ChunkReader(object):
                         elif field == getattr(point, PointProto.ALT):
                             alt = self.base_alt + point.packed[i]
                         elif field == getattr(point, PointProto.H_SPEED):
-                            h_speed = self.base_h_speed + point.packed[i]
+                            h_speed = point.packed[i]
                         elif field == getattr(point, PointProto.V_SPEED):
-                            v_speed = self.base_v_speed + point.packed[i]
+                            v_speed = point.packed[i]
                             v_speed = self._kmh2ms(v_speed)
                         i += 1
                 ts += timedelta

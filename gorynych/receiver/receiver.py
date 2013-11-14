@@ -13,9 +13,7 @@ from twisted.application.service import Service
 from twisted.python import log
 
 from gorynych.common.infrastructure.messaging import RabbitMQService
-from gorynych.receiver.parsers import GlobalSatTR203, TeltonikaGH3000UDP,\
-                                      MobileTracker, App13Parser, SBDParser, \
-                                      RedViewGT60, PathMakerParser
+from gorynych.receiver import parsers
 
 
 ###################### Different receivers ################################
@@ -36,8 +34,10 @@ class FileReceiver:
         fd.write(''.join((str(data), '\r\n')))
         fd.close()
 
+
 class CheckReceiver:
     running = 1
+
     def __init__(self, filename):
         self.filename = filename
         # imei: time
@@ -52,24 +52,28 @@ class CheckReceiver:
 
 
 class ReceiverRabbitService(RabbitMQService):
-
     def serialize(self, data):
         return cPickle.dumps(data, protocol=2)
 
 
 class ReceiverService(Service):
-    parsers = dict(tr203=GlobalSatTR203(), telt_gh3000=TeltonikaGH3000UDP(),
-                   mobile=MobileTracker(), app13=App13Parser(),
-                   new_mobile_sbd=SBDParser(), gt60=RedViewGT60(),
-                   pmtracker=PathMakerParser())
-
-    def __init__(self, sender, audit_log):
+    def __init__(self, sender, audit_log, tracker_type):
         self.sender = sender
         self.audit_log = audit_log
-        self.tr203 = GlobalSatTR203()
+        self._tracker_type = tracker_type
+        self.parsers = dict() # dictionary for parsers
         ##### checker
         self.messages = dict()
         self.coords = dict()
+
+    def startService(self):
+        try:
+            self.parsers[self._tracker_type] = getattr(parsers,
+                self._tracker_type)()
+        except AttributeError:
+            raise SystemExit("Parser for tracker %s is unknown" %
+                             self._tracker_type)
+        Service.startService(self)
 
     def check_message(self, msg, **kw):
         '''
@@ -82,13 +86,13 @@ class ReceiverService(Service):
         d.addCallbacks(self.audit_log.log_msg,
             self.audit_log.log_err,
             callbackArgs=[],
-            callbackKeywords={'time':receiving_time,
+            callbackKeywords={'time': receiving_time,
                 'proto': kw.get('proto', 'Unknown'),
                 'device': kw.get('device_type', 'Unknown')},
             errbackArgs=[],
             errbackKeywords={'data': msg, 'time': receiving_time,
                 'proto': kw.get('proto', 'Unknown'),
-                'device':kw.get('device_type', 'Unknown')})
+                'device': kw.get('device_type', 'Unknown')})
         if not self.sender.running:
             log.msg("Received but not sent: %s" % msg)
         d.addErrback(self._handle_error)

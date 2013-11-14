@@ -47,7 +47,7 @@ def makeService(config):
         exchange='receiver', exchange_type='fanout')
     sender.setName('RabbitMQReceiverService')
     sender.setServiceParent(sc)
-    receiver_service = ReceiverService(sender, audit_log)
+    receiver_service = ReceiverService(sender, audit_log, config['tracker'])
     receiver_service.setName('ReceiverService')
     receiver_service.setServiceParent(sc)
 

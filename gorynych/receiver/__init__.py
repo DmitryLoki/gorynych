@@ -34,7 +34,7 @@ def makeService(config):
     @rtype: C{twisted.application.service.IServiceCollection}
     '''
     from gorynych.receiver.factories import ReceivingFactory
-    from gorynych.receiver import protocols
+    from gorynych.receiver import protocols, parsers
     from gorynych.receiver.receiver import ReceiverRabbitService, ReceiverService, AuditFileLog
 
     # Set up application.
@@ -45,9 +45,10 @@ def makeService(config):
     audit_log = AuditFileLog('audit_log')
     sender = ReceiverRabbitService(host='localhost', port=5672,
         exchange='receiver', exchange_type='fanout')
+    parser = getattr(parsers, config['tracker'])()
     sender.setName('RabbitMQReceiverService')
     sender.setServiceParent(sc)
-    receiver_service = ReceiverService(sender, audit_log, config['tracker'])
+    receiver_service = ReceiverService(sender, audit_log, parser)
     receiver_service.setName('ReceiverService')
     receiver_service.setServiceParent(sc)
 
@@ -55,14 +56,14 @@ def makeService(config):
         receiver_server = TCPServer(config['port'],
             ReceivingFactory(receiver_service))
         protocol = getattr(protocols,
-            '_'.join((config['tracker'], 'tcp','protocol')))
+            '_'.join((config['tracker'], 'tcp', 'protocol')))
         receiver_server.args[1].protocol = protocol
         receiver_server.setName(config['tracker'] + '_tcp')
         receiver_server.setServiceParent(sc)
 
     if 'udp' in config['protocols']:
         protocol = getattr(protocols,
-            '_'.join((config['tracker'], 'udp','protocol')))(receiver_service)
+            '_'.join((config['tracker'], 'udp', 'protocol')))(receiver_service)
         receiver_server = UDPServer(config['port'], protocol)
         receiver_server.setName(config['tracker'] + '_udp')
         receiver_server.setServiceParent(sc)

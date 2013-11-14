@@ -45,8 +45,7 @@ class UDPTeltonikaGH3000Protocol(protocol.DatagramProtocol):
         self.service = service
 
     def datagramReceived(self, datagram, sender):
-        response = self.service.parsers[
-            self.device_type].get_response(datagram)
+        response = self.service.parser.get_response(datagram)
         self.transport.write(response, sender)
         self.service.handle_message(datagram, proto='UDP', client=sender,
                                     device_type=self.device_type)
@@ -59,8 +58,7 @@ class App13ProtobuffMobileProtocol(protocol.Protocol):
     device_type = 'app13'
 
     def dataReceived(self, data):
-        resp_list = self.factory.service.parsers[
-            self.device_type].get_response(data)
+        resp_list = self.factory.service.parser.get_response(data)
         for response in resp_list:
             self.transport.write(response)
         self.factory.service.handle_message(
@@ -109,10 +107,10 @@ class PathMakerProtocol(protocol.Protocol):
             result = self.factory.service.check_message(data, proto='TCP',
                                                         device_type=self.device_type)
             data = Frame(frame_id, msg)
-            resp = self.factory.service.parsers[self.device_type].get_response(data)
+            resp = self.factory.service.parser.get_response(data)
             if resp:
                 self.transport.write(resp)
-            parsed = self.factory.service.parsers[self.device_type].parse(data)
+            parsed = self.factory.service.parser.parse(data)
 
             if frame_id == FrameId.MOBILEID:
                 self.session.init(parsed)

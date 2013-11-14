@@ -2,8 +2,9 @@
 Tests for receiver service deployment.
 '''
 import unittest
-from twisted.application.service import IServiceCollection
 
+import mock
+from twisted.application.service import IServiceCollection
 from zope.interface.verify import verifyObject
 
 from gorynych.receiver import makeService, Options
@@ -33,7 +34,12 @@ class TestTrackerServices(unittest.TestCase):
         self.options = Options()
         self.options['tracker'] = self.tracker
         self.options['protocols'] = self._get_protocols()
-        self.service = makeService(self.options)
+        if self.tracker == 'dumb_tracker':
+            from gorynych.receiver import parsers
+            parsers.dumb_tracker = mock.MagicMock
+            self.service = makeService(self.options)
+        else:
+            self.service = makeService(self.options)
         self.sc = []
         for s in self.service:
             self.sc.append(s.name)
@@ -82,6 +88,18 @@ class TestTrackerServices(unittest.TestCase):
         if issubclass(self.__class__, _TCPTrackerMixin):
             result.append('tcp')
         return result
+
+    def test_parser_instance(self):
+        from gorynych.receiver import parsers
+        r = None
+        for s in self.service:
+            if s.name == 'ReceiverService':
+                r = s
+                break
+        if r is None:
+            raise unittest.SkipTest("ReceiverService not found for test.")
+        expected_class = getattr(parsers, self.options['tracker'])
+        self.assertIsInstance(r.parser, expected_class)
 
 
 class TestMakeService(TestTrackerServices):

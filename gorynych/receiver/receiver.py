@@ -13,7 +13,6 @@ from twisted.application.service import Service
 from twisted.python import log
 
 from gorynych.common.infrastructure.messaging import RabbitMQService
-from gorynych.receiver import parsers
 
 
 ###################### Different receivers ################################
@@ -57,23 +56,13 @@ class ReceiverRabbitService(RabbitMQService):
 
 
 class ReceiverService(Service):
-    def __init__(self, sender, audit_log, tracker_type):
+    def __init__(self, sender, audit_log, parser):
         self.sender = sender
         self.audit_log = audit_log
-        self._tracker_type = tracker_type
-        self.parsers = dict() # dictionary for parsers
+        self.parser = parser
         ##### checker
         self.messages = dict()
         self.coords = dict()
-
-    def startService(self):
-        try:
-            self.parsers[self._tracker_type] = getattr(parsers,
-                self._tracker_type)()
-        except AttributeError:
-            raise SystemExit("Parser for tracker %s is unknown" %
-                             self._tracker_type)
-        Service.startService(self)
 
     def check_message(self, msg, **kw):
         '''
@@ -82,7 +71,7 @@ class ReceiverService(Service):
         receiving_time = time.time()
         device_type = kw.get('device_type', 'tr203')
         d = defer.succeed(msg)
-        d.addCallback(self.parsers[device_type].check_message_correctness)
+        d.addCallback(self.parser.check_message_correctness)
         d.addCallbacks(self.audit_log.log_msg,
             self.audit_log.log_err,
             callbackArgs=[],
@@ -121,7 +110,7 @@ class ReceiverService(Service):
         """
         dev_type = kw.get('device_type', 'tr203')
         result = self.check_message(msg, **kw)
-        result.addCallback(self.parsers[dev_type].parse)
+        result.addCallback(self.parser.parse)
         result.addCallback(self.store_point)
         return result
 

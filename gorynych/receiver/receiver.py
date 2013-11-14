@@ -60,9 +60,6 @@ class ReceiverService(Service):
         self.sender = sender
         self.audit_log = audit_log
         self.parser = parser
-        ##### checker
-        self.messages = dict()
-        self.coords = dict()
 
     def check_message(self, msg, **kw):
         '''
@@ -95,10 +92,8 @@ class ReceiverService(Service):
                 # item=item magic is required by lambda to grab item correctly
                 # otherwise item is always message[-1]. Do not modify!
                 d.addCallback(lambda _, item=item: self.sender.write(item))
-                self._save_coords_for_checker(item)
         else:
             d.addCallback(lambda _: self.sender.write(message))
-            self._save_coords_for_checker(message)
 
         d.callback('go!')
         return d
@@ -113,12 +108,6 @@ class ReceiverService(Service):
         result.addCallback(self.parser.parse)
         result.addCallback(self.store_point)
         return result
-
-    def _save_coords_for_checker(self, parsed):
-        self.messages[parsed['imei']] = int(time.time())
-        self.coords[parsed['imei']] = (parsed['lat'], parsed['lon'],
-        parsed['alt'], parsed['h_speed'], int(time.time()) )
-        return parsed
 
     def _handle_error(self, failure):
         failure.trap(EOFError)

@@ -14,3 +14,4 @@ class TestReceiverRabbitService(TestCase):
         self.sender.write(message)
         received = self.sender.read(message)
         self.assertEquals(received, message)
+

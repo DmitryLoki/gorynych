@@ -1,5 +1,3 @@
-# encoding: utf-8
-
 from zope.interface import Interface
 
 
@@ -28,7 +26,6 @@ class IParseMessage(Interface):
         @rtype: dict
         '''
 
-# for convenience
 
 from tr203 import GlobalSatTR203
 from logonly_tr203 import LogOnlyGlobalSatTR203
@@ -36,3 +33,8 @@ from telt_gh3000 import TeltonikaGH3000UDP
 from old_mobile import MobileTracker
 from app13.parser import App13Parser, PathMakerParser, SBDParser
 from gt60 import RedViewGT60
+
+tr203 = GlobalSatTR203
+app13 = App13Parser
+telt_gh3000 = TeltonikaGH3000UDP
+gt60 = RedViewGT60

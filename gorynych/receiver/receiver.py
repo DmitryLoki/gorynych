@@ -13,9 +13,6 @@ from twisted.application.service import Service
 from twisted.python import log
 
 from gorynych.common.infrastructure.messaging import RabbitMQService
-from gorynych.receiver.parsers import GlobalSatTR203, TeltonikaGH3000UDP,\
-                                      MobileTracker, App13Parser, SBDParser, \
-                                      RedViewGT60, PathMakerParser
 
 
 ###################### Different receivers ################################
@@ -36,8 +33,10 @@ class FileReceiver:
         fd.write(''.join((str(data), '\r\n')))
         fd.close()
 
+
 class CheckReceiver:
     running = 1
+
     def __init__(self, filename):
         self.filename = filename
         # imei: time
@@ -52,24 +51,15 @@ class CheckReceiver:
 
 
 class ReceiverRabbitService(RabbitMQService):
-
     def serialize(self, data):
         return cPickle.dumps(data, protocol=2)
 
 
 class ReceiverService(Service):
-    parsers = dict(tr203=GlobalSatTR203(), telt_gh3000=TeltonikaGH3000UDP(),
-                   mobile=MobileTracker(), app13=App13Parser(),
-                   new_mobile_sbd=SBDParser(), gt60=RedViewGT60(),
-                   pmtracker=PathMakerParser())
-
-    def __init__(self, sender, audit_log):
+    def __init__(self, sender, audit_log, parser):
         self.sender = sender
         self.audit_log = audit_log
-        self.tr203 = GlobalSatTR203()
-        ##### checker
-        self.messages = dict()
-        self.coords = dict()
+        self.parser = parser
 
     def check_message(self, msg, **kw):
         '''
@@ -78,17 +68,17 @@ class ReceiverService(Service):
         receiving_time = time.time()
         device_type = kw.get('device_type', 'tr203')
         d = defer.succeed(msg)
-        d.addCallback(self.parsers[device_type].check_message_correctness)
+        d.addCallback(self.parser.check_message_correctness)
         d.addCallbacks(self.audit_log.log_msg,
             self.audit_log.log_err,
             callbackArgs=[],
-            callbackKeywords={'time':receiving_time,
+            callbackKeywords={'time': receiving_time,
                 'proto': kw.get('proto', 'Unknown'),
                 'device': kw.get('device_type', 'Unknown')},
             errbackArgs=[],
             errbackKeywords={'data': msg, 'time': receiving_time,
                 'proto': kw.get('proto', 'Unknown'),
-                'device':kw.get('device_type', 'Unknown')})
+                'device': kw.get('device_type', 'Unknown')})
         if not self.sender.running:
             log.msg("Received but not sent: %s" % msg)
         d.addErrback(self._handle_error)
@@ -102,10 +92,8 @@ class ReceiverService(Service):
                 # item=item magic is required by lambda to grab item correctly
                 # otherwise item is always message[-1]. Do not modify!
                 d.addCallback(lambda _, item=item: self.sender.write(item))
-                self._save_coords_for_checker(item)
         else:
             d.addCallback(lambda _: self.sender.write(message))
-            self._save_coords_for_checker(message)
 
         d.callback('go!')
         return d
@@ -117,15 +105,9 @@ class ReceiverService(Service):
         """
         dev_type = kw.get('device_type', 'tr203')
         result = self.check_message(msg, **kw)
-        result.addCallback(self.parsers[dev_type].parse)
+        result.addCallback(self.parser.parse)
         result.addCallback(self.store_point)
         return result
-
-    def _save_coords_for_checker(self, parsed):
-        self.messages[parsed['imei']] = int(time.time())
-        self.coords[parsed['imei']] = (parsed['lat'], parsed['lon'],
-        parsed['alt'], parsed['h_speed'], int(time.time()) )
-        return parsed
 
     def _handle_error(self, failure):
         failure.trap(EOFError)

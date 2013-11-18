@@ -181,3 +181,4 @@ tr203_udp_protocol = UDPTR203Protocol
 telt_gh3000_udp_protocol = UDPTeltonikaGH3000Protocol
 app13_tcp_protocol = App13ProtobuffMobileProtocol
 gt60_tcp_protocol = RedViewGT60Protocol
+pmtracker_tcp_protocol = PathMakerProtocol

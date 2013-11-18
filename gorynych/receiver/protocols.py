@@ -65,6 +65,10 @@ class App13ProtobuffMobileProtocol(protocol.Protocol):
             data, proto='TCP', device_type=self.device_type)
 
 
+from gorynych.receiver.parsers.app13.parser import Frame
+from gorynych.receiver.parsers.app13.constants import HEADER, MAGIC_BYTE, FrameId
+
+
 class PathMakerProtocol(protocol.Protocol):
     """
     New mobile application protocol, is also used by a satellite modem.
@@ -80,8 +84,6 @@ class PathMakerProtocol(protocol.Protocol):
         self._buffer = ''
 
     def dataReceived(self, data):
-        from gorynych.receiver.parsers.app13.parser import Frame
-        from gorynych.receiver.parsers.app13.constants import HEADER, MAGIC_BYTE, FrameId
         self._buffer += data
         cursor = 0
         while True:
@@ -100,7 +102,7 @@ class PathMakerProtocol(protocol.Protocol):
             frame_len = payload_len + HEADER.size
             if len(self._buffer) < frame_len:  # keep accumulating
                 break
-            msg = self._buffer[cursor+HEADER.size: cursor+frame_len]
+            msg = self._buffer[cursor + HEADER.size: cursor + frame_len]
             cursor += frame_len
 
             # go to the parser

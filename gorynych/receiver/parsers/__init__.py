@@ -38,3 +38,4 @@ tr203 = GlobalSatTR203
 app13 = App13Parser
 telt_gh3000 = TeltonikaGH3000UDP
 gt60 = RedViewGT60
+pmtracker = PathMakerParser

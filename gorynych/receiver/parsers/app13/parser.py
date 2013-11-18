@@ -82,7 +82,6 @@ class App13Parser(object):
         self.points = []
         self._parse_collection(msg)
 
-        print self.points
         # if no imei encountered, raise error
         if not self.imei:
             raise ValueError('Orphan message; no imei found')
@@ -91,6 +90,7 @@ class App13Parser(object):
             point['imei'] = self.imei
 
         response = self.points
+        print response
         del self.points
         return response
 

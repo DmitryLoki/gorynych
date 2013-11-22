@@ -176,9 +176,14 @@ class Track(AggregateRoot):
 
     def append_data(self, data):
         self.buffer = services.create_uniq_hstack(
-                                    self.buffer, self.type.read(data))
-        self.buffer = self.buffer[
-            np.where(self.buffer['timestamp'] >=self.task.start_time)]
+                                self.buffer, self.type.read(data))
+        idxs = np.where(np.logical_and(
+                        self.buffer['timestamp'] >= self.task.start_time,
+                        self.buffer['timestamp'] <= self.task.end_time))
+        self.buffer = self.buffer[idxs]
+        if len(self.buffer) == 0:
+            raise Exception('Track time bounds are not within race time ({}, {})'.format(
+                self.task.start_time, self.task.end_time))
 
     def process_data(self):
         points, evs = self.type.process(self.buffer, self)

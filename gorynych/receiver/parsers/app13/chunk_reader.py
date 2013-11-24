@@ -23,9 +23,6 @@ class ChunkReader(object):
     def _format(self, *args):
         return dict(zip(self.format, args))
 
-    def _kmh2ms(self, value):
-        return round((value * 1000.0) / 3600.0, 1)
-
     def _get_base_point(self):
         self.base_lat = getattr(self.chunk, BasePointProto.LAT)
         self.base_lon = getattr(self.chunk, BasePointProto.LON)
@@ -36,8 +33,9 @@ class ChunkReader(object):
 
         self.base_alt = getattr(self.chunk, BasePointProto.ALT, 0)
         self.base_h_speed = getattr(self.chunk, BasePointProto.H_SPEED, 0)
-        self.base_v_speed = self._kmh2ms(getattr(self.chunk, BasePointProto.V_SPEED, 0))
-
+        self.base_v_speed = getattr(self.chunk, BasePointProto.V_SPEED, 0)
+        # v_speed is 10*m. per sec.
+        self.base_v_speed = round(self.base_v_speed / 10., 1)
         return self.base_lat, self.base_lon, self.base_ts, self.base_alt, \
             self.base_h_speed, self.base_v_speed
 
@@ -80,8 +78,7 @@ class ChunkReader(object):
                         elif field == getattr(point, PointProto.H_SPEED):
                             h_speed = point.packed[i]
                         elif field == getattr(point, PointProto.V_SPEED):
-                            v_speed = point.packed[i]
-                            v_speed = self._kmh2ms(v_speed)
+                            v_speed = round(point.packed[i] / 10., 1)
                         i += 1
                 ts += timedelta
 

@@ -15,6 +15,8 @@ class Phone(ValueObject):
         self._number = self._validate(phone)
 
     def _validate(self, value):
+        if isinstance(value, Phone):
+            return value.number
         try:
             if re.match(r'^\+\d+', value):
                 return value
@@ -240,3 +242,31 @@ def geojson_feature_collection(ch_list):
         result.append(item.__geo_interface__)
     return json.dumps(dict(type='FeatureCollection',
                            features=result))
+
+
+class EntitiesCollection(dict):
+    def get_properties_values(self, property_name, ignore_absent=True):
+        '''
+        Return a list with values of properties with property_name for
+        collection.
+        @param property_name: name of property to search.
+        @type property_name: C{str}
+        @param ignore_absent: don't rise AttributeError if object in a
+        collections don't has property. Default is True.
+        @type ignore_absent: C{boolean}
+        @return: list of property values.
+        @rtype: C{list}
+        '''
+        assert isinstance(property_name, str), "Property name must be string."
+        result = list()
+        for key, item in self.viewitems():
+            if hasattr(item, property_name) and not callable(item):
+                result.append(getattr(item, property_name))
+            else:
+                if ignore_absent:
+                    continue
+                else:
+                    raise AttributeError("Item %s don't has property %s" %
+                                         (key, property_name))
+        return result
+

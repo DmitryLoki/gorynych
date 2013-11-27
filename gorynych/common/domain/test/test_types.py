@@ -198,5 +198,36 @@ class CheckpointTest(unittest.TestCase):
         self.assertEqual(ch1.distance_to(ch2), check_distance)
 
 
+class A(object):
+    def __init__(self, prop1, prop2=None):
+        self.prop1 = prop1
+        if not prop2 is None:
+            self.prop2 = prop2
+
+
+class EntitiesCollectionTest(unittest.TestCase):
+    def setUp(self):
+        ec = types.EntitiesCollection()
+        ec['1'] = A('1', '2')
+        ec['2'] = A('1', '3')
+        ec['3'] = A('2', '4')
+        ec['4'] = A('3')
+        self.e = ec
+
+    def test_lookup_existed(self):
+        res = self.e.get_properties_values('prop1')
+        self.assertIsInstance(res, list)
+        self.assertEqual(len(res), 4)
+
+    def test_lookup_nonexistent_with_ignore(self):
+        res = self.e.get_properties_values('prop2')
+        self.assertIsInstance(res, list)
+        self.assertEqual(len(res), 3)
+
+    def test_lookup_nonexistent(self):
+        self.assertRaises(AttributeError, self.e.get_properties_values,
+            'prop2', ignore_absent=False)
+
+
 if __name__ == '__main__':
     unittest.main()

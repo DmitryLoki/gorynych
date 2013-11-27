@@ -70,6 +70,11 @@ class IdentifierObjectTest(unittest.TestCase):
         di = TestID(_id)
         self.assertTrue(_id == di)
 
+    def test_create_from_domainidentifier_bad_case(self):
+        _id = TestID()
+        _id._id = _id._id[:-3]
+        self.assertRaises(ValueError, TestID, _id)
+
     def test_create_from_another_domainidentifier(self):
         _id = TestID()
         class TestID2(model.DomainIdentifier):pass

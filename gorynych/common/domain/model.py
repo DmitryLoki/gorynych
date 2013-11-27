@@ -32,8 +32,10 @@ class DomainIdentifier(object):
         @type identifier: DomainIdentifier subclass or string.
         '''
         if identifier is None:
-            self._id = str(uuid.uuid4())
-        elif identifier.__class__ == self.__class__:
+            self._id = self._create_new_id()
+        elif identifier.__class__ == self.__class__ and (
+            self._string_is_valid_id(str(identifier))
+        ):
             self._id = identifier
         elif isinstance(identifier, str):
             if self._string_is_valid_id(identifier):
@@ -41,6 +43,9 @@ class DomainIdentifier(object):
         else:
             raise ValueError("Got identifier %s with type %s" %
                              (identifier, type(identifier)))
+
+    def _create_new_id(self):
+        return str(uuid.uuid4())
 
     @property
     def id(self):

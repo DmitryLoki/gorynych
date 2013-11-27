@@ -4,8 +4,9 @@ from sys import getsizeof
 
 from twisted.trial import unittest
 
-from gorynych.info.domain.ids import ContestID, \
-    namespace_date_random_validator, namespace_uuid_validator
+from gorynych.info.domain.ids import ContestID, PersonID, TrackerID,\
+    namespace_date_random_validator, namespace_uuid_validator, \
+    namespace_date_random_id, namespace_uuid_id
 
 
 class ContestIDTest(unittest.TestCase):
@@ -43,6 +44,32 @@ class ContestIDTest(unittest.TestCase):
         string = 'cnts-120203-abr'
         self.assertRaises(ValueError, ContestID.fromstring, string)
 
+    def test_repititions(self):
+        id1 = ContestID()
+        id2 = ContestID()
+        self.assertNotEqual(id1, id2)
+
+
+class PersonIDTest(unittest.TestCase):
+    def test_equality(self):
+        id1 = PersonID()
+        id2 = PersonID(id1)
+        self.assertTrue(id1 == id2)
+
+
+class TrackerIDTest(unittest.TestCase):
+    def test_string_creation(self):
+        id1 = TrackerID.fromstring('tr203-123')
+        self.assertIsInstance(id1, TrackerID)
+
+    def test_wrong_string_creation(self):
+        self.assertRaises(ValueError, TrackerID.fromstring, 'wrongstring')
+
+    def test_string_init(self):
+        id1 = TrackerID.fromstring('tr203-123')
+        id2 = TrackerID('tr203', '123')
+        self.assertEqual(id1, id2)
+
 
 class ValidatorsTest(unittest.TestCase):
     def test_namespace_date_random_validator(self):
@@ -57,6 +84,14 @@ class ValidatorsTest(unittest.TestCase):
         anotherbadstring = 'cnts-120203-hahaha'
         self.assertRaises(ValueError, namespace_date_random_validator,
                           anotherbadstring, 'cnts')
+
+    def test_namespace_date_random_id(self):
+        id1 = namespace_date_random_id('nmsp')
+        self.assertTrue(namespace_date_random_validator(id1, 'nmsp'))
+
+    def test_namespace_uuid_id(self):
+        id1 = namespace_uuid_id('qwer')
+        self.assertTrue(namespace_uuid_validator(id1, 'qwer'))
 
     def test_namespace_uuid_validator(self):
         _id = str(uuid.uuid4())

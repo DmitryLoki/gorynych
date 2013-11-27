@@ -4,8 +4,16 @@ import uuid
 
 from gorynych.common.domain.model import DomainIdentifier
 
-def namespace_date_random_validator(string, atype):
-    aggr_type, creation_date, random_number = string.split('-')
+
+def namespace_date_random_id(namespace, date_fmt='%y%m%d', delimiter='-'):
+    rand = str(uuid.uuid4().fields[0])
+    return delimiter.join((namespace,
+    date.today().strftime(date_fmt),
+    rand))
+
+
+def namespace_date_random_validator(string, atype, delimiter='-'):
+    aggr_type, creation_date, random_number = string.split(delimiter)
     assert aggr_type == atype, "Wrong aggregate type in id string."
     assert re.match('[0-9]{6}', creation_date), "Wrong creation date in " \
                                                 "id string."
@@ -16,8 +24,12 @@ def namespace_date_random_validator(string, atype):
     return True
 
 
-def namespace_uuid_validator(string, namespace):
-    aggr_type, uid = string.split('-', 1)
+def namespace_uuid_id(namespace, delimiter='-'):
+    return delimiter.join((namespace, (str(uuid.uuid4()))))
+
+
+def namespace_uuid_validator(string, namespace, delimiter='-'):
+    aggr_type, uid = string.split(delimiter, 1)
     assert aggr_type == namespace, "Wrong aggregate type %s in id string %s"\
                                    % (namespace, string)
     _uid = uuid.UUID(uid)
@@ -29,13 +41,8 @@ class ContestID(DomainIdentifier):
     cnts-130513-12345341234
     namespace-ddmmyy-random
     '''
-    def __init__(self):
-        fmt = '%y%m%d'
-        self.__creation_date = date.today().strftime(fmt)
-        self.__aggregate_type = 'cnts'
-        self.__random = uuid.uuid4().fields[0]
-        self._id = '-'.join((self.__aggregate_type, self.__creation_date,
-                             str(self.__random)))
+    def _create_new_id(self):
+        return namespace_date_random_id('cnts')
 
     def _string_is_valid_id(self, string):
         return namespace_date_random_validator(string, 'cnts')
@@ -46,13 +53,8 @@ class PersonID(DomainIdentifier):
     pers-130513-424141234123
     namespace-ddmmyy-random
     '''
-    def __init__(self):
-        fmt = '%y%m%d'
-        self.__creation_date = date.today().strftime(fmt)
-        self.__aggregate_type = 'pers'
-        self.__random = uuid.uuid4().fields[0]
-        self._id = '-'.join((self.__aggregate_type, self.__creation_date,
-                             str(self.__random)))
+    def _create_new_id(self):
+        return namespace_date_random_id('pers')
 
     def _string_is_valid_id(self, string):
         return namespace_date_random_validator(string, 'pers')
@@ -63,9 +65,8 @@ class RaceID(DomainIdentifier):
     r-b4e75299-c7c5-4b73-a7b0-17f57320231c
     r-uuid4
     '''
-    def __init__(self):
-        _uid = str(uuid.uuid4())
-        self._id = '-'.join(('r', _uid))
+    def _create_new_id(self):
+        return namespace_uuid_id('r')
 
     def _string_is_valid_id(self, string):
         return namespace_uuid_validator(string, 'r')
@@ -79,6 +80,7 @@ class TrackerID(DomainIdentifier):
     # TODO: global constants.
     device_types = ['tr203', 'telt_gh3000', 'app13']
 
+    # TODO: rewrite init to use common new method.
     def __init__(self, device_type, device_id):
         super(TrackerID, self).__init__()
         if not device_type in self.device_types:
@@ -117,9 +119,8 @@ class TransportID(DomainIdentifier):
     trns-uuid
     r-uuid4
     '''
-    def __init__(self):
-        _uid = str(uuid.uuid4())
-        self._id = '-'.join(('trns', _uid))
+    def _create_new_id(self):
+        return namespace_uuid_id('trns')
 
     def _string_is_valid_id(self, string):
         return namespace_uuid_validator(string, 'trns')

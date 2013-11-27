@@ -26,8 +26,21 @@ class DomainIdentifier(object):
     Base class for aggregate IDs. By default use uuid4 as id.
     '''
 
-    def __init__(self):
-        self._id = str(uuid.uuid4())
+    def __init__(self, identifier=None):
+        '''
+        @param identifier: identifier can be passed on creation.
+        @type identifier: DomainIdentifier subclass or string.
+        '''
+        if identifier is None:
+            self._id = str(uuid.uuid4())
+        elif identifier.__class__ == self.__class__:
+            self._id = identifier
+        elif isinstance(identifier, str):
+            if self._string_is_valid_id(identifier):
+                self._id = identifier
+        else:
+            raise ValueError("Got identifier %s with type %s" %
+                             (identifier, type(identifier)))
 
     @property
     def id(self):
@@ -35,6 +48,7 @@ class DomainIdentifier(object):
 
     @classmethod
     def fromstring(cls, string):
+        # deprecated. TODO: delete this method from code.
         id = cls()
         if id._string_is_valid_id(str(string)):
             id._id = str(string)

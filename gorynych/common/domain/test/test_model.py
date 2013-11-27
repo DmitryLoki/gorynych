@@ -9,6 +9,10 @@ from zope.interface.exceptions import DoesNotImplement
 from gorynych.common.domain import model
 from gorynych.eventstore.interfaces import IEvent
 
+
+class TestID(model.DomainIdentifier): pass
+
+
 class IdentifierObjectTest(unittest.TestCase):
     def _get_id(self):
         return model.DomainIdentifier()
@@ -61,7 +65,25 @@ class IdentifierObjectTest(unittest.TestCase):
         self.assertRaises(ValueError, model.DomainIdentifier.fromstring,
                           'hello')
 
-class TestID(model.DomainIdentifier): pass
+    def test_create_from_domainidentifier(self):
+        _id = TestID()
+        di = TestID(_id)
+        self.assertTrue(_id == di)
+
+    def test_create_from_another_domainidentifier(self):
+        _id = TestID()
+        class TestID2(model.DomainIdentifier):pass
+        self.assertRaises(ValueError, TestID2, _id)
+
+    def test_init_with_string(self):
+        string = str(uuid.uuid4())
+        _id = model.DomainIdentifier(string)
+        self.assertIsInstance(_id, model.DomainIdentifier)
+        self.assertEqual(_id.id, string)
+
+    def test_init_with_string_bad_case(self):
+        self.assertRaises(ValueError, model.DomainIdentifier, 'hello')
+
 
 class DomainEventTest(unittest.TestCase):
     def test_success_creation(self):

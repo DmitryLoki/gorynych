@@ -1,14 +1,15 @@
 import unittest
-
-import mock
 import time
 from copy import deepcopy
 
+import mock
+
 from gorynych.common.domain import events
-from gorynych.info.domain.test.helpers import create_contest, create_person, create_transport, create_checkpoints
-from gorynych.info.domain import contest, person, race
+from gorynych.info.domain.test.helpers import create_contest, create_person, create_checkpoints
+from gorynych.info.domain import contest, race
 from gorynych.common.domain.types import Address, Name, Country
-from gorynych.info.domain.ids import PersonID, RaceID, TrackerID, TransportID
+from gorynych.info.domain.ids import PersonID, RaceID, TrackerID
+from gorynych.common.exceptions import DomainError
 
 
 class MockedPersonRepository(mock.Mock):
@@ -63,13 +64,8 @@ class EventsApplyingTest(unittest.TestCase):
         ev = events.ContestRaceCreated(cont.id, rid)
         self.assertRaises(AssertionError, cont.apply, ev)
         cont.apply([ev])
-        self.assertEqual(len(cont.race_ids), 1)
-        cont.apply([ev])
-        self.assertEqual(len(cont.race_ids), 1)
-        rid = RaceID()
-        ev = events.ContestRaceCreated(cont.id, rid)
-        cont.apply([ev])
-        self.assertEqual(len(cont.race_ids), 2)
+        self.assertFalse(hasattr(cont, 'race_ids'), "New version don't has "
+                                                    "race_id set.")
 
 
 class ContestTest(unittest.TestCase):
@@ -100,7 +96,7 @@ class ContestTest(unittest.TestCase):
 
         # Check contest numbers uniqueness.
         p3 = create_person()
-        self.assertRaises(ValueError, cont.register_paraglider, p3,
+        self.assertRaises(DomainError, cont.register_paraglider, p3,
             'mantrA 9', '757')
 
         mock_calls = event_store.mock_calls
@@ -119,8 +115,8 @@ class ContestTest(unittest.TestCase):
         self.assertEqual(cont.end_time, 8)
         self.assertRaises(ValueError, setattr, cont, 'start_time', 8)
         self.assertRaises(ValueError, setattr, cont, 'start_time', 9)
-        self.assertRaises(ValueError, setattr, cont, 'end_time', 2)
-        self.assertRaises(ValueError, setattr, cont, 'end_time', 1)
+        self.assertRaises(DomainError, setattr, cont, 'end_time', 2)
+        self.assertRaises(DomainError, setattr, cont, 'end_time', 1)
         cont.change_times('10', '16')
         self.assertEqual((cont.start_time, cont.end_time), (10, 16))
         self.assertRaises(ValueError, cont.change_times, '10', '8')

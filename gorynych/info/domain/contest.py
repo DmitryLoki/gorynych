@@ -2,17 +2,16 @@
 Contest Aggregate.
 '''
 from copy import deepcopy
+import datetime
 
 import pytz
-import datetime
-from zope.interface.interfaces import Interface
 
-from gorynych.info.domain import race, transport
+from gorynych.info.domain import transport
 from gorynych.common.domain.model import AggregateRoot, ValueObject, DomainIdentifier
-from gorynych.common.domain.types import Address, Country, Name, Phone, Checkpoint
+from gorynych.common.domain.types import Address, Country, Phone, Checkpoint
 from gorynych.common.domain.events import ParagliderRegisteredOnContest
 from gorynych.common.infrastructure import persistence
-from gorynych.info.domain.ids import ContestID, PersonID, TrackerID, TransportID, RaceID
+from gorynych.info.domain.ids import ContestID, RaceID
 from gorynych.common.exceptions import DomainError
 from gorynych.common.domain.services import times_from_checkpoints
 
@@ -48,7 +47,6 @@ class Contest(AggregateRoot):
         self._end_time = end_time
         self.address = address
         self._participants = dict()
-        self.race_ids = set()
         self.retrieve_id = None
         self._tasks = dict()
 
@@ -100,7 +98,7 @@ class Contest(AggregateRoot):
         self._end_time = int(value)
         if not self._invariants_are_correct():
             self._end_time = old_end_time
-            raise ValueError("Incorrect end_time violate aggregate's "
+            raise DomainError("Incorrect end_time violate aggregate's "
                              "invariants.")
 
     @property
@@ -229,6 +227,16 @@ class Contest(AggregateRoot):
         self._title = value.strip()
 
     def register_paraglider(self, pers, glider, cnum):
+        '''
+        Register person as a paraglider.
+        @param pers: person registered
+        @type pers: L{gorynych.info.domain.person.Person}
+        @param glider: glider manufacturer name
+        @type glider: C{str}
+        @param cnum: contest number
+        @type cnum: C{str}
+        @return: self
+        '''
         paragliders_before = deepcopy(self._participants)
         glider = glider.strip().split(' ')[0].lower()
         self._participants[pers.id] = dict(
@@ -240,7 +248,7 @@ class Contest(AggregateRoot):
             phone=pers.phone)
         if not self._invariants_are_correct():
             self._participants = paragliders_before
-            raise ValueError("Paraglider must have unique contest number.")
+            raise DomainError("Paraglider must have unique contest number.")
         persistence.event_store().persist(ParagliderRegisteredOnContest(
             pers.id, self.id))
         return self
@@ -269,10 +277,6 @@ class Contest(AggregateRoot):
             description=staffmember.description)
         return self
 
-    def remove_transport(self, transport_id):
-        if transport_id in self.transport:
-            del self.transport[transport_id]
-
     def _invariants_are_correct(self):
         """
         Check next invariants for contest:
@@ -294,9 +298,6 @@ class Contest(AggregateRoot):
         # TODO: this function should rollback all paragliders. Am I need this
         # function?
         self._participants[person_id] = paraglider_before
-
-    def apply_ContestRaceCreated(self, ev):
-        self.race_ids.add(ev.payload)
 
     def change_participant_data(self, person_id, **kwargs):
         if not kwargs:

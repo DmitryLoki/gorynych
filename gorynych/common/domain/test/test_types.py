@@ -36,10 +36,8 @@ class AddressTest(unittest.TestCase):
         self.assertRaises(ValueError, types.Address, 'ss', 'de', (0, 270))
         self.assertRaises(ValueError, types.Address, 'ss', 'de', (90, 0))
         self.assertRaises(ValueError, types.Address, 'ss', 'de', (-90, 0))
-        self.assertRaises(ValueError, types.Address, 'ss', 'de', (-89,
-                                                                  180.01))
-        self.assertRaises(ValueError, types.Address, 'ss', 'de', (-89,
-                                                                  -180.01))
+        self.assertRaises(ValueError, types.Address, 'ss', 'de', (-89, 180.01))
+        self.assertRaises(ValueError, types.Address, 'ss', 'de', (-89, -180.01))
 
     def test_coordinates(self):
         a1 = types.Address('ss', 'de', (-89.999999, -180))
@@ -60,16 +58,14 @@ class AddressTest(unittest.TestCase):
 class CheckpointTest(unittest.TestCase):
     def test_creating(self):
         point1 = Point(42.502, 0.798)
-        ch1 = types.Checkpoint(name='A01', geometry=point1,
-                                ch_type='TO', times=(2, None), radius=2,
-                                checked_on='exit')
-        ch2 = types.Checkpoint(name='A01', geometry=Point(42.502, 0.798),
-                                 times=(4, 6), radius=3)
+        ch1 = types.Checkpoint(name='A01', geometry=point1, ch_type='TO', times=(2, None), radius=2,
+            checked_on='exit')
+        ch2 = types.Checkpoint(name='A01', geometry=Point(42.502, 0.798), times=(4, 6), radius=3)
         ch3 = types.Checkpoint(name='B02', geometry=Point(1, 2), ch_type='es',
             radius=3)
-        ch4 = types.Checkpoint(name='g10', geometry={'type': 'Point',
-                                                     'coordinates': [1, 2]},
-            ch_type='goal', radius=3, times=(None, 8))
+        ch4 = types.Checkpoint(name='g10',
+            geometry={'type': 'Point', 'coordinates': [1, 2]}, ch_type='goal',
+            radius=3, times=(None, 8))
 
         self.assertEqual(ch1.geometry, point1)
         self.assertEqual(ch1.radius, 2)
@@ -88,87 +84,79 @@ class CheckpointTest(unittest.TestCase):
         self.assertEqual(ch2.name, 'A01')
 
         self.assertIsInstance(ch4.geometry, Point)
-        self.assertAlmostEqual(ch2.__geo_interface__['geometry'][
-            'coordinates'][0], 42.502, 3)
-        self.assertAlmostEqual(ch2.__geo_interface__['geometry'][
-            'coordinates'][1], 0.798, 3)
+        self.assertAlmostEqual(
+            ch2.__geo_interface__['geometry']['coordinates'][0], 42.502, 3)
+        self.assertAlmostEqual(
+            ch2.__geo_interface__['geometry']['coordinates'][1], 0.798, 3)
 
     def test_geo_interface(self):
-        ch1 = types.Checkpoint(name='A01', geometry=Point(53, 1),
-                               ch_type='TO', times=(2, None), radius=2)
+        ch1 = types.Checkpoint(name='A01', geometry=Point(53, 1), ch_type='TO',
+            times=(2, None), radius=2)
         expected_interface = {'type': 'Feature',
-                              'geometry': {'type': 'Point',
-                                           'coordinates': [53.0, 1.0]},
-                              'properties': {'radius': 2, 'name': 'A01',
-                                            'checkpoint_type': 'to',
-                                            'open_time': 2,
-                                            'close_time': None,
-                                            'checked_on': 'enter'}
-                                }
+            'geometry': {'type': 'Point', 'coordinates': [53.0, 1.0]},
+            'properties': {'radius': 2, 'name': 'A01', 'checkpoint_type': 'to',
+                'open_time': 2, 'close_time': None, 'checked_on': 'enter'}}
 
-        self.assertEqual(json.dumps(ch1.__geo_interface__),
-                         json.dumps(expected_interface))
+        self.assertEqual(json.dumps(ch1.__geo_interface__), json.dumps(expected_interface))
 
     def test_equal(self):
-        ch1 = types.Checkpoint(name='A01', geometry=Point(53, 1),
-                               ch_type='TO', times=(2, None), radius=2)
-        ch2 = types.Checkpoint(name='A01', geometry=Point(53, 1),
-                               ch_type='TO', times=(2, None), radius=2)
+        ch1 = types.Checkpoint(name='A01', geometry=Point(53, 1), ch_type='TO',
+            times=(2, None), radius=2)
+        ch2 = types.Checkpoint(name='A01', geometry=Point(53, 1), ch_type='TO',
+            times=(2, None), radius=2)
         self.assertEqual(ch1, ch2)
-        ch3 = types.Checkpoint(name='A01', geometry=Point(53, 1),
-                               ch_type='TO', times=(2, 3), radius=2)
+        ch3 = types.Checkpoint(name='A01', geometry=Point(53, 1), ch_type='TO',
+            times=(2, 3), radius=2)
         self.assertNotEqual(ch1, ch3)
 
     def test_checkpoint_from_geojson(self):
         point = {'geometry': {'type': 'Point', 'coordinates': [0.0, 1.0]},
-                 'type': 'Feature',
-                 'properties': {'name': "A01", 'radius': 400,
-                              'open_time': 12345, 'close_time': 123456}}
+            'type': 'Feature',
+            'properties': {'name': "A01", 'radius': 400, 'open_time': 12345,
+                'close_time': 123456}}
         ch = types.checkpoint_from_geojson(point)
         self.assertIsInstance(ch, types.Checkpoint)
         self.assertEqual(ch.type, 'ordinal')
         self.assertDictContainsSubset(point['properties'],
-                                      ch.__geo_interface__['properties'])
+            ch.__geo_interface__['properties'])
         self.assertIsInstance(ch.geometry, Point)
 
     def test_from_geojson_staticmethod_dict(self):
         point = {'geometry': {'type': 'Point', 'coordinates': [0.0, 1.0]},
-                 'type': 'Feature',
-                 'properties': {'name': "A01", 'radius': 400,
-                                'open_time': 12345, 'close_time': 123456}}
+            'type': 'Feature',
+            'properties': {'name': "A01", 'radius': 400, 'open_time': 12345,
+                'close_time': 123456}}
         ch = types.Checkpoint.from_geojson(point)
         self.assertIsInstance(ch.geometry, Point)
         self.assertIsInstance(ch, types.Checkpoint)
         self.assertEqual(ch.type, 'ordinal')
         self.assertDictContainsSubset(point['properties'],
-                                      ch.__geo_interface__['properties'])
+            ch.__geo_interface__['properties'])
         self.assertIsInstance(ch.geometry, Point)
 
     def test_from_geojson_staticmethod_str(self):
         point = {'geometry': {'type': 'Point', 'coordinates': [0.0, 1.0]},
-                 'type': 'Feature',
-                 'properties': {'name': "A01", 'radius': 400,
-                                'open_time': 12345, 'close_time': 123456}}
+            'type': 'Feature',
+            'properties': {'name': "A01", 'radius': 400, 'open_time': 12345,
+                'close_time': 123456}}
         ch = types.Checkpoint.from_geojson(json.dumps(point))
         self.assertIsInstance(ch.geometry, Point)
         self.assertIsInstance(ch, types.Checkpoint)
         self.assertEqual(ch.type, 'ordinal')
         self.assertDictContainsSubset(point['properties'],
-                                      ch.__geo_interface__['properties'])
+            ch.__geo_interface__['properties'])
         self.assertIsInstance(ch.geometry, Point)
 
     def test_bad_creating(self):
         self.assertRaises(ValueError, types.Checkpoint, 'A01', Point(1, 1))
         self.assertRaises(AssertionError, types.Checkpoint, '2', Point(2, 2),
-                                                           times=(3, 1),
-                                                           radius=1)
+            times=(3, 1), radius=1)
 
     def test_str(self):
         point = {'geometry': {'type': 'Point', 'coordinates': [0.0, 1.0]},
-                 'type': 'Feature',
-                 'properties': {'name': "A01", 'radius': 400,
-                                'open_time': 12345, 'close_time': 123456,
-                                'checkpoint_type': 'ordinal'}}
+            'type': 'Feature',
+            'properties': {'name': "A01", 'radius': 400, 'open_time': 12345,
+                'close_time': 123456, 'checkpoint_type': 'ordinal'}}
         ch = types.Checkpoint.from_geojson(point)
         self.assertIsInstance(str(ch), bytes)
         point['properties']['checked_on'] = 'enter'
@@ -184,17 +172,18 @@ class CheckpointTest(unittest.TestCase):
         coords1 = [0.0, 1.0]
         point1 = {'geometry': {'type': 'Point', 'coordinates': coords1},
             'type': 'Feature',
-            'properties': {'name': "A01", 'radius': 400,
-                'open_time': 12345, 'close_time': 123456}}
+            'properties': {'name': "A01", 'radius': 400, 'open_time': 12345,
+                'close_time': 123456}}
         coords2 = [0.0, 2.0]
         point2 = {'geometry': {'type': 'Point', 'coordinates': coords2},
             'type': 'Feature',
-            'properties': {'name': "A01", 'radius': 400,
-                'open_time': 12345, 'close_time': 123456}}
+            'properties': {'name': "A01", 'radius': 400, 'open_time': 12345,
+                'close_time': 123456}}
         ch1 = types.Checkpoint.from_geojson(point1)
         ch2 = types.Checkpoint.from_geojson(point2)
 
-        check_distance = point_dist_calculator(coords1[0], coords1[1], coords2[0], coords2[1])
+        check_distance = point_dist_calculator(coords1[0], coords1[1],
+            coords2[0], coords2[1])
         self.assertEqual(ch1.distance_to(ch2), check_distance)
 
 
@@ -227,6 +216,51 @@ class EntitiesCollectionTest(unittest.TestCase):
     def test_lookup_nonexistent(self):
         self.assertRaises(AttributeError, self.e.get_properties_values,
             'prop2', ignore_absent=False)
+
+
+class B(object):
+    def __init__(self, dic):
+        self.dic = dic
+
+    def change_dic(self, key, value, raise_exception=False):
+        with types.TransactionalDict(self.dic) as dic:
+            dic[key] = value
+            if raise_exception:
+                self.check_len()
+
+    def check_len(self):
+        assert len(self.dic) == 1, "Initial dictionary length must be 1."
+
+
+class TransactionalDictTest(unittest.TestCase):
+    def test_success_in_function(self):
+        dic = dict(a='b')
+        with types.TransactionalDict(dic) as w:
+            w['c'] = 'd'
+        self.assertDictEqual(dic, dict(a='b', c='d'))
+
+    def test_no_succes_in_function(self):
+        dic = dict(a='b')
+        try:
+            with types.TransactionalDict(dic) as w:
+                w['c'] = 'd'
+                raise Exception()
+        except Exception:
+            pass
+        self.assertDictEqual(dic, dict(a='b'))
+
+    def test_success(self):
+        b = B(dict(a='b'))
+        b.change_dic('c', 'd')
+        self.assertDictEqual(b.dic, dict(a='b', c='d'))
+
+    def test_no_success(self):
+        b = B(dict(a='b'))
+        try:
+            b.change_dic('c', 'd', raise_exception=True)
+        except:
+            pass
+        self.assertDictEqual(b.dic, dict(a='b'))
 
 
 if __name__ == '__main__':

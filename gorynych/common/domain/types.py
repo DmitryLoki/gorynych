@@ -1,16 +1,18 @@
 '''
-Common types.
+Common types and helpers.
+Should it be in separate module/package?
 '''
-import simplejson as json
 import re
+from contextlib import contextmanager
+from copy import deepcopy
 
+import simplejson as json
 from shapely.geometry import shape
 from gorynych.common.domain.model import ValueObject
 from gorynych.common.domain.services import point_dist_calculator
 
 
 class Phone(ValueObject):
-
     def __init__(self, phone):
         self._number = self._validate(phone)
 
@@ -49,8 +51,7 @@ class Name(ValueObject):
             raise ValueError("Surname must be set.")
 
     def short(self):
-        return '. '.join((self._name.capitalize()[0],
-            self._surname.capitalize()))
+        return '. '.join((self._name.capitalize()[0], self._surname.capitalize()))
 
     def full(self):
         return ' '.join((self._name, self._surname))
@@ -65,7 +66,6 @@ class Name(ValueObject):
 
 
 class Country(ValueObject):
-
     def __init__(self, code=None):
         if code:
             self._code = code[:2].upper()
@@ -77,7 +77,6 @@ class Country(ValueObject):
 
 
 class Address(ValueObject):
-
     def __init__(self, place, country, coordinates):
         self._place = place.strip().capitalize()
         if not isinstance(country, Country):
@@ -108,8 +107,9 @@ class Checkpoint(ValueObject):
     Checkpoint object is a GeoJSON Feature. It exposes python geo interface as
     described here: L{https://gist.github.com/sgillies/2217756}
     '''
-    def __init__(self, name, geometry, ch_type=None, times=None,
-            radius=None, checked_on='enter'):
+
+    def __init__(self, name, geometry, ch_type=None, times=None, radius=None,
+            checked_on='enter'):
         if ch_type:
             self.type = ch_type.strip().lower()
         else:
@@ -129,8 +129,8 @@ class Checkpoint(ValueObject):
         else:
             self.open_time, self.close_time = None, None
         if self.open_time and self.close_time:
-            assert int(self.close_time) > int(self.open_time), \
-                "Checkpoint close_time must be after open_time."
+            assert int(self.close_time) > int(
+                self.open_time), "Checkpoint close_time must be after open_time."
         if not checked_on == 'enter':
             checked_on = 'exit'
         self.checked_on = checked_on
@@ -204,6 +204,7 @@ class Checkpoint(ValueObject):
     def __str__(self):
         return bytes(json.dumps(self.__geo_interface__))
 
+
 def checkpoint_from_geojson(geodict):
     '''
     Create L{Checkpoint} instance from geojson-like dictionary.
@@ -223,8 +224,9 @@ def checkpoint_from_geojson(geodict):
     radius = geodict['properties'].get('radius')
     geometry = geodict['geometry']
     checked_on = geodict['properties'].get('checked_on', 'enter')
-    return Checkpoint(name, geometry, ch_type,
-                      (open_time, close_time), radius, checked_on)
+    return Checkpoint(name, geometry, ch_type, (open_time, close_time), radius,
+        checked_on)
+
 
 def checkpoint_collection_from_geojson(data):
     if not isinstance(data, dict):
@@ -235,13 +237,13 @@ def checkpoint_collection_from_geojson(data):
         result.append(checkpoint_from_geojson(ch))
     return result
 
+
 def geojson_feature_collection(ch_list):
     assert isinstance(ch_list, list), "I'm waiting for list of Checkpoint."
     result = []
     for i, item in enumerate(ch_list):
         result.append(item.__geo_interface__)
-    return json.dumps(dict(type='FeatureCollection',
-                           features=result))
+    return json.dumps(dict(type='FeatureCollection', features=result))
 
 
 class EntitiesCollection(dict):
@@ -266,7 +268,22 @@ class EntitiesCollection(dict):
                 if ignore_absent:
                     continue
                 else:
-                    raise AttributeError("Item %s don't has property %s" %
-                                         (key, property_name))
+                    raise AttributeError(
+                        "Item %s don't has property %s" % (key, property_name))
         return result
 
+
+@contextmanager
+def TransactionalDict(dic):
+    '''
+    Context manager which return dictionary in previous state if exception
+    occurs. For usage see tests.
+    @param dic: dictionary to change
+    @type dic: C{dict}
+    '''
+    backup = deepcopy(dic)
+    try:
+        yield dic
+    except Exception:
+        dic.clear()
+        dic.update(backup)

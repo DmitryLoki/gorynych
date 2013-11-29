@@ -10,7 +10,7 @@ from twisted.python import log
 from gorynych.info.domain import contest, person, race, tracker, transport, interfaces
 from gorynych.common.infrastructure import persistence
 from gorynych.common.domain.events import ContestRaceCreated
-from gorynych.common.domain.service import SinglePollerService
+from gorynych.common.domain.services import SinglePollerService
 from gorynych.common.application import DBPoolService
 
 

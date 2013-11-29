@@ -1,13 +1,14 @@
 from twisted.trial.unittest import TestCase
 
-from gorynych.receiver.receiver import ReceiverRabbitService
-from gorynych.common.infrastructure.messaging import FakeRabbitMQService
+from gorynych.receiver.receiver import ReceiverRabbitQueue
+from gorynych.common.infrastructure.messaging import FakeRabbitMQObject
 
 
-class TestReceiverRabbitService(TestCase):
+class TestReceiverRabbitQueue(TestCase):
 
     def setUp(self):
-        self.sender = FakeRabbitMQService(ReceiverRabbitService)
+        self.sender = FakeRabbitMQObject(ReceiverRabbitQueue)
+        self.sender.open('some_queue')
 
     def test_message_transfer(self):
         message = "Hi! I'm a message!"

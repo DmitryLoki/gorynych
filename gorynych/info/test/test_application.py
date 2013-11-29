@@ -13,7 +13,7 @@ from twisted.internet import defer
 from gorynych.info.domain.test.helpers import create_checkpoints
 from gorynych.info.application import ApplicationService
 from gorynych.common.domain.types import Checkpoint
-from gorynych.common.infrastructure.messaging import FakeRabbitMQService
+from gorynych.common.infrastructure.messaging import FakeRabbitMQObject, RabbitMQObject
 from gorynych.info.application import LastPointApplication
 
 
@@ -356,9 +356,10 @@ class ContestParagliderRaceTest(unittest.TestCase):
         race2 = self.repository.get_by_id(races[1].id)
 
 
-class TestLastPointApplicationRabbitMQService(unittest.TestCase):
+class TestLastPointApplicationPoller(unittest.TestCase):
     def setUp(self):
-        self.sender = FakeRabbitMQService(LastPointApplication)
+        self.sender = FakeRabbitMQObject(RabbitMQObject)
+        self.sender.open('some_queue')
 
     def test_message_transfer(self):
         message = "Hi! I'm a message!"

@@ -179,9 +179,9 @@ class RabbitMQObject(Service):
         d.addErrback(log.err)
 
 
-class FakeRabbitMQService(object):
+class FakeRabbitMQObject(object):
     """
-    This is a special class to test classes derived from RabbitMQService.
+    This is a special class to test classes derived from RabbitMQObject.
     Put your derived class as an argument to the constructor and you'll get the
     patched version of it so you can send and read messages without touching
     any actual RabbitMQ mechanics.
@@ -199,9 +199,17 @@ class FakeRabbitMQService(object):
         def mock_read(target, queue_name):
             return target.storage
 
+        def mock_connect(target):
+            pass
+
+        def mock_open(target, queue_name):
+            pass
+
         with mock.patch.object(derived_class, '__init__') as patched:
             patched.return_value = None
-            instance = derived_class()
+            instance = RabbitMQObject()
             instance.write = types.MethodType(mock_write, instance)
             instance.read = types.MethodType(mock_read, instance)
+            instance.connect = types.MethodType(mock_connect, instance)
+            instance.open = types.MethodType(mock_open, instance)
             return instance

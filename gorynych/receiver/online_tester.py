@@ -19,7 +19,7 @@ import simplejson as json
 sys.path.append('..')
 
 
-from gorynych.receiver.receiver import ReceiverRabbitService, ReceiverService, DumbAuditLog
+from gorynych.receiver.receiver import ReceiverRabbitQueue, ReceiverService, DumbAuditLog
 from gorynych.receiver.protocols import UDPReceivingProtocol
 
 HOST, PORT = 'localhost', 9998
@@ -230,7 +230,7 @@ application = service.Application('hui')
 sc = service.IServiceCollection(application)
 
 audit_log = DumbAuditLog()
-sender = ReceiverRabbitService(host='localhost', port=5672, exchange='receiver')
+sender = ReceiverRabbitQueue(host='localhost', port=5672, exchange='receiver')
 receiver_service = ReceiverService(sender, audit_log)
 
 sender.setServiceParent(sc)

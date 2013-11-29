@@ -12,7 +12,6 @@ from gorynych.common.infrastructure import persistence as pe
 from gorynych.processor.domain import TrackArchive, track
 from gorynych.common.application import EventPollingService
 from gorynych.common.domain.services import APIAccessor, SinglePollerService
-from gorynych.common.infrastructure.messaging import RabbitMQObject
 
 API = APIAccessor()
 
@@ -211,9 +210,8 @@ class OnlineTrashService(SinglePollerService):
     receive messages with track data from rabbitmq queue.
     '''
 
-    def __init__(self, pool, repo, **kw):
+    def __init__(self, pool, repo, connection, **kw):
         poll_interval = kw.get('interval', 0.0)
-        connection = RabbitMQObject(**kw)
         SinglePollerService.__init__(self, connection, poll_interval, queue_name='rdp')
         self.pool = pool
         self.did_aid = {}
@@ -228,6 +226,7 @@ class OnlineTrashService(SinglePollerService):
 
     def handle_payload(self, queue_name, channel, method_frame, header_frame, body):
         data = cPickle.loads(body)
+        print data
         if not data.has_key('ts'):
             # ts key MUST be in a data.
             return

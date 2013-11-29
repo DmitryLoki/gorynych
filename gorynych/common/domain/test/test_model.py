@@ -166,5 +166,75 @@ class AggregateRootTest(unittest.TestCase):
         ar = model.AggregateRoot()
         ar.apply(None)
 
+
+class Test(model.ValueObject):
+    three = 3
+
+    def __init__(self, one, two):
+        self._one = one
+        self.two = two
+
+    @property
+    def one(self):
+        return self._one
+
+    def four(self):
+        return 4
+
+    @staticmethod
+    def five():
+        return 5
+
+    @classmethod
+    def create(cls):
+        return Test(1, 2)
+
+
+class TestValueObjectReadOnly(unittest.TestCase):
+    def setUp(self):
+        self.t = Test(1, 2)
+
+    def tearDown(self):
+        del self.t
+
+    def test_get_private(self):
+        self.assertEqual(self.t._one, 1)
+
+    def test_get_class_variable(self):
+        self.assertEqual(self.t.three, 3)
+
+    def test_get_property(self):
+        self.assertEqual(self.t.one, 1)
+
+    def test_get_attribute(self):
+        self.assertEqual(self.t.two, 2)
+
+    def test_set_property(self):
+        self.assertRaises(AttributeError, setattr, self.t, 'one', 'new')
+
+    def test_get_method(self):
+        self.assertEqual(self.t.four(), 4)
+
+    def test_set_class_variable(self):
+        self.assertRaises(AttributeError, setattr, self.t, 'three', 'new')
+
+    def test_set_private(self):
+        self.t._one = 'new'
+        self.assertEqual(self.t._one, 'new')
+
+    def test_set_attribute(self):
+        self.assertRaises(AttributeError, setattr, self.t, 'two', 'new')
+
+    def test_replace_method(self):
+        self.t.four = 'new'
+        self.assertEqual(self.t.four, 'new')
+
+    def test_call_staticmethod(self):
+        self.assertEqual(self.t.five(), 5)
+
+    def test_call_classmethod(self):
+        self.assertIsInstance(Test.create(), Test)
+
+
 if __name__ == '__main__':
     unittest.main()

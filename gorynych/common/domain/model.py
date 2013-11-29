@@ -18,7 +18,17 @@ class ValueObject(object):
     '''
     Base class for value objects.
     '''
-    pass
+    def __setattr__(self, name, value):
+        '''
+        Make all properties and attributes which doesn't starts with _
+        read-only.
+        '''
+        name_is_readonly = not ( name.startswith('_') or
+                                 callable(self.__class__.__dict__.get(name)))
+        name_was_set = name in self.__dict__ or name in self.__class__.__dict__
+        if name_is_readonly and name_was_set:
+            raise AttributeError("ValueObjects  properties are readonly.")
+        object.__setattr__(self, name, value)
 
 
 class DomainIdentifier(object):

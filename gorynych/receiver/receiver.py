@@ -12,7 +12,7 @@ from twisted.internet import defer
 from twisted.application.service import Service
 from twisted.python import log
 
-from gorynych.common.infrastructure.messaging import RabbitMQService
+from gorynych.common.infrastructure.messaging import RabbitMQObject
 
 
 ###################### Different receivers ################################
@@ -50,7 +50,7 @@ class CheckReceiver:
         data['h_speed'])
 
 
-class ReceiverRabbitService(RabbitMQService):
+class ReceiverRabbitQueue(RabbitMQObject):
     def serialize(self, data):
         return cPickle.dumps(data, protocol=2)
 
@@ -58,6 +58,7 @@ class ReceiverRabbitService(RabbitMQService):
 class ReceiverService(Service):
     def __init__(self, sender, audit_log, parser):
         self.sender = sender
+        self.sender.connect()
         self.audit_log = audit_log
         self.parser = parser
 
@@ -79,7 +80,7 @@ class ReceiverService(Service):
             errbackKeywords={'data': msg, 'time': receiving_time,
                 'proto': kw.get('proto', 'Unknown'),
                 'device': kw.get('device_type', 'Unknown')})
-        if not self.sender.running:
+        if not self.sender.ready:
             log.msg("Received but not sent: %s" % msg)
         d.addErrback(self._handle_error)
         d.addErrback(log.err)
@@ -103,7 +104,6 @@ class ReceiverService(Service):
         Backwards compatible method: checks message, parses it, assumes
         that result is a point and stores it.
         """
-        dev_type = kw.get('device_type', 'tr203')
         result = self.check_message(msg, **kw)
         result.addCallback(self.parser.parse)
         result.addCallback(self.store_point)

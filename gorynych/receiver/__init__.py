@@ -35,7 +35,7 @@ def makeService(config):
     '''
     from gorynych.receiver.factories import ReceivingFactory
     from gorynych.receiver import protocols, parsers
-    from gorynych.receiver.receiver import ReceiverRabbitService, ReceiverService, AuditFileLog
+    from gorynych.receiver.receiver import ReceiverRabbitQueue, ReceiverService, AuditFileLog
 
     # Set up application.
     application = service.Application("ReceiverServer")
@@ -43,7 +43,7 @@ def makeService(config):
 
     # Prepare receiver.
     audit_log = AuditFileLog('audit_log')
-    sender = ReceiverRabbitService(host='localhost', port=5672,
+    sender = ReceiverRabbitQueue(host='localhost', port=5672,
         exchange='receiver', exchange_type='fanout')
     parser = getattr(parsers, config['tracker'])()
     sender.setName('RabbitMQReceiverService')

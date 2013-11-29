@@ -8,11 +8,10 @@ from twisted.internet import protocol, reactor, defer
 from twisted.python import log
 
 
-class RabbitMQService(Service):
+class RabbitMQObject(Service):
     '''
-    This is base service for consuming data from RabbitMQ.
-    All other services with the same goals need to be inherited from this one.
-    Every service is working with only one exchange.
+    This is base object for consuming data from RabbitMQ.
+    It can connect to exchange, write and read data from it.
     '''
 
     exchange = 'default'
@@ -20,7 +19,7 @@ class RabbitMQService(Service):
     durable_exchange = False
     exchange_auto_delete = False
 
-    queue = 'default' # not sure about this
+    queue = 'default'  # not sure about this
     queues_durable = False
     queue_auto_delete = False
     queues_exclusive = False
@@ -30,6 +29,7 @@ class RabbitMQService(Service):
     #        pars = parse_parameters(**kw) # TODO: parameters parsing
         # XXX: workaround
         self.pars = kw
+        self.queue = self.pars.get('queue', self.queue)
         self.exchange = self.pars.get('exchange',
             self.exchange)
         self.durable_exchange = self.pars.get('durable_exchange',
@@ -47,29 +47,15 @@ class RabbitMQService(Service):
         self.queues_no_ack = self.pars.get('queues_no_ack',
             self.queues_no_ack)
         self.opened_queues = {}
+        self.ready = False
 
-    def startService(self):
-        cc = protocol.ClientCreator(reactor, TwistedProtocolConnection,
-            ConnectionParameters())
-        d = cc.connectTCP(self.pars['host'], self.pars['port'])
-        d.addCallback(lambda protocol: protocol.ready)
-        d.addCallback(self.__on_connected)
-        d.addCallback(lambda _: Service.startService(self))
-        d.addCallback(lambda _:log.msg("Service started on exchange %s type %s."
-                                       % (self.exchange, self.exchange_type)))
-        d.addCallback(lambda _:self.when_started)
-        return d
-
-    def when_started(self):
-        '''
-        This method will be executed after service start.
-        '''
-        pass
-
-    def stopService(self):
-        for queue in self.opened_queues.keys():
-            self.channel.queue_delete(queue=queue)
-        Service.stopService(self)
+    def connect(self):
+        if not self.ready:
+            cc = protocol.ClientCreator(reactor, TwistedProtocolConnection,
+                                        ConnectionParameters())
+            d = cc.connectTCP(self.pars['host'], self.pars['port'])
+            d.addCallback(lambda protocol: protocol.ready)
+            d.addCallback(self.__on_connected)
 
     def __on_connected(self, connection):
         log.msg('RabbitmqSender: connected.')
@@ -80,6 +66,7 @@ class RabbitMQService(Service):
     def __got_channel(self, channel):
         log.msg('RabbitmqSender: got the channel.')
         self.channel = channel
+        self.ready = True
 
     def create_exchange(self, _):
         return self.channel.exchange_declare(
@@ -171,23 +158,8 @@ class RabbitMQService(Service):
             return queue_name
 
     def read(self, queue_name):
-        '''Read opened queue.'''
-        #        log.msg(self.opened_queues[queue_name])
-        d = self.opened_queues[queue_name].get()
-        return d.addCallback(lambda  ret: self.handle_payload(queue_name,
-            *ret))
-
-    def handle_payload(self, queue_name, channel, method_frame, header_frame,
-            body):
-        '''Override this method for doing something usefull.'''
-        log.msg("Message received from queue %s: %s" % (queue_name,body))
-        #        log.msg('Also received: %s %s %s' % (channel, method_frame,
-        #                                             header_frame))
-        #        Also received:
-        #        <pika.channel.Channel object at 0x101aa4f10>
-        #        <Basic.Deliver(['consumer_tag=ctag1.0', 'redelivered=False', 'routing_key=', 'delivery_tag=4', 'exchange=default'])>
-        #        <BasicProperties([])>
-        return body
+        '''Read opened queue. Returns Deferred'''
+        return self.opened_queues[queue_name].get()
 
     def write(self, data, key='', exchange=''):
         if data:

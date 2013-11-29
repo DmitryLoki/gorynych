@@ -12,7 +12,6 @@ from gorynych.common.infrastructure import persistence
 from gorynych.common.domain.events import ContestRaceCreated
 from gorynych.common.domain.service import SinglePollerService
 from gorynych.common.application import DBPoolService
-from gorynych.common.infrastructure.messaging import RabbitMQObject
 
 
 class BaseApplicationService(DBPoolService):
@@ -332,9 +331,8 @@ class ApplicationService(BaseApplicationService):
 
 
 class LastPointApplication(SinglePollerService):
-    def __init__(self, pool, **kw):
+    def __init__(self, pool, connection, **kw):
         poll_interval = kw.get('interval', 0.0)
-        connection = RabbitMQObject(**kw)
         SinglePollerService.__init__(self, connection, poll_interval, queue_name='last_point')
         self.pool = pool
         # imei:ts

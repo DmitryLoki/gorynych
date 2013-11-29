@@ -28,6 +28,7 @@ def makeService(config, services=None):
     # import persistence staff
     from gorynych.info.domain import interfaces
     from gorynych.common.infrastructure import persistence
+    from gorynych.common.infrastructure.messaging import RabbitMQObject
     from gorynych.eventstore.eventstore import EventStore
     from gorynych.eventstore.store import PGSQLAppendOnlyStore
     from gorynych.info.infrastructure.persistence import PGSQLContestRepository, PGSQLPersonRepository, PGSQLRaceRepository, PGSQLTrackerRepository, PGSQLTransportRepository
@@ -52,8 +53,10 @@ def makeService(config, services=None):
     app_service.setServiceParent(services)
 
     # LastPoint application service init.
-    last_point = LastPointApplication(pool, host='localhost', port=5672,
-        exchange='receiver', queues_no_ack=True, exchange_type='fanout')
+    rabbit_connection = RabbitMQObject(host='localhost', port=5672,
+                                       exchange='receiver', queues_no_ack=True,
+                                       exchange_type='fanout')
+    last_point = LastPointApplication(pool, rabbit_connection)
     last_point.setServiceParent(services)
 
     # Repositories init.

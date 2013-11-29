@@ -10,8 +10,9 @@ from twisted.python import log
 from gorynych.info.domain import contest, person, race, tracker, transport, interfaces
 from gorynych.common.infrastructure import persistence
 from gorynych.common.domain.events import ContestRaceCreated
+from gorynych.common.domain.service import SinglePollerService
 from gorynych.common.application import DBPoolService
-from gorynych.common.infrastructure.messaging import RabbitMQService
+from gorynych.common.infrastructure.messaging import RabbitMQObject
 
 
 class BaseApplicationService(DBPoolService):
@@ -205,7 +206,7 @@ class ApplicationService(BaseApplicationService):
         transport_list = yield self.pool.runQuery(
             persistence.select('transport_for_contest', 'transport'),
                               (str(cont.id),))
-        
+
         new_race = race.create_race_for_contest(cont,
                                            person_list,
                                            transport_list,
@@ -216,7 +217,7 @@ class ApplicationService(BaseApplicationService):
             cont.id, new_race.id)))
         yield d
         defer.returnValue(new_race)
-        
+
     def get_contest_races(self, params):
         '''
         Return list of races for contest.
@@ -330,20 +331,14 @@ class ApplicationService(BaseApplicationService):
             transport.change_transport)
 
 
-class LastPointApplication(RabbitMQService):
+class LastPointApplication(SinglePollerService):
     def __init__(self, pool, **kw):
-        RabbitMQService.__init__(self, **kw)
+        poll_interval = kw.get('interval', 0.0)
+        connection = RabbitMQObject(**kw)
+        SinglePollerService.__init__(self, connection, poll_interval, queue_name='last_point')
         self.pool = pool
         # imei:ts
         self.points = dict()
-
-    def when_started(self):
-        d = defer.Deferred()
-        d.addCallback(self.open)
-        d.addCallback(lambda x: task.LoopingCall(self.read, x))
-        d.addCallback(lambda lc: lc.start(0.00))
-        d.callback('last_point')
-        return d
 
     def handle_payload(self, queue_name, channel, method_frame, header_frame,
             body):

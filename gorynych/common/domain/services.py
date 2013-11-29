@@ -7,6 +7,8 @@ import requests
 import simplejson as json
 from twisted.python import log
 from twisted.web.client import getPage
+from twisted.internet import defer, task
+from twisted.application.service import Service
 
 from gorynych import __version__, OPTS
 from gorynych.common.exceptions import BadCheckpoint
@@ -33,7 +35,7 @@ class AsynchronousAPIAccessor(object):
     def _return_page(self, url):
         d = getPage(url)
         d.addCallback(json.loads)
-        d.addErrback(lambda _:None)
+        d.addErrback(lambda _: None)
         return d
 
     def get_contest_races(self, contest_id):
@@ -76,6 +78,59 @@ class APIAccessor(object):
                     (r.text, e))
             raise e
         return result
+
+
+class SinglePollerService(Service):
+    """
+    This is a service which gets a pollable object and asks its method read()
+    every time specified. Results are handled in handle_payload method.
+    """
+    def __init__(self, connection, polling_interval, **read_args):
+        # ensure it by interface?
+        self.connection = connection
+        self.polling_interval = polling_interval
+        self.read_args = read_args
+
+    def _start_state_polling(self):
+        self.state_poller = task.LoopingCall(self.poll_state)
+        return self.state_poller
+
+    def _start_polling(self):
+        self.poller = task.LoopingCall(self.poll, **self.read_args)
+        return self.poller
+
+    def startService(self):
+        d = defer.Deferred()
+        d.addCallback(lambda _: Service.startService(self))
+        d.addCallback(lambda _: log.msg("Poller is started"))
+        d.addCallback(lambda _: self.connection.connect())
+        d.addCallback(lambda _: self._start_state_polling())
+        d.addCallback(lambda lc: lc.start(0.5))
+        d.callback('run!')
+        return d
+
+    def poll_state(self):
+        if self.connection.ready:
+            self.state_poller.stop()
+            d = defer.Deferred()
+            d.addCallback(lambda _: self.connection.open(**self.read_args))
+            d.addCallback(lambda _: self._start_polling())
+            d.addCallback(lambda lc: lc.start(self.polling_interval))
+            d.callback('callback!')
+
+    def poll(self, **kwargs):
+        d = self.connection.read(**kwargs)
+        return d.addCallback(lambda data: self.handle_payload(kwargs.values(), *data))
+
+    def handle_payload(data):
+        """
+        Override this method
+        """
+        pass
+
+    def stopService(self):
+        self.poller.stop()
+        Service.stopService(self)
 
 
 def point_dist_calculator(start_lat, start_lon, end_lat, end_lon):

@@ -61,13 +61,15 @@ class ChunkReader(object):
             if point.HasField(BasePointProto.ALT):
                 self.base_alt = alt = getattr(point, BasePointProto.ALT)
 
+            point_time_delta = timedelta
+
             if len(point.packed) > 1:
                 mask = point.packed[0]
                 i = 1
                 for field in xrange(point.PACKED_FIELDS_NUMBER):
                     if mask & (1 << field):
                         if field == getattr(point, PointProto.TS):
-                            timedelta = point.packed[i]
+                            point_time_delta = point.packed[i]
                         elif field == getattr(point, PointProto.LAT):
                             lat = self.base_lat + \
                                 point.packed[i] / angle_divisor
@@ -83,7 +85,7 @@ class ChunkReader(object):
                         elif field == getattr(point, PointProto.V_SPEED):
                             v_speed = round(point.packed[i] / 10., 1)
                         i += 1
-                ts += timedelta
+                ts += point_time_delta
 
             yield self._format(lat, lon, ts, alt, h_speed, v_speed)
 

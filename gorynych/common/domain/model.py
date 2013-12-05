@@ -4,7 +4,6 @@ DDD-model specific base classes.
 import time
 import uuid
 
-
 from zope.interface import implementer
 from zope.interface.verify import verifyObject
 
@@ -13,7 +12,6 @@ from gorynych.eventstore.interfaces import IEvent
 __author__ = 'Boris Tsema'
 
 
-# TODO: implement comparison by properties
 class ValueObject(object):
     '''
     Base class for value objects.
@@ -29,6 +27,42 @@ class ValueObject(object):
         if name_is_readonly and name_was_set:
             raise AttributeError("ValueObjects  properties are readonly.")
         object.__setattr__(self, name, value)
+
+    def __eq__(self, other):
+        one = self.__get_values_for_comparison(self)
+        two = self.__get_values_for_comparison(other)
+        if min(len(one), len(two)) > 0:
+            return one == two
+
+    def __ne__(self, other):
+        one = self.__get_values_for_comparison(self)
+        two = self.__get_values_for_comparison(other)
+        return not one == two
+
+    def __get_values_for_comparison(self, obj):
+        '''
+        Return dict of object's attributes with their values.
+        Properties, methods and started with '__' attributes will not
+        returned.
+        @return: dict with name as a key.
+        @rtype: C{dict}
+        '''
+        result = dict()
+        for attr in dir(obj):
+            value = getattr(obj.__class__, attr, None)
+            # Skip class methods and properties.
+            if callable(value) or isinstance(value, property): continue
+            # Skip all magic.
+            if attr.startswith('__'): continue
+            value = getattr(obj, attr, None)
+            # Skip object methods.
+            if callable(value): continue
+            # Resulted are class/objects attributes.
+            result[attr] = value
+        return result
+
+    # Hash should be implemented in subclass.
+    __hash__ = None
 
 
 class DomainIdentifier(object):

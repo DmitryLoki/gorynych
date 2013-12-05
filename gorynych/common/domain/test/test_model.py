@@ -236,5 +236,71 @@ class TestValueObjectReadOnly(unittest.TestCase):
         self.assertIsInstance(Test.create(), Test)
 
 
+class Test2(model.ValueObject):
+    def __init__(self, two, one):
+        self._one = one
+        self.two = two
+    @property
+    def one(self):
+        return self._one
+
+
+class Test3(model.ValueObject):
+    a = Test(1, 2)
+    def __init__(self, one, two):
+        self.one = one
+        self.two = Test(1, two)
+
+
+class SlottedTest(Test):
+    __slots__ = ['one', 'three']
+
+
+class TestValueObjectEquality(unittest.TestCase):
+    def test_same_class(self):
+        self.assertEqual(Test(1, range(2)), Test(1, range(2)))
+
+    def test_different_class(self):
+        t2 = Test2(2, 1)
+        t2.three = 3
+        t1 = Test(1, 2)
+        self.assertEqual(t1, t2)
+
+    def test_with_value_objects(self):
+        self.assertEqual(Test3(1, 'two'), Test3(1, 'two'))
+
+    def test_slotted(self):
+        self.assertEqual(SlottedTest(1, 2), SlottedTest(1, 2))
+
+
+class TestValueObjectNonEquality(unittest.TestCase):
+    def test_different_class(self):
+        self.assertNotEqual(Test(1, 2), Test2(1, 2))
+
+    def test_same_class_modified_attributes(self):
+        t = Test(range(5), 2)
+        t._one[1] = 10
+        self.assertNotEqual(t, Test(range(5), 2))
+
+    def test_same_class(self):
+        self.assertNotEqual(Test(1, 2), Test(2, 1))
+
+    def test_same_class_modified(self):
+        t = Test(1, 2)
+        del t._one
+        self.assertNotEqual(Test(1, 2), t)
+
+    def test_with_value_objects(self):
+        self.assertNotEqual(Test3(2, 'two'), Test3(1, 'to'))
+
+    def test_slotted(self):
+        self.assertNotEqual(SlottedTest(2, 2), SlottedTest(1, 2))
+
+
+class TestValueObjectHashability(unittest.TestCase):
+    def test_unhashable(self):
+        self.assertRaises(TypeError, hash, Test(1, 2))
+
+
 if __name__ == '__main__':
     unittest.main()

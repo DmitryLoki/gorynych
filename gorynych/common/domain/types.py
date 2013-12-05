@@ -32,9 +32,6 @@ class Phone(ValueObject):
     def number(self):
         return self._number
 
-    def __eq__(self, other):
-        return self._number == other._number
-
 
 class Name(ValueObject):
     '''
@@ -80,9 +77,6 @@ class Country(ValueObject):
 
     def code(self):
         return self._code
-
-    def __eq__(self, other):
-        return self._code == other._code
 
 
 class Address(ValueObject):

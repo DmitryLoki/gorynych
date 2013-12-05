@@ -194,9 +194,9 @@ class A(object):
             self.prop2 = prop2
 
 
-class EntitiesCollectionTest(unittest.TestCase):
+class MappingCollectionTest(unittest.TestCase):
     def setUp(self):
-        ec = types.EntitiesCollection()
+        ec = types.MappingCollection()
         ec['1'] = A('1', '2')
         ec['2'] = A('1', '3')
         ec['3'] = A('2', '4')
@@ -204,18 +204,18 @@ class EntitiesCollectionTest(unittest.TestCase):
         self.e = ec
 
     def test_lookup_existed(self):
-        res = self.e.get_properties_values('prop1')
+        res = self.e.get_attribute_values('prop1')
         self.assertIsInstance(res, list)
         self.assertEqual(len(res), 4)
 
     def test_lookup_nonexistent_with_ignore(self):
-        res = self.e.get_properties_values('prop2')
+        res = self.e.get_attribute_values('prop2')
         self.assertIsInstance(res, list)
         self.assertEqual(len(res), 3)
 
     def test_lookup_nonexistent(self):
-        self.assertRaises(AttributeError, self.e.get_properties_values,
-            'prop2', ignore_absent=False)
+        self.assertRaises(AttributeError, self.e.get_attribute_values,
+            'prop2', ignore_errors=False)
 
 
 class B(object):

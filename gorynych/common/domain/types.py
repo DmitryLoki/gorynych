@@ -246,37 +246,46 @@ def geojson_feature_collection(ch_list):
     return json.dumps(dict(type='FeatureCollection', features=result))
 
 
-class EntitiesCollection(dict):
-    def get_properties_values(self, property_name, ignore_absent=True):
+class MappingCollection(dict):
+    '''
+    Mapping objects collection in which items can be looked up by their key.
+    Support additional methods for convenient items retrieval.
+    '''
+    def get_attribute_values(self, attribute_name, ignore_errors=True):
         '''
-        Return a list with values of properties with property_name for
-        collection.
-        @param property_name: name of property to search.
-        @type property_name: C{str}
-        @param ignore_absent: don't rise AttributeError if object in a
-        collections don't has property. Default is True.
-        @type ignore_absent: C{boolean}
-        @return: list of property values.
+        Return a list with values of attribute with attribute_name. If
+        attribute_name is absent in collection item AttributeError can be
+        raised if ignore_errors is False.
+        @param attribute_name: name of attribute to search.
+        @type attribute_name: C{str}
+        @param ignore_errors: don't rise AttributeError if object in a
+        collections don't has attribute. Default is True.
+        @type ignore_errors: C{boolean}
+        @raise: AttributeError if object in collection don't has attribute
+        with name attribute_name.
+        @return: list of attribute values.
         @rtype: C{list}
         '''
-        assert isinstance(property_name, str), "Property name must be string."
+        assert isinstance(attribute_name, str), "Attribute name must be " \
+                                                "string."
         result = list()
         for key, item in self.viewitems():
-            if hasattr(item, property_name) and not callable(item):
-                result.append(getattr(item, property_name))
+            if hasattr(item, attribute_name) and not callable(item):
+                result.append(getattr(item, attribute_name))
             else:
-                if ignore_absent:
+                if ignore_errors:
                     continue
                 else:
                     raise AttributeError(
-                        "Item %s don't has property %s" % (key, property_name))
+                        "Item %s don't has attribute %s" %
+                        (key, attribute_name))
         return result
 
 
 @contextmanager
 def TransactionalDict(dic):
     '''
-    Context manager which return dictionary in previous state if exception
+    Context manager which restore dictionary in previous state if exception
     occurs. For usage see tests.
     @param dic: dictionary to change
     @type dic: C{dict}

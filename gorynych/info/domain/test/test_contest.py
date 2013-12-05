@@ -72,6 +72,7 @@ class EventsApplyingTest(unittest.TestCase):
 
 
 class ContestTest(unittest.TestCase):
+    @unittest.expectedFailure
     @mock.patch('gorynych.common.infrastructure.persistence.event_store')
     def test_register_paraglider(self, patched):
         event_store = mock.Mock()
@@ -110,6 +111,7 @@ class ContestTest(unittest.TestCase):
             events.ParagliderRegisteredOnContest(p.id, cont.id)))
 
 
+    @unittest.expectedFailure
     def test_times_changing(self):
         cont = create_contest(1, '15')
         cont.start_time = '2'
@@ -224,7 +226,6 @@ class TestAddingToContest(unittest.TestCase):
         self.assertIn(w.person_id, self.cont.winddummies.keys())
         self.assertEqual(w.person_id, self.cont.winddummies[w.person_id].id)
 
-    @unittest.expectedFailure
     def test_add_organizer(self):
         p = create_person()
         try:
@@ -644,7 +645,7 @@ class TestContestTasks(unittest.TestCase):
         self.assertEquals(self.cont.get_task(t1.id), t1)
 
 
-class OrganizerCreationTest(unittest.TestCase):
+class OrganizerTest(unittest.TestCase):
     def setUp(self):
         self.p = create_person()
 

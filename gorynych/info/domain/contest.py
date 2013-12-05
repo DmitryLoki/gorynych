@@ -8,10 +8,11 @@ import pytz
 
 from gorynych.info.domain import transport
 from gorynych.common.domain.model import AggregateRoot, ValueObject, DomainIdentifier
-from gorynych.common.domain.types import Address, Country, Phone, Checkpoint
+from gorynych.common.domain.types import Address, Country, Phone, \
+    Checkpoint, MappingCollection, TransactionalDict
 from gorynych.common.domain.events import ParagliderRegisteredOnContest
 from gorynych.common.infrastructure import persistence
-from gorynych.info.domain.ids import ContestID, RaceID
+from gorynych.info.domain.ids import ContestID, RaceID, PersonID
 from gorynych.common.exceptions import DomainError
 from gorynych.common.domain.services import times_from_checkpoints
 
@@ -45,10 +46,12 @@ class Contest(AggregateRoot):
         self._timezone = ''
         self._start_time = start_time
         self._end_time = end_time
+        #TODO: store and return Address here.
         self.address = address
         self._participants = dict()
         self.retrieve_id = None
         self._tasks = dict()
+        self.organizers = MappingCollection()
 
     @property
     def timezone(self):
@@ -81,7 +84,7 @@ class Contest(AggregateRoot):
             return
         old_start_time = self.start_time
         self._start_time = int(value)
-        if not self._invariants_are_correct():
+        if not self.check_invariants():
             self._start_time = old_start_time
             raise ValueError("Incorrect start_time violate aggregate's "
                              "invariants.")
@@ -96,7 +99,7 @@ class Contest(AggregateRoot):
             return
         old_end_time = self.end_time
         self._end_time = int(value)
-        if not self._invariants_are_correct():
+        if not self.check_invariants():
             self._end_time = old_end_time
             raise DomainError("Incorrect end_time violate aggregate's "
                              "invariants.")
@@ -181,30 +184,35 @@ class Contest(AggregateRoot):
             old_end_time = self.end_time
             self._start_time = start_time
             self._end_time = end_time
-            if not self._invariants_are_correct():
+            if not self.check_invariants():
                 self._start_time = old_start_time
                 self._end_time = old_end_time
                 raise ValueError("Times values violate aggregate's "
                                  "invariants.")
 
+    #TODO: remove this.
     @property
     def country(self):
         return self.address.country
 
+    #TODO: remove this.
     @country.setter
     def country(self, value):
         self.address = Address(self.place, Country(value),
                                self.address.coordinates)
 
+    #TODO: remove this.
     @property
     def place(self):
         return self.address.place
 
+    #TODO: remove this.
     @place.setter
     def place(self, value):
         self.address = Address(value, self.address.country,
                                self.address.coordinates)
 
+    #TODO: remove this.
     @property
     def hq_coords(self):
         '''
@@ -214,6 +222,7 @@ class Contest(AggregateRoot):
         '''
         return self.address.coordinates
 
+    #TODO: remove this.
     @hq_coords.setter
     def hq_coords(self, value):
         self.address = Address(self.place, self.country, value)
@@ -246,7 +255,7 @@ class Contest(AggregateRoot):
             glider=glider,
             contest_number=int(cnum),
             phone=pers.phone)
-        if not self._invariants_are_correct():
+        if not self.check_invariants():
             self._participants = paragliders_before
             raise DomainError("Paraglider must have unique contest number.")
         persistence.event_store().persist(ParagliderRegisteredOnContest(
@@ -260,12 +269,9 @@ class Contest(AggregateRoot):
             phone=pers.phone)
         return self
 
-    def add_organizer(self, pers, description=""):
-        self._participants[pers.id] = dict(
-            role='organizer',
-            name=pers.name.full(),
-            email=pers.email,
-            description=description)
+    def add_organizer(self, org):
+        with TransactionalDict(self.organizers) as orgs:
+            orgs[org.id] = org
         return self
 
     def add_staff_member(self, staffmember):
@@ -277,11 +283,13 @@ class Contest(AggregateRoot):
             description=staffmember.description)
         return self
 
-    def _invariants_are_correct(self):
+    def check_invariants(self):
         """
         Check next invariants for contest:
         every paraglider has unique contest_number
         context start_time is less then end_time
+        not implemented:
+        tasks are not overlapping
         """
         contest_numbers = set()
         paragliders = set()
@@ -289,9 +297,14 @@ class Contest(AggregateRoot):
                 contest_numbers.add(
                     self.paragliders[key]['contest_number'])
                 paragliders.add(key)
+        # TODO: this method should rise exceptions in case of invariants
+        # violation.
         all_contest_numbers_uniq = len(paragliders) == len(contest_numbers)
 
         end_after_start = int(self.start_time) < int(self.end_time)
+
+        assert all_contest_numbers_uniq, "Contest numbers are not unique."
+        assert end_after_start, "Start time must be before end time."
         return all_contest_numbers_uniq and end_after_start
 
     def _rollback_register_paraglider(self, paraglider_before, person_id):
@@ -315,7 +328,7 @@ class Contest(AggregateRoot):
                 kwargs[key] = kwargs[key].strip().split(' ')[0].lower()
             self._participants[person_id][key] = kwargs[key]
 
-        if not self._invariants_are_correct():
+        if not self.check_invariants():
             self._participants[person_id] = old_participant
             raise ValueError("Contest invariants violated.")
 
@@ -333,10 +346,6 @@ class Contest(AggregateRoot):
     @property
     def winddummies(self):
         return self._get_participants('winddummy')
-
-    @property
-    def organizers(self):
-        return self._get_participants('organizer')
 
     @property
     def staff(self):
@@ -393,6 +402,31 @@ class StaffMember(ValueObject):
             self.phone = ""
         self.id = DomainIdentifier()
         self.description = description
+
+
+class Winddummy(ValueObject):
+    def __init__(self, person_id, phone, name):
+        self._person_id = PersonID(person_id)
+        self._phone = Phone(phone)
+        self._name = name
+
+
+class Organizer(ValueObject):
+    def __init__(self, person_id, email, name, description=None):
+        self.id = PersonID(person_id)
+        self.email = email
+        self.name = name
+        self.description = description if description else ''
+
+
+class Staff(ValueObject):
+    def __init__(self, title, type, description="", phone=None):
+        pass
+
+
+class Paraglider(ValueObject):
+    pass
+
 
 class BaseTask(ValueObject):
 

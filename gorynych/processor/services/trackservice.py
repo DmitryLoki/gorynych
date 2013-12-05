@@ -226,7 +226,6 @@ class OnlineTrashService(SinglePollerService):
 
     def handle_payload(self, queue_name, channel, method_frame, header_frame, body):
         data = cPickle.loads(body)
-        print data
         if not data.has_key('ts'):
             # ts key MUST be in a data.
             return

@@ -50,18 +50,20 @@ class RabbitMQObject(Service):
         self.ready = False
 
     def connect(self):
-        if not self.ready:
-            cc = protocol.ClientCreator(reactor, TwistedProtocolConnection,
-                                        ConnectionParameters())
-            d = cc.connectTCP(self.pars['host'], self.pars['port'])
-            d.addCallback(lambda protocol: protocol.ready)
-            d.addCallback(self.__on_connected)
+        cc = protocol.ClientCreator(reactor, TwistedProtocolConnection,
+                                    ConnectionParameters())
+        d = cc.connectTCP(self.pars['host'], self.pars['port'])
+        d.addCallback(lambda protocol: protocol.ready)
+        d.addCallback(self.__on_connected)
+        d.addCallback(lambda _: self)
+        return d
 
     def __on_connected(self, connection):
         log.msg('RabbitmqSender: connected.')
         self.defer = connection.channel()
         self.defer.addCallback(self.__got_channel)
         self.defer.addCallback(self.create_exchange)
+        return self.defer
 
     def __got_channel(self, channel):
         log.msg('RabbitmqSender: got the channel.')
@@ -69,7 +71,7 @@ class RabbitMQObject(Service):
         self.ready = True
 
     def create_exchange(self, _):
-        return self.channel.exchange_declare(
+        self.channel.exchange_declare(
             exchange=self.exchange,
             durable=self.durable_exchange,
             type=self.exchange_type,

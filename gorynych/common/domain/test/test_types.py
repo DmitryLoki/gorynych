@@ -215,6 +215,32 @@ class CountryTest(unittest.TestCase):
         self.assertEqual(m, n)
 
 
+class PhoneTest(unittest.TestCase):
+    def test_string_creation(self):
+        p = types.Phone('+713')
+        self.assertIsInstance(p, types.Phone)
+
+    def test_phone_creation(self):
+        p1 = types.Phone('+713')
+        p2 = types.Phone(p1)
+        self.assertIsInstance(p2, types.Phone)
+
+    def test_number_property(self):
+        p = types.Phone('+713')
+        self.assertEqual(p.number, '+713')
+
+    def test_incorrect_string_creation(self):
+        self.assertRaises(ValueError, types.Phone, 'hello')
+
+    def test_incorrect_type_creation(self):
+        self.assertRaises(TypeError, types.Phone, [])
+
+    def test_equality(self):
+        p1 = types.Phone('+12345667788990')
+        p2 = types.Phone('+12345667788990')
+        self.assertEqual(p1, p2)
+
+
 class A(object):
     def __init__(self, prop1, prop2=None):
         self.prop1 = prop1

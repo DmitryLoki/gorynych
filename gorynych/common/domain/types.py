@@ -32,6 +32,9 @@ class Phone(ValueObject):
     def number(self):
         return self._number
 
+    def __eq__(self, other):
+        return self._number == other._number
+
 
 class Name(ValueObject):
     '''
@@ -66,6 +69,7 @@ class Name(ValueObject):
 
 
 class Country(ValueObject):
+    # TODO: create properties for every country code type.
     def __init__(self, code=None):
         if isinstance(code, str):
             self._code = code.strip()[:2].upper()

@@ -67,13 +67,18 @@ class Name(ValueObject):
 
 class Country(ValueObject):
     def __init__(self, code=None):
-        if code:
-            self._code = code[:2].upper()
+        if isinstance(code, str):
+            self._code = code.strip()[:2].upper()
+        elif isinstance(code, Country):
+            self._code = code._code
         else:
             raise ValueError("Country can't be set without code.")
 
     def code(self):
         return self._code
+
+    def __eq__(self, other):
+        return self._code == other._code
 
 
 class Address(ValueObject):

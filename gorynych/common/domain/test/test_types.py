@@ -187,6 +187,34 @@ class CheckpointTest(unittest.TestCase):
         self.assertEqual(ch1.distance_to(ch2), check_distance)
 
 
+class CountryTest(unittest.TestCase):
+    def test_create_from_string(self):
+        n = types.Country(' ru ')
+        self.assertIsInstance(n, types.Country)
+
+    def test_code_method(self):
+        n = types.Country(' ru ')
+        self.assertEqual(n.code(), 'RU')
+
+    def test_long_name(self):
+        n = types.Country('Russia')
+        self.assertEqual(n.code(), 'RU')
+
+    def test_without_code(self):
+        self.assertRaises(ValueError, types.Country)
+
+    def test_create_from_country(self):
+        n = types.Country('ru')
+        m = types.Country(n)
+        self.assertIsInstance(m, types.Country)
+        self.assertEqual(m.code(), 'RU')
+
+    def test_equality(self):
+        n = types.Country('ru')
+        m = types.Country('ru')
+        self.assertEqual(m, n)
+
+
 class A(object):
     def __init__(self, prop1, prop2=None):
         self.prop1 = prop1

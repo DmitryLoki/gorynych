@@ -96,12 +96,13 @@ class SinglePollerService(Service):
 
     def poll(self, **kwargs):
         d = self.connection.read(**kwargs)
-        return d.addCallback(lambda data: self.handle_payload(kwargs.values(), *data))
+        return d.addCallback(lambda data: self.handle_payload(*data, **kwargs))
 
-    def handle_payload(self, data):
+    def handle_payload(self, *payload, **kwargs):
         """
         Override this method
         """
+        print payload, kwargs
         pass
 
     def startService(self):

@@ -199,10 +199,12 @@ class FakeRabbitMQObject(object):
             target.storage = data
 
         def mock_read(target, queue_name):
-            return target.storage
+            d = defer.Deferred()
+            d.addCallback(lambda _: [target.storage, 'test_param'])
+            return d
 
         def mock_connect(target):
-            pass
+            return target
 
         def mock_open(target, queue_name):
             pass
@@ -210,6 +212,7 @@ class FakeRabbitMQObject(object):
         with mock.patch.object(derived_class, '__init__') as patched:
             patched.return_value = None
             instance = RabbitMQObject()
+            instance.storage = ''
             instance.write = types.MethodType(mock_write, instance)
             instance.read = types.MethodType(mock_read, instance)
             instance.connect = types.MethodType(mock_connect, instance)

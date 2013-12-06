@@ -302,5 +302,22 @@ class TestValueObjectHashability(unittest.TestCase):
         self.assertRaises(TypeError, hash, Test(1, 2))
 
 
+class Ent(model.Entity):
+    def __init__(self, id):
+        self.id = id
+
+
+class TestEntity(unittest.TestCase):
+    def test_equality(self):
+        self.assertEqual(Ent(1), Ent(1))
+
+    def test_nonequality(self):
+        self.assertNotEqual(Ent(range(2)), Ent(range(4)))
+
+    def test_hashability(self):
+        t = Ent('a')
+        dict(t=1)
+
+
 if __name__ == '__main__':
     unittest.main()

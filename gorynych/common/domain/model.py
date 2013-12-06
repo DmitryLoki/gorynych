@@ -65,6 +65,14 @@ class ValueObject(object):
     __hash__ = None
 
 
+class Entity(object):
+    def __eq__(self, other):
+        return self.id == other.id
+
+    def __ne__(self, other):
+        return self.id != other.id
+
+
 class DomainIdentifier(object):
     '''
     Base class for aggregate IDs. By default use uuid4 as id.

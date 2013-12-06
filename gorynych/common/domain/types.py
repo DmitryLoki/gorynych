@@ -80,29 +80,28 @@ class Country(ValueObject):
 
 
 class Address(ValueObject):
-    def __init__(self, place, country, coordinates):
-        self._place = place.strip().capitalize()
-        if not isinstance(country, Country):
-            country = Country(country)
-        self._country = country
-        if isinstance(coordinates, str):
-            coordinates = coordinates.split(',')
-        self.lat = float(coordinates[0])
-        self.lon = float(coordinates[1])
-        if not (-90 < self.lat < 90 and -180 <= self.lon <= 180):
-            raise ValueError("Coordinates not in their range or format.")
-
-    @property
-    def country(self):
-        return self._country.code()
+    def __init__(self, place_or_address, country=None, coordinates=None):
+        if isinstance(place_or_address, Address):
+            self.place = place_or_address.place
+            self.country = place_or_address.country
+            self.lat, self.lon = place_or_address.lat, place_or_address.lon
+        elif isinstance(place_or_address, str):
+            self.place = place_or_address.strip().capitalize()
+            self.country = Country(country)
+            if isinstance(coordinates, str):
+                coordinates = coordinates.split(',')
+            elif coordinates is None:
+                raise ValueError("Coordinates should be presented.")
+            self.lat = float(coordinates[0])
+            self.lon = float(coordinates[1])
+            if not (-90 < self.lat < 90 and -180 <= self.lon <= 180):
+                raise ValueError("Coordinates not in their range or format.")
+        else:
+            raise TypeError("Wrong address arguments.")
 
     @property
     def coordinates(self):
         return self.lat, self.lon
-
-    @property
-    def place(self):
-        return self._place
 
 
 class Checkpoint(ValueObject):

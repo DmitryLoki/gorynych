@@ -5,9 +5,9 @@ import mock
 
 from gorynych.common.domain import events
 from gorynych.info.domain.test.helpers import create_contest, create_person, create_checkpoints
-from gorynych.info.domain import contest, race
-from gorynych.common.domain.types import Address, Name, Country
-from gorynych.info.domain.ids import PersonID, RaceID, TrackerID
+from gorynych.info.domain import contest
+from gorynych.common.domain.types import Address, Name, Country, Phone
+from gorynych.info.domain.ids import PersonID, RaceID
 from gorynych.common.exceptions import DomainError
 
 
@@ -33,9 +33,10 @@ class ContestFactoryTest(unittest.TestCase):
         cont = create_contest(1, 2)
         self.assertIsInstance(cont.address, Address)
         self.assertEqual(cont.title, 'Hello world')
-        self.assertEqual(cont.country, 'RU')
+        self.assertEqual(cont.address,
+                        Address('Yrupinsk', 'RU', '45.23,-23.22'))
         self.assertEqual(cont.timezone, 'Europe/Moscow')
-        self.assertEqual(cont.place, 'Yrupinsk')
+        #self.assertEqual(cont.place, 'Yrupinsk')
         self.assertEquals((cont.start_time, cont.end_time), (1, 2))
         self.assertIsInstance(cont.id, contest.ContestID)
         self.assertIsNone(cont._id)
@@ -133,12 +134,8 @@ class ContestTest(unittest.TestCase):
 
     def test_change_address(self):
         cont = create_contest(1, '15')
-        cont.place = 'Severodvinsk'
-        self.assertEqual(cont.place, 'Severodvinsk')
-        cont.country = 'tw'
-        self.assertEqual(cont.country, 'TW')
-        cont.hq_coords = (15, 0)
-        self.assertEqual(cont.hq_coords, (15, 0))
+        cont.address = Address('Severodvinsk', 'tw', (15, 0))
+        self.assertEqual(cont.address, Address('Severodvinsk', 'tw', (15, 0)))
 
 
 class ContestTestWithRegisteredParagliders(unittest.TestCase):
@@ -189,18 +186,6 @@ class ContestTestWithRegisteredParagliders(unittest.TestCase):
     def test_violate_invariants(self):
         self.assertRaises(ValueError, self.cont.change_participant_data,
             'person1', contest_number='757')
-
-
-class ParagliderTest(unittest.TestCase):
-    def test_success_creation(self):
-        p_id = PersonID()
-        t_id = TrackerID(TrackerID.device_types[0], '123456789012345')
-        p = race.Paraglider(p_id, Name('Vasya', 'Pupkin'),
-                            Country('RU'), 'Mantra 9', 15, t_id)
-        self.assertEqual(p.person_id, p_id)
-        self.assertEqual(p.glider, 'mantra')
-        self.assertEqual(p.contest_number, 15)
-        self.assertEqual(p.tracker_id, t_id)
 
 
 class TestAddingToContest(unittest.TestCase):
@@ -670,4 +655,52 @@ class OrganizerTest(unittest.TestCase):
         o = contest.Organizer(str(self.p.id), 'john@example.com', self.p.name)
         self.assertIsInstance(o.id, PersonID)
         self.assertEqual(o.id, self.p.id)
+
+    def test_equality(self):
+        o1 = contest.Organizer(self.p.id, 'john@example.com', self.p.name,
+            'big boy')
+        o2 = contest.Organizer(self.p.id, 'john@example.com', self.p.name,
+            'big boy')
+        self.assertEqual(o1, o2)
+
+    def test_nonequality(self):
+        o1 = contest.Organizer(self.p.id, 'john@example.com', self.p.name,
+            'big boy')
+        o2 = contest.Organizer(self.p.id, 'john@example.com', Name('Ya', "a"),
+            'big boy')
+        self.assertNotEqual(o1, o2)
+
+
+class ParagliderTest(unittest.TestCase):
+    def setUp(self):
+        self.p = create_person()
+
+    def test_creation_with_phone(self):
+        p = contest.Paraglider(self.p.id, '0', ' aXis The 2', self.p.country,
+            self.p.name, phone='+713')
+        self.assertIsInstance(p, contest.Paraglider)
+        self.assertIsInstance(p.name, Name)
+        self.assertIsInstance(p.id, PersonID)
+        self.assertEqual(p.id, self.p.id)
+        self.assertEqual(p.name, self.p.name)
+        self.assertEqual(p.contest_number, 0)
+        self.assertEqual(p.glider, 'axis')
+        self.assertIsInstance(p.country, Country)
+        self.assertEqual(p.country, Country("UA"))
+        self.assertIsInstance(p.phone, Phone)
+        self.assertEqual(p.phone, Phone('+713'))
+
+    def test_equality(self):
+        p1 = contest.Paraglider(self.p.id, '0', ' aXis The 2', self.p.country,
+            self.p.name, phone='+713')
+        p2 = contest.Paraglider(self.p.id, '0', ' aXes The 2', self.p.country,
+            self.p.name, phone='+714')
+        self.assertEqual(p1, p2)
+
+    def test_nonequality(self):
+        p1 = contest.Paraglider(self.p.id, '0', ' aXis The 2', self.p.country,
+            self.p.name, phone='+713')
+        p2 = contest.Paraglider(PersonID(), '0', ' aXis The 2', self.p.country,
+            self.p.name, phone='+713')
+        self.assertNotEqual(p1, p2)
 

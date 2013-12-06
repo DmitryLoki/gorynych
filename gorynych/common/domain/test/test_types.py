@@ -27,7 +27,18 @@ class AddressTest(unittest.TestCase):
     def test_success_creation(self):
         addr = types.Address('  ParIs', 'Fr', (1.08812, 3))
         self.assertEqual(addr.place, 'Paris')
-        self.assertEqual(addr.country, 'FR')
+        self.assertIsInstance(addr.country, types.Country)
+        self.assertEqual(addr.country.code(), 'FR')
+        self.assertIsInstance(addr.coordinates, tuple)
+        self.assertAlmostEqual(addr.lat, 1.08812, 6)
+        self.assertAlmostEqual(addr.lon, 3, 6)
+
+    def test_create_from_address(self):
+        addr1 = types.Address('  ParIs', 'Fr', (1.08812, 3))
+        addr = types.Address(addr1)
+        self.assertEqual(addr.place, 'Paris')
+        self.assertIsInstance(addr.country, types.Country)
+        self.assertEqual(addr.country.code(), 'FR')
         self.assertAlmostEqual(addr.lat, 1.08812, 6)
         self.assertAlmostEqual(addr.lon, 3, 6)
 
@@ -48,11 +59,21 @@ class AddressTest(unittest.TestCase):
 
     def test_country(self):
         a = types.Address('ss', 'de', (0, 0))
-        self.assertEqual(a.country, 'DE')
+        self.assertEqual(a.country.code(), 'DE')
 
     def test_place(self):
         a = types.Address('ss', 'de', (0, 0))
         self.assertEqual(a.place, 'Ss')
+
+    def test_equality(self):
+        self.assertEqual(types.Address('  ParIs', 'Fr', (1.08812, 3)),
+                         types.Address('  ParIs', 'Fr', (1.08812, 3)))
+
+    def test_nonequality(self):
+        self.assertNotEqual(types.Address('  ParI', 'Fr', (1.08812, 3)),
+                            types.Address('  ParIs', 'Fr', (1.08812, 3)))
+
+
 
 
 class CheckpointTest(unittest.TestCase):

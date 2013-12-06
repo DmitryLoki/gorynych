@@ -7,7 +7,8 @@ import datetime
 import pytz
 
 from gorynych.info.domain import transport
-from gorynych.common.domain.model import AggregateRoot, ValueObject, DomainIdentifier
+from gorynych.common.domain.model import AggregateRoot, ValueObject, \
+    DomainIdentifier, Entity
 from gorynych.common.domain.types import Address, Country, Phone, \
     Checkpoint, MappingCollection, TransactionalDict
 from gorynych.common.domain.events import ParagliderRegisteredOnContest
@@ -46,8 +47,7 @@ class Contest(AggregateRoot):
         self._timezone = ''
         self._start_time = start_time
         self._end_time = end_time
-        #TODO: store and return Address here.
-        self.address = address
+        self.address = Address(address)
         self._participants = dict()
         self.retrieve_id = None
         self._tasks = dict()
@@ -189,43 +189,6 @@ class Contest(AggregateRoot):
                 self._end_time = old_end_time
                 raise ValueError("Times values violate aggregate's "
                                  "invariants.")
-
-    #TODO: remove this.
-    @property
-    def country(self):
-        return self.address.country
-
-    #TODO: remove this.
-    @country.setter
-    def country(self, value):
-        self.address = Address(self.place, Country(value),
-                               self.address.coordinates)
-
-    #TODO: remove this.
-    @property
-    def place(self):
-        return self.address.place
-
-    #TODO: remove this.
-    @place.setter
-    def place(self, value):
-        self.address = Address(value, self.address.country,
-                               self.address.coordinates)
-
-    #TODO: remove this.
-    @property
-    def hq_coords(self):
-        '''
-
-        @return:(float, float)
-        @rtype: C{tuple}
-        '''
-        return self.address.coordinates
-
-    #TODO: remove this.
-    @hq_coords.setter
-    def hq_coords(self, value):
-        self.address = Address(self.place, self.country, value)
 
     @property
     def title(self):
@@ -424,8 +387,16 @@ class Staff(ValueObject):
         pass
 
 
-class Paraglider(ValueObject):
-    pass
+class Paraglider(Entity):
+    def __init__(self, person_id, contest_number, glider, country, name,
+            phone=None):
+        self.id = PersonID(person_id)
+        assert int(contest_number) >= 0, "Contest number must be positive."
+        self.contest_number = int(contest_number)
+        self.name = name
+        self.glider = glider.strip().split(' ')[0].lower()
+        self.country = Country(country)
+        self.phone = Phone(phone) if phone else None
 
 
 class BaseTask(ValueObject):

@@ -4,7 +4,7 @@ import mock
 from twisted.trial import unittest
 
 from gorynych.common.domain import events as evs
-from gorynych.common.domain.types import Name, checkpoint_from_geojson
+from gorynych.common.domain.types import Name, checkpoint_from_geojson, Country
 from gorynych.info.domain import race
 from gorynych.common.exceptions import TrackArchiveAlreadyExist
 from gorynych.info.domain.ids import RaceID, PersonID, TrackerID
@@ -312,3 +312,16 @@ class RaceServiceTest(unittest.TestCase):
         self.assertEquals(changed_race.checkpoints[0],
                           checkpoint_from_geojson(race_params['checkpoints']['features'][0]))
         self.assertEquals(changed_race.type, r.type)
+
+
+class ParagliderTest(unittest.TestCase):
+    def test_success_creation(self):
+        p_id = PersonID()
+        t_id = TrackerID(TrackerID.device_types[0], '123456789012345')
+        p = race.Paraglider(p_id, Name('Vasya', 'Pupkin'),
+            Country('RU'), 'Mantra 9', 15, t_id)
+        self.assertEqual(p.person_id, p_id)
+        self.assertEqual(p.glider, 'mantra')
+        self.assertEqual(p.contest_number, 15)
+        self.assertEqual(p.tracker_id, t_id)
+

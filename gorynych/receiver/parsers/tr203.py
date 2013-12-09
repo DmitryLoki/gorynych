@@ -44,6 +44,7 @@ class GlobalSatTR203(object):
             return -data
 
     def check_message_correctness(self, msg):
+        return msg
         try:
             # Check checksum of obtained message.
             msg = str(msg)

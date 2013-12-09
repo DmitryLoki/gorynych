@@ -9,6 +9,7 @@ from constants import FrameId
 from chunk_reader import ChunkReader
 
 
+@implementer(IParseMessage)
 class App13Parser(object):
     '''
     Common class for mobile application tracker and satellite tracker.
@@ -95,6 +96,7 @@ class App13Parser(object):
         return response
 
 
+@implementer(IParseMessage)
 class PathMakerParser(object):
 
     def __init__(self):

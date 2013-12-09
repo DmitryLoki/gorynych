@@ -27,12 +27,12 @@ class UDPTR203Protocol(protocol.DatagramProtocol):
     '''
     device_type = 'tr203'
 
-    def __init__(self, service):
-        self.service = service
+    # def __init__(self, service):
+    #     self.service = service
 
     def datagramReceived(self, datagram, sender):
-        self.service.handle_message(datagram, proto='UDP',
-                                    device_type=self.device_type)
+        self.factory.service.handle_message(datagram, proto='UDP',
+                                            device_type=self.device_type)
 
 
 class UDPTeltonikaGH3000Protocol(protocol.DatagramProtocol):
@@ -41,14 +41,14 @@ class UDPTeltonikaGH3000Protocol(protocol.DatagramProtocol):
     '''
     device_type = 'telt_gh3000'
 
-    def __init__(self, service):
-        self.service = service
+    # def __init__(self, service):
+    #     self.service = service
 
     def datagramReceived(self, datagram, sender):
-        response = self.service.parser.get_response(datagram)
+        response = self.factory.service.parser.get_response(datagram)
         self.transport.write(response, sender)
-        self.service.handle_message(datagram, proto='UDP', client=sender,
-                                    device_type=self.device_type)
+        self.factory.service.handle_message(datagram, proto='UDP', client=sender,
+                                            device_type=self.device_type)
 
 
 class App13ProtobuffMobileProtocol(protocol.Protocol):

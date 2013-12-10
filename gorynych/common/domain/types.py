@@ -295,6 +295,7 @@ def TransactionalDict(dic):
     backup = deepcopy(dic)
     try:
         yield dic
-    except Exception:
+    except Exception as e:
         dic.clear()
         dic.update(backup)
+        raise e

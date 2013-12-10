@@ -329,12 +329,10 @@ class TransactionalDictTest(unittest.TestCase):
         b.change_dic('c', 'd')
         self.assertDictEqual(b.dic, dict(a='b', c='d'))
 
-    def test_no_success(self):
+    def test_no_success_raise_exception(self):
         b = B(dict(a='b'))
-        try:
-            b.change_dic('c', 'd', raise_exception=True)
-        except:
-            pass
+        self.assertRaises(AssertionError, b.change_dic, 'c', 'd',
+            raise_exception=True)
         self.assertDictEqual(b.dic, dict(a='b'))
 
 

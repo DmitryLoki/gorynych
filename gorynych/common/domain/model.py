@@ -88,13 +88,14 @@ class DomainIdentifier(object):
         elif identifier.__class__ == self.__class__ and (
             self._string_is_valid_id(str(identifier))
         ):
-            self._id = identifier
+            self._id = identifier._id
         elif isinstance(identifier, str):
             if self._string_is_valid_id(identifier):
                 self._id = identifier
         else:
             raise ValueError("Got identifier %s with type %s" %
                              (identifier, type(identifier)))
+        assert isinstance(self._id, str)
 
     def _create_new_id(self):
         return str(uuid.uuid4())
@@ -145,7 +146,8 @@ class DomainIdentifier(object):
         '''
         Make object human-readable in logs.
         '''
-        return self._id
+        return ''.join(('<',self.__class__.__name__ , ' ', str(self._id),
+        '>'))
 
     def __str__(self):
         '''

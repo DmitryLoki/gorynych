@@ -48,7 +48,13 @@ class IdentifierObjectTest(unittest.TestCase):
     def test_repr(self):
         id = self._get_id()
         self.assertIsInstance(repr(id), str)
-        self.assertEqual(len(repr(id)), 36)
+        self.assertEqual(len(repr(id)), 55)
+        r = repr(id).split(' ')[0]
+        self.assertEqual(r, '<DomainIdentifier')
+
+    def test_repr_diid(self):
+        id = model.DomainIdentifier(model.DomainIdentifier())
+        self.assertIsInstance(repr(id), str)
 
     def test_str(self):
         uid = str(uuid.uuid4())

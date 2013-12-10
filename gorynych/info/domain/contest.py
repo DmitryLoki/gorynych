@@ -252,6 +252,26 @@ class Contest(AggregateRoot):
             self.check_invariants()
         return self
 
+    def replace_organizer(self, org_id, new_org):
+        with TransactionalDict(self.organizers) as orgs:
+            orgs[org_id] = new_org
+            self.check_invariants()
+
+    def replace_paraglider(self, par_id, new_par):
+        with TransactionalDict(self.paragliders) as pars:
+            pars[par_id] = new_par
+            self.check_invariants()
+
+    def replace_windummy(self, w_id, new_w):
+        with TransactionalDict(self.winddummies) as winds:
+            winds[w_id] = new_w
+            self.check_invariants()
+
+    def replace_staff(self, s_id, new_s):
+        with TransactionalDict(self.staff) as staff:
+            staff[s_id] = new_s
+            self.check_invariants()
+
     def check_invariants(self):
         """
         Check next invariants for contest:
@@ -267,26 +287,6 @@ class Contest(AggregateRoot):
         end_after_start = int(self.start_time) < int(self.end_time)
 
         assert end_after_start, "Start time must be before end time."
-
-    def change_participant_data(self, person_id, **kwargs):
-        if not kwargs:
-            raise ValueError("No new data has been received.")
-        try:
-            old_participant = deepcopy(self._participants[person_id])
-        except KeyError:
-            raise ValueError("No participant with such id.")
-
-        for key in kwargs.keys():
-            if key == 'contest_number':
-                # TODO: check necessity of this.
-                kwargs[key] = int(kwargs[key])
-            if key == 'glider':
-                kwargs[key] = kwargs[key].strip().split(' ')[0].lower()
-            self._participants[person_id][key] = kwargs[key]
-
-        if not self.check_invariants():
-            self._participants[person_id] = old_participant
-            raise ValueError("Contest invariants violated.")
 
 
 def change(cont, params):
@@ -328,6 +328,8 @@ def change_participant(cont, role, part_id, **data):
     @return: contest with changed role.
     @rtype: C{Contes}
     '''
+    if len(data) == 0:
+        return cont
     role = role.lower()
     if not part_id in getattr(cont, _pluralize(role)):
         raise ValueError(
@@ -344,7 +346,7 @@ def change_participant(cont, role, part_id, **data):
             data.get('name', old.name), data.get('phone', old.phone))
     else:
         raise ValueError("No such role %s" % role)
-    cont = getattr(cont, 'replace_' + role)(part_id, new)
+    getattr(cont, 'replace_' + role)(part_id, new)
     return cont
 
 

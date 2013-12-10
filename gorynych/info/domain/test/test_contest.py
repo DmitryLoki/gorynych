@@ -28,6 +28,26 @@ class MockedPersonRepository(mock.Mock):
         return person
 
 
+def create_role(rolename, pers=None, **kw):
+    if pers is None:
+        pers = create_person()
+    try:
+        if rolename.lower() == 'paraglider':
+            result = contest.Paraglider(pers.id, kw['cnum'],
+                kw.get('glider', 'mantra'), pers.country, pers.name,
+                kw.get('phone'))
+        elif rolename.lower() == 'organizer':
+            result = contest.Organizer(pers.id, kw['email'], pers.name,
+                kw.get('description', None))
+        else:
+            raise ValueError(
+                "Wrong argument passed during role creation: %s" % rolename)
+    except Exception as e:
+        raise unittest.SkipTest("ERROR: contest.%s can't be created: %r" %
+                                (rolename.capitalize(), e))
+    return pers, result
+
+
 class ContestFactoryTest(unittest.TestCase):
     def test_contestid_successfull_contest_creation(self):
         cont = create_contest(1, 2)
@@ -120,7 +140,6 @@ class TestInvariants(unittest.TestCase):
         self.assertIsNone(contest.person_only_in_one_role(self.cont))
 
 
-
 class ContestTestWithRegisteredParagliders(unittest.TestCase):
     def setUp(self):
         self.p1 = create_person()
@@ -131,16 +150,21 @@ class ContestTestWithRegisteredParagliders(unittest.TestCase):
         def fixture(patched):
             patched.return_value = mock.Mock()
             cont = create_contest(1, 15)
-            cont.add_paraglider(self.p2, 'mantrA 9', '757')
-            cont.add_paraglider(self.p1, 'gIn 9', '747')
-            person1 = cont.paragliders[self.p1.id]
-            person2 = cont.paragliders[self.p2.id]
-            return cont, person1, person2
+            _, par2 = create_role('paraglider', pers=self.p2, glider='mantra',
+                cnum='757')
+            _, par1 = create_role('paraglider', pers=self.p1, glider='gin',
+                cnum='747')
+            _, org = create_role('organizer', self.p3,
+                                email='john@example.org')
+            cont.add_paraglider(par1)
+            cont.add_paraglider(par2)
+            cont.add_organizer(org)
+            return cont, par1, par2
         try:
             self.cont, self.person1, self.person2 = fixture()
-        except:
+        except Exception as e:
             raise unittest.SkipTest("ERROR: need contest with paragliders "
-                                    "for test.")
+                                    "for test. %r" % e)
 
     def tearDown(self):
         del self.cont
@@ -148,26 +172,34 @@ class ContestTestWithRegisteredParagliders(unittest.TestCase):
         del self.person2
 
     def test_correct_change_participant_data(self):
-        self.cont.change_participant_data(self.p1.id, glider='ajAx  ',
-            contest_number='0')
-        self.assertEqual(self.person1['glider'], 'ajax')
-        self.assertEqual(self.person1['contest_number'], 0)
+        cont = contest.change_participant(self.cont, 'paraglider', self.p1.id,
+                                      glider='ajAx', contest_number='0')
+        self.assertIsInstance(cont, contest.Contest)
+        self.assertEqual(self.cont.paragliders[self.p1.id].glider, 'ajax')
+        self.assertEqual(self.cont.paragliders[self.p1.id].contest_number, 0)
+
+    def test_absent_role(self):
+        self.assertRaises(ValueError, contest.change_participant, self.cont,
+            'paragliders', self.p1.id, glider='ajax')
+
+    def test_absent_id(self):
+        self.assertRaises(ValueError, contest.change_participant, self.cont,
+            'paragliders', self.p3.id, glider='ajax')
 
     def test_no_data(self):
-        self.assertRaises(ValueError, self.cont.change_participant_data,
-            'person2')
-
-    def test_wrong_parameters(self):
-        self.assertRaises(ValueError, self.cont.change_participant_data,
-            'person3', contest_number=9, glider='ajax')
-        self.cont.change_participant_data(self.p1.id, cotest_number=9,
-            glider='aJax')
-        self.assertEqual(self.person1['contest_number'], 747)
-        self.assertEqual(self.person1['glider'], 'ajax')
+        cont = contest.change_participant(self.cont, 'paraglider', self.p1.id)
+        self.assertEqual(self.cont.paragliders[self.p1.id].glider, 'gin')
+        self.assertIsInstance(cont, contest.Contest)
 
     def test_violate_invariants(self):
-        self.assertRaises(ValueError, self.cont.change_participant_data,
-            'person1', contest_number='757')
+        self.assertRaises(DomainError, contest.change_participant, self.cont,
+            'paraglider', self.p1.id, glider='ajax', contest_number=757)
+
+    def test_change_organizer(self):
+        cont = contest.change_participant(self.cont, 'organizer',
+            self.p3.id, email='vas@mail.ru', name=Name('Vasisualy', 'Lohankin'))
+        self.assertIsInstance(cont, contest.Contest)
+        self.assertIsInstance(cont.organizers[self.p3.id], contest.Organizer)
 
 
 class TestAddingToContest(unittest.TestCase):
@@ -177,25 +209,6 @@ class TestAddingToContest(unittest.TestCase):
 
     def tearDown(self):
         del self.cont
-
-    def _create_role(self, rolename, pers=None, **kw):
-        if pers is None:
-            pers = create_person()
-        try:
-            if rolename.lower() == 'paraglider':
-                result = contest.Paraglider(pers.id, kw['cnum'],
-                    kw.get('glider', 'mantra'), pers.country, pers.name,
-                    kw.get('phone'))
-            elif rolename.lower() == 'organizer':
-                result = contest.Organizer(pers.id, kw['email'], pers.name,
-                    kw.get('description', None))
-            else:
-                raise ValueError(
-                "Wrong argument passed during role creation: %s" % rolename)
-        except Exception as e:
-            raise unittest.SkipTest("ERROR: contest.%s can't be created: %r" %
-                                    (rolename.capitalize(), e))
-        return pers, result
 
     @unittest.expectedFailure
     def test_add_winddummy(self):
@@ -213,7 +226,7 @@ class TestAddingToContest(unittest.TestCase):
         self.assertEqual(w.person_id, self.cont.winddummies[w.person_id].id)
 
     def test_add_organizer(self):
-        p, o = self._create_role('organizer', email='john@example.com')
+        p, o = create_role('organizer', email='john@example.com')
         populated_cont = self.cont.add_organizer(o)
         self.assertIsInstance(populated_cont, contest.Contest)
         self.assertEqual(len(self.cont.organizers), 1)
@@ -223,7 +236,7 @@ class TestAddingToContest(unittest.TestCase):
             contest.Organizer)
 
         # Add another organizer.
-        p2, o2 = self._create_role('organizer', email='john@example.com')
+        p2, o2 = create_role('organizer', email='john@example.com')
         populated_cont = self.cont.add_organizer(o2)
         self.assertIsInstance(populated_cont, contest.Contest)
         self.assertEqual(len(self.cont.organizers), 2)
@@ -246,7 +259,7 @@ class TestAddingToContest(unittest.TestCase):
         patched.return_value = event_store
 
         # Register first paraglider.
-        p, par = self._create_role('paraglider', cnum=0, glider='mantra')
+        p, par = create_role('paraglider', cnum=0, glider='mantra')
         c = self.cont.add_paraglider(par)
         self.assertIsInstance(c, contest.Contest)
         self.assertEqual(len(self.cont.paragliders), 1)
@@ -255,7 +268,7 @@ class TestAddingToContest(unittest.TestCase):
         self.assertEqual(self.cont.paragliders[p.id].id, p.id)
 
         # Register second paraglider.
-        p2, par2 = self._create_role('paraglider', cnum='1', glider='mantra')
+        p2, par2 = create_role('paraglider', cnum='1', glider='mantra')
         c2 = self.cont.add_paraglider(par2)
         self.assertIsInstance(c2, contest.Contest)
         self.assertEqual(len(self.cont.paragliders), 2)
@@ -266,7 +279,7 @@ class TestAddingToContest(unittest.TestCase):
             self.cont.paragliders[p2.id])
 
         # Check contest numbers uniqueness.
-        p3, par3 = self._create_role('paraglider', cnum='1', glider='mantra')
+        p3, par3 = create_role('paraglider', cnum='1', glider='mantra')
         self.assertRaises(DomainError, self.cont.add_paraglider, par3)
         self.assertEqual(len(self.cont.paragliders), 2)
         self.assertIn(1,self.cont.paragliders.get_attribute_values(
@@ -280,8 +293,8 @@ class TestAddingToContest(unittest.TestCase):
         self.assertEqual(mock_calls[-2], mock.call.persist(events.ParagliderRegisteredOnContest(p.id, self.cont.id)))
 
     def test_add_same_pers_as_organizer_and_paraglider(self):
-        p1, org = self._create_role('organizer', email='john@example.com')
-        p2, par = self._create_role('paraglider', pers=p1, cnum=1)
+        p1, org = create_role('organizer', email='john@example.com')
+        p2, par = create_role('paraglider', pers=p1, cnum=1)
         try:
             c = self.cont.add_organizer(org)
         except Exception as e:
@@ -691,8 +704,8 @@ class ParagliderTest(unittest.TestCase):
     def test_equality(self):
         p1 = contest.Paraglider(self.p.id, '0', ' aXis The 2', self.p.country,
             self.p.name, phone='+713')
-        p2 = contest.Paraglider(self.p.id, '0', ' aXes The 2', self.p.country,
-            self.p.name, phone='+714')
+        p2 = contest.Paraglider(self.p.id, '0', ' aXis The 3', self.p.country,
+            self.p.name, phone='+713')
         self.assertEqual(p1, p2)
 
     def test_nonequality(self):

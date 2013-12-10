@@ -150,7 +150,7 @@ class ApplicationService(BaseApplicationService):
         elif role == 'organizer':
             d.addCallback(lambda _: cont.add_organizer(pers, params.get('description', "")))
         elif role == 'paraglider':
-            d.addCallback(lambda _: cont.register_paraglider(pers, params['glider'],
+            d.addCallback(lambda _: cont.add_paraglider(pers, params['glider'],
                                                  params['contest_number']))
         d.addCallback(
             persistence.get_repository(interfaces.IContestRepository).save)

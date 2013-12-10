@@ -3,14 +3,14 @@ Contest Aggregate.
 '''
 from copy import deepcopy
 import datetime
+from operator import attrgetter
+from collections import defaultdict
 
 import pytz
 
 from gorynych.info.domain import transport
-from gorynych.common.domain.model import AggregateRoot, ValueObject, \
-    DomainIdentifier, Entity
-from gorynych.common.domain.types import Address, Country, Phone, \
-    Checkpoint, MappingCollection, TransactionalDict
+from gorynych.common.domain.model import AggregateRoot, ValueObject, DomainIdentifier
+from gorynych.common.domain.types import Address, Country, Phone, Checkpoint, MappingCollection, TransactionalDict
 from gorynych.common.domain.events import ParagliderRegisteredOnContest
 from gorynych.common.infrastructure import persistence
 from gorynych.info.domain.ids import ContestID, RaceID, PersonID
@@ -18,18 +18,22 @@ from gorynych.common.exceptions import DomainError
 from gorynych.common.domain.services import times_from_checkpoints
 
 
-class ContestFactory(object):
+def _pluralize(role):
+    plural_roles = dict(organizer='organizers', staff='staff', winddummy='winddummies', paraglider='paragliders')
+    result = plural_roles.get(role)
+    if result is None:
+        raise ValueError("Can't pluralize %s" % role)
+    return result
 
-    def create_contest(self, title, start_time, end_time,
-                       contest_place, contest_country, hq_coords, timezone,
-                       contest_id=None):
+
+class ContestFactory(object):
+    def create_contest(self, title, start_time, end_time, contest_place,
+            contest_country, hq_coords, timezone, contest_id=None):
         address = Address(contest_place, contest_country, hq_coords)
         if end_time < start_time:
             raise ValueError("Start time must be less then end time.")
         if not contest_id:
             contest_id = ContestID()
-        elif not isinstance(contest_id, ContestID):
-            contest_id = ContestID.fromstring(contest_id)
         if not timezone in pytz.all_timezones_set:
             raise pytz.exceptions.UnknownTimeZoneError("Wrong timezone.")
         contest = Contest(contest_id, start_time, end_time, address)
@@ -37,12 +41,44 @@ class ContestFactory(object):
         contest.timezone = timezone
         return contest
 
+######################## Contest invariants #######################
+def contest_numbers_are_unique(obj):
+    '''
+    Every paragliders should has unique contest number. If it's not so
+    DomainError will be raised.
+    @param obj:
+    @type obj: Contest
+    @raise: DomainError
+    '''
+    cnums = set(obj.paragliders.get_attribute_values('contest_number'))
+    if not len(obj.paragliders) == len(cnums):
+        raise DomainError("Every paraglider should have unique contest "
+                          "number.")
+
+
+def person_only_in_one_role(cont):
+    '''
+    Check if newly added participant already exist as another role.
+    @param cont: contest for check
+    @type cont: L{Contest}
+    @raise: DomainError.
+    '''
+    roles = ['winddummies', 'organizers', 'paragliders', 'staff']
+    counts = defaultdict(list)
+    for role in roles:
+        for p_id in getattr(cont, role).keys():
+            counts[p_id].append(role)
+            if len(counts[p_id]) > 1:
+                raise DomainError("%s with id %s already exist as %s" % (
+                            role.capitalize(), str(p_id), counts[p_id][0]))
+
+
+###################################################################
 
 class Contest(AggregateRoot):
-
     def __init__(self, contest_id, start_time, end_time, address):
         super(Contest, self).__init__()
-        self.id = contest_id
+        self.id = ContestID(contest_id)
         self._title = ''
         self._timezone = ''
         self._start_time = start_time
@@ -52,6 +88,12 @@ class Contest(AggregateRoot):
         self.retrieve_id = None
         self._tasks = dict()
         self.organizers = MappingCollection()
+        self.paragliders = MappingCollection()
+        self.winddummies = MappingCollection()
+        self.staff = MappingCollection()
+
+    title = property(attrgetter('_title'),
+        lambda self, x: setattr(self, '_title', x.strip()))
 
     @property
     def timezone(self):
@@ -102,7 +144,7 @@ class Contest(AggregateRoot):
         if not self.check_invariants():
             self._end_time = old_end_time
             raise DomainError("Incorrect end_time violate aggregate's "
-                             "invariants.")
+                              "invariants.")
 
     @property
     def tasks(self):
@@ -138,8 +180,8 @@ class Contest(AggregateRoot):
 
     def add_task(self, task):
         if not isinstance(task, BaseTask):
-            raise TypeError('Expected BaseTask instance, got {} instead'.format(
-                type(task)))
+            raise TypeError(
+                'Expected BaseTask instance, got {} instead'.format(type(task)))
         tasks_before = deepcopy(self._tasks)
         self._tasks[task.id] = task
         if not self._tasks_are_correct():
@@ -190,60 +232,24 @@ class Contest(AggregateRoot):
                 raise ValueError("Times values violate aggregate's "
                                  "invariants.")
 
-    @property
-    def title(self):
-        return self._title
-
-    @title.setter
-    def title(self, value):
-        self._title = value.strip()
-
-    def register_paraglider(self, pers, glider, cnum):
+    def add_paraglider(self, paraglider):
         '''
         Register person as a paraglider.
-        @param pers: person registered
-        @type pers: L{gorynych.info.domain.person.Person}
-        @param glider: glider manufacturer name
-        @type glider: C{str}
-        @param cnum: contest number
-        @type cnum: C{str}
+        @param paraglider: paraglider registered.
+        @type paraglider: L{gorynych.info.domain.contest.Paraglider}
         @return: self
+        @raise
         '''
-        paragliders_before = deepcopy(self._participants)
-        glider = glider.strip().split(' ')[0].lower()
-        self._participants[pers.id] = dict(
-            role='paraglider',
-            name=pers.name.full(),
-            country=pers.country,
-            glider=glider,
-            contest_number=int(cnum),
-            phone=pers.phone)
-        if not self.check_invariants():
-            self._participants = paragliders_before
-            raise DomainError("Paraglider must have unique contest number.")
-        persistence.event_store().persist(ParagliderRegisteredOnContest(
-            pers.id, self.id))
-        return self
-
-    def add_winddummy(self, pers):
-        self._participants[pers.id] = dict(
-            role='winddummy',
-            name=pers.name.full(),
-            phone=pers.phone)
+        with TransactionalDict(self.paragliders) as paragliders:
+            paragliders[paraglider.id] = paraglider
+            self.check_invariants()
+        persistence.event_store().persist(ParagliderRegisteredOnContest(paraglider.id, self.id))
         return self
 
     def add_organizer(self, org):
         with TransactionalDict(self.organizers) as orgs:
             orgs[org.id] = org
-        return self
-
-    def add_staff_member(self, staffmember):
-        self._participants[staffmember.id] = dict(
-            role='staff',
-            title=staffmember.title,
-            type=staffmember.type,
-            phone=staffmember.phone,
-            description=staffmember.description)
+            self.check_invariants()
         return self
 
     def check_invariants(self):
@@ -251,29 +257,16 @@ class Contest(AggregateRoot):
         Check next invariants for contest:
         every paraglider has unique contest_number
         context start_time is less then end_time
+        person can be only in one role
         not implemented:
         tasks are not overlapping
         """
-        contest_numbers = set()
-        paragliders = set()
-        for key in self.paragliders.keys():
-                contest_numbers.add(
-                    self.paragliders[key]['contest_number'])
-                paragliders.add(key)
-        # TODO: this method should rise exceptions in case of invariants
-        # violation.
-        all_contest_numbers_uniq = len(paragliders) == len(contest_numbers)
 
+        contest_numbers_are_unique(self)
+        person_only_in_one_role(self)
         end_after_start = int(self.start_time) < int(self.end_time)
 
-        assert all_contest_numbers_uniq, "Contest numbers are not unique."
         assert end_after_start, "Start time must be before end time."
-        return all_contest_numbers_uniq and end_after_start
-
-    def _rollback_register_paraglider(self, paraglider_before, person_id):
-        # TODO: this function should rollback all paragliders. Am I need this
-        # function?
-        self._participants[person_id] = paraglider_before
 
     def change_participant_data(self, person_id, **kwargs):
         if not kwargs:
@@ -294,25 +287,6 @@ class Contest(AggregateRoot):
         if not self.check_invariants():
             self._participants[person_id] = old_participant
             raise ValueError("Contest invariants violated.")
-
-    def _get_participants(self, role):
-        result = dict()
-        for key in self._participants:
-            if self._participants[key]['role'] == role:
-                result[key] = self._participants[key]
-        return result
-
-    @property
-    def paragliders(self):
-        return self._get_participants('paraglider')
-
-    @property
-    def winddummies(self):
-        return self._get_participants('winddummy')
-
-    @property
-    def staff(self):
-        return self._get_participants('staff')
 
 
 def change(cont, params):
@@ -340,13 +314,37 @@ def change(cont, params):
     return cont
 
 
-def change_participant(cont, participant_data):
-    if 'glider' in participant_data:
-        cont.change_participant_data(participant_data['person_id'],
-                                     glider=participant_data['glider'])
-    if 'contest_number' in participant_data:
-        cont.change_participant_data(participant_data['person_id'],
-                                     contest_number=participant_data['contest_number'])
+def change_participant(cont, role, part_id, **data):
+    '''
+    Change data for contest participant with id as role.
+    @param cont: contest for which data should be changed.
+    @type cont:  C{Contest}
+    @param role: role name (organizer, paraglider, staff, winddummy)
+    @type role: C{str}
+    @param part_id: participant id
+    @type id: C{gorynych.common.model.DomainIdentifier} subclass
+    @param data:
+    @type data:
+    @return: contest with changed role.
+    @rtype: C{Contes}
+    '''
+    role = role.lower()
+    if not part_id in getattr(cont, _pluralize(role)):
+        raise ValueError(
+            "Participant with id %s wasn't found as %s for contest %s" % (
+                part_id, role, cont.id))
+    old = getattr(cont, _pluralize(role))[part_id]
+    if role == 'organizer':
+        new = Organizer(part_id, data.get('email', old.email),
+            data.get('name', old.name),
+            data.get('description', old.description))
+    elif role == 'paraglider':
+        new = Paraglider(part_id, data.get('contest_number', old.contest_number),
+            data.get('glider', old.glider), data.get('country', old.country),
+            data.get('name', old.name), data.get('phone', old.phone))
+    else:
+        raise ValueError("No such role %s" % role)
+    cont = getattr(cont, 'replace_' + role)(part_id, new)
     return cont
 
 
@@ -387,7 +385,7 @@ class Staff(ValueObject):
         pass
 
 
-class Paraglider(Entity):
+class Paraglider(ValueObject):
     def __init__(self, person_id, contest_number, glider, country, name,
             phone=None):
         self.id = PersonID(person_id)
@@ -427,8 +425,9 @@ class BaseTask(ValueObject):
             try:
                 datetime.datetime.fromtimestamp(t)
             except TypeError:
-                raise TypeError("Expected int or float for timestamp, got {} instead".format(
-                    type(t)))
+                raise TypeError(
+                    "Expected int or float for timestamp, got {} instead".format(
+                        type(t)))
         if start_time >= deadline:
             raise ValueError(
                 'Incorrect time section specified: first time value should be before the last')
@@ -442,8 +441,8 @@ class BaseTask(ValueObject):
 
     def _check_title(self, title):
         if not isinstance(title, (str, unicode)) or len(title.strip()) == 0:
-            raise ValueError('Expection non-zero-length string, got {} instead'.format(
-                title))
+            raise ValueError(
+                'Expection non-zero-length string, got {} instead'.format(title))
 
     def is_task_correct(self):
         try:
@@ -504,8 +503,9 @@ class SpeedRunTask(BaseTask):
     def _check_window_bounds(self, window_open, window_close):
         self._check_timelimits(window_open, window_close)
         if window_open < self.start_time or window_close >= self.deadline:
-            raise ValueError('Window margins ({}, {}) are out of task bounds ({}, {})'.format(
-                window_open, window_close, self.start_time, self.deadline))
+            raise ValueError(
+                'Window margins ({}, {}) are out of task bounds ({}, {})'.format(
+                    window_open, window_close, self.start_time, self.deadline))
 
     def __eq__(self, other):
         return BaseTask.__eq__(self, other) and self.window_open == other.window_open \
@@ -515,8 +515,8 @@ class SpeedRunTask(BaseTask):
 class RaceToGoalTask(BaseTask):
     type = 'racetogoal'
 
-    def __init__(self, window_open, window_close,
-                 race_gates_number=1, race_gates_interval=None, *args, **kwargs):
+    def __init__(self, window_open, window_close, race_gates_number=1,
+            race_gates_interval=None, *args, **kwargs):
         BaseTask.__init__(self, *args, **kwargs)
         self._check_window_bounds(window_open, window_close)
         self.window_open = window_open
@@ -529,18 +529,22 @@ class RaceToGoalTask(BaseTask):
     def _check_window_bounds(self, window_open, window_close):
         self._check_timelimits(window_open, window_close)
         if window_open < self.start_time or window_close >= self.deadline:
-            raise ValueError('Window margins ({}, {}) are out of task bounds ({}, {})'.format(
-                window_open, window_close, self.start_time, self.deadline))
+            raise ValueError(
+                'Window margins ({}, {}) are out of task bounds ({}, {})'.format(
+                    window_open, window_close, self.start_time, self.deadline))
 
     def _check_gates(self, num, interval):
         if not isinstance(num, int) or num < 0:
             raise TypeError('Number of gates must be positive integer')
         if num == 1 and interval is not None:
-            raise ValueError('Only one gate specified, expecting null interval: got {} instead'.format(
-                interval))
-        if num != 1 and (not interval or not isinstance(interval, int) or interval < 0):
-            raise ValueError('Multiple gates specified, expecting positive integer interval: got {} instead'.format(
-                interval))
+            raise ValueError(
+                'Only one gate specified, expecting null interval: got {} instead'.format(
+                    interval))
+        if num != 1 and (
+                    not interval or not isinstance(interval, int) or interval < 0):
+            raise ValueError(
+                'Multiple gates specified, expecting positive integer interval: got {} instead'.format(
+                    interval))
 
     def is_task_correct(self):
         if not BaseTask.is_task_correct(self):

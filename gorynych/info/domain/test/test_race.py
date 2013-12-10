@@ -239,7 +239,7 @@ class ContestRaceCreationTest(unittest.TestCase):
 
         # make this list of aggregates list of tuples
         for i, p in enumerate(self.person_list):
-            self.cont.register_paraglider(p.id, 'flying piece of wood', i)
+            self.cont.add_paraglider(p.id, 'flying piece of wood', i)
 
         transport_list = [(
             self.trnsp.type, self.trnsp.title, self.trnsp.description,

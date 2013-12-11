@@ -17,7 +17,7 @@ from gorynych.info.domain.ids import ContestID, RaceID, PersonID
 from gorynych.common.exceptions import DomainError
 from gorynych.common.domain.services import times_from_checkpoints
 
-ROLES = dict(organizer='organizers', staff='staff', windummy='windummies',
+ROLES = dict(organizer='organizers', staff='staff', winddummy='winddummies',
     paraglider='paragliders')
 def _pluralize(role):
     plural_roles = dict(organizer='organizers', staff='staff', winddummy='winddummies', paraglider='paragliders')
@@ -64,9 +64,8 @@ def person_only_in_one_role(cont):
     @type cont: L{Contest}
     @raise: DomainError.
     '''
-    roles = ['winddummies', 'organizers', 'paragliders', 'staff']
     counts = defaultdict(list)
-    for role in roles:
+    for role in ROLES.values():
         for p_id in getattr(cont, role).keys():
             counts[p_id].append(role)
             if len(counts[p_id]) > 1:
@@ -333,28 +332,26 @@ def change_participant(cont, role, part_id, **data):
     return cont
 
 
-class StaffMember(ValueObject):
+class Staff(ValueObject):
     types = frozenset(['rescuer', 'ambulance']).union(transport.TYPES)
 
-    def __init__(self, title, type, description="", phone=None):
+    def __init__(self, title, type, description="", phone=None, id=None):
         if type not in self.types:
-            raise TypeError('Incorrect type ({}). Avaliable types: {}'.format(
+            raise TypeError(
+                'Incorrect type ({}). Avaliable types: {}'.format(
                               type, self.types))
         self.title = title
         self.type = type
-        if phone:
-            self.phone = Phone(phone).number
-        else:
-            self.phone = ""
-        self.id = DomainIdentifier()
+        self.phone = Phone(phone) if phone else ''
+        self.id = DomainIdentifier(id)
         self.description = description
 
 
 class Winddummy(ValueObject):
     def __init__(self, person_id, phone, name):
-        self._person_id = PersonID(person_id)
-        self._phone = Phone(phone)
-        self._name = name
+        self.id = PersonID(person_id)
+        self.phone = Phone(phone)
+        self.name = name
 
 
 class Organizer(ValueObject):
@@ -363,11 +360,6 @@ class Organizer(ValueObject):
         self.email = email
         self.name = name
         self.description = description if description else ''
-
-
-class Staff(ValueObject):
-    def __init__(self, title, type, description="", phone=None):
-        pass
 
 
 class Paraglider(ValueObject):

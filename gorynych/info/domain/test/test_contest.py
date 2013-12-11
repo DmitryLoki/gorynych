@@ -3,7 +3,7 @@ import time
 
 import mock
 
-from gorynych.common.domain import events
+from gorynych.common.domain import events, model
 from gorynych.info.domain.test.helpers import create_contest, create_person, create_checkpoints
 from gorynych.info.domain import contest
 from gorynych.common.domain.types import Address, Name, Country, Phone, MappingCollection
@@ -15,6 +15,7 @@ class MockedPersonRepository(mock.Mock):
     '''
     Necessary only for tracker assignment.
     '''
+    # TODO: check necessity and correctness of this class.
     def get_by_id(self, key):
         person = mock.Mock()
         person.name = Name('name', 'surname')
@@ -39,6 +40,8 @@ def create_role(rolename, pers=None, **kw):
         elif rolename.lower() == 'organizer':
             result = contest.Organizer(pers.id, kw['email'], pers.name,
                 kw.get('description', None))
+        elif rolename.lower() == 'winddummy':
+            result = contest.Winddummy(pers.id, kw['phone'], pers.name)
         else:
             raise ValueError(
                 "Wrong argument passed during role creation: %s" % rolename)
@@ -210,20 +213,15 @@ class TestAddingToContest(unittest.TestCase):
     def tearDown(self):
         del self.cont
 
-    @unittest.expectedFailure
     def test_add_winddummy(self):
-        p = create_person()
-        try:
-            w = contest.Winddummy(p.id, '+712', p.name)
-        except:
-            raise unittest.SkipTest("Due to error on contest.Winddummy "
-                                    "creation.")
-        populated_cont = self.cont.add_winddummy(w)
+        p, w = create_role('winddummy', phone='+712')
+        c = self.cont.add_winddummy(w)
 
         self.assertTrue(len(self.cont.winddummies) > 0)
-        self.assertIsInstance(populated_cont, contest.Contest)
-        self.assertIn(w.person_id, self.cont.winddummies.keys())
-        self.assertEqual(w.person_id, self.cont.winddummies[w.person_id].id)
+        self.assertIsInstance(c, contest.Contest)
+        self.assertIsInstance(c.winddummies, MappingCollection)
+        self.assertIn(w.id, self.cont.winddummies.keys())
+        self.assertEqual(w.id, self.cont.winddummies[w.id].id)
 
     def test_add_organizer(self):
         p, o = create_role('organizer', email='john@example.com')
@@ -245,13 +243,14 @@ class TestAddingToContest(unittest.TestCase):
         self.assertIsInstance(populated_cont.organizers[p2.id],
             contest.Organizer)
 
-    @unittest.expectedFailure
     def test_add_staffmember(self):
-        t = contest.StaffMember(title='t', type='bus')
-        populated_cont = self.cont.add_staff_member(t)
-        self.assertTrue(len(self.cont.staff) == 1)
+        t = contest.Staff(title='t', type='bus')
+        populated_cont = self.cont.add_staff(t)
+        self.assertIsInstance(populated_cont, contest.Contest)
+        self.assertEqual(len(self.cont.staff), 1)
         self.assertIn(t.id, populated_cont.staff.keys())
         self.assertEqual(t.id, populated_cont.staff[t.id].id)
+        self.assertEqual(t, populated_cont.staff[t.id])
 
     @mock.patch('gorynych.common.infrastructure.persistence.event_store')
     def test_register_paraglider(self, patched):
@@ -306,28 +305,49 @@ class TestAddingToContest(unittest.TestCase):
 
 class StaffMemberTest(unittest.TestCase):
     def test_type(self):
-        self.assertRaises(TypeError, contest.StaffMember, title='Scruffy the janitor', type='janitor',
-            description="Don't know who that guy is")
-        sm = contest.StaffMember(title="Chip'n'Dale", type='rescuer',
+        self.assertRaises(TypeError, contest.Staff, title='Scruffy the janitor',
+            type='janitor',  description="Don't know who that guy is")
+        sm = contest.Staff(title="Chip'n'Dale", type='rescuer',
             description='rescue ranger!')
-        self.assertIsInstance(sm, contest.StaffMember)
+        self.assertIsInstance(sm, contest.Staff)
+        self.assertIsInstance(sm.id, model.DomainIdentifier)
         self.assertEquals(sm.title, "Chip'n'Dale")
         self.assertEquals(sm.type, "rescuer")
         self.assertEquals(sm.description, "rescue ranger!")
         self.assertFalse(sm.phone)
 
     def test_phone(self):
-        self.assertRaises(ValueError, contest.StaffMember, title='Serenity',
+        self.assertRaises(ValueError, contest.Staff, title='Serenity',
             type='ambulance', description='firefly-class starship', phone='nope')
-        self.assertRaises(TypeError, contest.StaffMember, title='Serenity',
+        self.assertRaises(TypeError, contest.Staff, title='Serenity',
             type='ambulance', description='firefly-class starship', phone=1)
-        sm = contest.StaffMember(title='Millenium Falcon', type='ambulance',
+        sm = contest.Staff(title='Millenium Falcon', type='ambulance',
             description='piece of junk', phone='+3456324433')
-        self.assertIsInstance(sm, contest.StaffMember)
+        self.assertIsInstance(sm, contest.Staff)
+        self.assertIsInstance(sm.phone, Phone)
         self.assertEquals(sm.title, "Millenium Falcon")
         self.assertEquals(sm.type, "ambulance")
         self.assertEquals(sm.description, "piece of junk")
-        self.assertEquals(sm.phone, '+3456324433')
+        self.assertEquals(sm.phone, Phone('+3456324433'))
+
+    def test_equality(self):
+        sm = contest.Staff(title="Chip'n'Dale", type='rescuer',
+            description='rescue ranger!')
+        sm2 = contest.Staff(title="Chip'n'Dale", type='rescuer',
+            description='rescue ranger!', id=sm.id)
+        self.assertEqual(sm, sm2)
+
+    def test_nonequality(self):
+        sm = contest.Staff(title="Chip'n'Dale", type='rescuer',
+            description='rescue ranger!')
+        sm2 = contest.Staff(title="Chip'n'Dale", type='ambulance',
+            description='rescue ranger!', id=sm.id)
+        self.assertNotEqual(sm, sm2)
+
+    def test_immutability(self):
+        sm = contest.Staff(title="Chip'n'Dale", type='rescuer',
+            description='rescue ranger!')
+        self.assertRaises(AttributeError, setattr, sm, 'title', 'Hero')
 
 
 @unittest.expectedFailure
@@ -715,3 +735,14 @@ class ParagliderTest(unittest.TestCase):
             self.p.name, phone='+713')
         self.assertNotEqual(p1, p2)
 
+class WinddummyTest(unittest.TestCase):
+    def setUp(self):
+        self.p = create_person()
+
+    def test_creation(self):
+        w = contest.Winddummy(self.p.id, Phone('+7322'), self.p.name)
+        self.assertIsInstance(w.id, PersonID)
+        self.assertIsInstance(w.phone, Phone)
+        self.assertIsInstance(w.name, Name)
+        self.assertTupleEqual((w.id, w.phone, w.name),
+            (self.p.id, Phone('+7322'), self.p.name))

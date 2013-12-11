@@ -159,7 +159,7 @@ class ApplicationService(BaseApplicationService):
         defer.returnValue(cont)
 
     def add_staff_member_to_contest(self, params):
-        sm = contest.StaffMember(title=params['title'],
+        sm = contest.Staff(title=params['title'],
                                  type=params['type'],
                                  description=params.get('description', ''),
                                  phone=params.get('phone', ''))

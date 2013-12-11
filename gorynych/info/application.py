@@ -338,8 +338,8 @@ class LastPointApplication(SinglePollerService):
         # imei:ts
         self.points = dict()
 
-    def handle_payload(self, queue_name, channel, method_frame, header_frame,
-            body):
+    def handle_payload(self, channel, method_frame, header_frame,
+            body, queue_name):
         data = cPickle.loads(body)
         if not data.has_key('ts'):
             # ts key MUST be in a data.

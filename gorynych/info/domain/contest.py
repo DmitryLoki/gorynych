@@ -17,7 +17,8 @@ from gorynych.info.domain.ids import ContestID, RaceID, PersonID
 from gorynych.common.exceptions import DomainError
 from gorynych.common.domain.services import times_from_checkpoints
 
-
+ROLES = dict(organizer='organizers', staff='staff', windummy='windummies',
+    paraglider='paragliders')
 def _pluralize(role):
     plural_roles = dict(organizer='organizers', staff='staff', winddummy='winddummies', paraglider='paragliders')
     result = plural_roles.get(role)
@@ -232,46 +233,6 @@ class Contest(AggregateRoot):
                 raise ValueError("Times values violate aggregate's "
                                  "invariants.")
 
-    def add_paraglider(self, paraglider):
-        '''
-        Register person as a paraglider.
-        @param paraglider: paraglider registered.
-        @type paraglider: L{gorynych.info.domain.contest.Paraglider}
-        @return: self
-        @raise
-        '''
-        with TransactionalDict(self.paragliders) as paragliders:
-            paragliders[paraglider.id] = paraglider
-            self.check_invariants()
-        persistence.event_store().persist(ParagliderRegisteredOnContest(paraglider.id, self.id))
-        return self
-
-    def add_organizer(self, org):
-        with TransactionalDict(self.organizers) as orgs:
-            orgs[org.id] = org
-            self.check_invariants()
-        return self
-
-    def replace_organizer(self, org_id, new_org):
-        with TransactionalDict(self.organizers) as orgs:
-            orgs[org_id] = new_org
-            self.check_invariants()
-
-    def replace_paraglider(self, par_id, new_par):
-        with TransactionalDict(self.paragliders) as pars:
-            pars[par_id] = new_par
-            self.check_invariants()
-
-    def replace_windummy(self, w_id, new_w):
-        with TransactionalDict(self.winddummies) as winds:
-            winds[w_id] = new_w
-            self.check_invariants()
-
-    def replace_staff(self, s_id, new_s):
-        with TransactionalDict(self.staff) as staff:
-            staff[s_id] = new_s
-            self.check_invariants()
-
     def check_invariants(self):
         """
         Check next invariants for contest:
@@ -281,12 +242,34 @@ class Contest(AggregateRoot):
         not implemented:
         tasks are not overlapping
         """
-
         contest_numbers_are_unique(self)
         person_only_in_one_role(self)
         end_after_start = int(self.start_time) < int(self.end_time)
 
         assert end_after_start, "Start time must be before end time."
+
+
+# Meta adding
+for role in ROLES:
+    def create_adder_for(role):
+        def add_role(self, obj):
+            with TransactionalDict(getattr(self, ROLES[role])) as td:
+                td[obj.id] = obj
+                self.check_invariants()
+            if role == 'paraglider':
+                persistence.event_store().persist(
+                    ParagliderRegisteredOnContest(obj.id, self.id))
+            return self
+        return add_role
+    setattr(Contest, 'add_' + role, create_adder_for(role))
+
+    def create_replacer_for(role):
+        def replace_role(self, _id, obj):
+            with TransactionalDict(getattr(self, ROLES[role])) as td:
+                td[_id] = obj
+                self.check_invariants()
+        return replace_role
+    setattr(Contest, 'replace_' + role, create_replacer_for(role))
 
 
 def change(cont, params):

@@ -123,7 +123,7 @@ class PathMakerSBDProtocol(FrameReceivingProtocol):
             frame = Frame(ord(msg['data'][0]), msg['data'][1:])
             self.frameReceived(frame)
         else:
-            super(PathMakerSBDProtocol, self).dataReceived(self, msg['data'])
+            FrameReceivingProtocol.dataReceived(self, msg['data'])
 
     def frameReceived(self, frame):
         result = self.factory.service.check_message(frame.serialize(), proto='TCP',

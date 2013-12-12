@@ -13,6 +13,7 @@ class FrameReceivingProtocol(protocol.Protocol):
     """
 
     def __init__(self, *args, **kwargs):
+        self._buffer = ''
         self.reset()
 
     def reset(self):

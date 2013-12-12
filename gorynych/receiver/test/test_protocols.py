@@ -4,7 +4,8 @@ from twisted.trial import unittest
 from twisted.test import proto_helpers
 
 from gorynych.receiver.protocols import UDPTR203Protocol, UDPTeltonikaGH3000Protocol, \
-    RedViewGT60Protocol, App13ProtobuffMobileProtocol, PathMakerProtocol, TR203ReceivingProtocol
+    RedViewGT60Protocol, App13ProtobuffMobileProtocol, PathMakerProtocol, TR203ReceivingProtocol, \
+    PathMakerSBDProtocol
 from gorynych.receiver.receiver import ReceiverService
 from gorynych.receiver.factories import ReceivingFactory
 
@@ -160,3 +161,18 @@ class TestPathMaker_TCP(BaseProtoTestCase):
         self.proto.dataReceived(data[-1])
         self.assertTrue(self.proto.session.is_valid())
 
+
+class TestPathMakerSBD_TCP(BaseProtoTestCase):
+    protocol_type = PathMakerSBDProtocol
+    transport_type = 'tcp'
+
+    def setUp(self):
+        super(TestPathMakerSBD_TCP, self).setUp()
+        self.proto.frameReceived = mock.MagicMock()
+
+    def test_send_sbd_message(self):
+        # SBD protocols contain two parsers, so need to send actual message
+        msg = '\x01\x00\xa3\x01\x00\x1c\x01\x02\x03\x08300434060007200\x00\x00\x05\x00\x00R\xa8r\xa1\x02\x00\x81\x03\x18\x95\x13\x98\xf4t\xe1TV\xd9\x93\x82\xf2N\xaa\x9cYrN\x1ao\xf8\rX\x1cD=\x84\x83\xd8\xb9Xm\xd8\xb8\x19=\x82\xd8\xb8X,x\x99y\xc0\x02\\\xa2\xac\x1a`\x86\x804\xbb\t\x98!\xa1\xcci\x01f\xc8ir\x1b\x05qp\xb1\xd5\xa8\x98\xf2;\xa9\x83\x84btl\x05\xc1\xe6\xe4\x98y\xfa0\x80\xe5l\x02y-\xc0\x06\xe4\xb8\x84\xdb0\x80\x8c\xd6\xf1Kt\x03K\x85\xa5\xf3\xdb@T\'\x14\xfb0\x00\x00-\x9b\x1a\xc1'
+        expected = Frame(FrameId.PATHCHUNK_ZIPPED, '\x18\x95\x13\x98\xf4t\xe1TV\xd9\x93\x82\xf2N\xaa\x9cYrN\x1ao\xf8\rX\x1cD=\x84\x83\xd8\xb9Xm\xd8\xb8\x19=\x82\xd8\xb8X,x\x99y\xc0\x02\\\xa2\xac\x1a`\x86\x804\xbb\t\x98!\xa1\xcci\x01f\xc8ir\x1b\x05qp\xb1\xd5\xa8\x98\xf2;\xa9\x83\x84btl\x05\xc1\xe6\xe4\x98y\xfa0\x80\xe5l\x02y-\xc0\x06\xe4\xb8\x84\xdb0\x80\x8c\xd6\xf1Kt\x03K\x85\xa5\xf3\xdb@T\'\x14\xfb0\x00\x00-\x9b\x1a\xc1')
+        self.proto.dataReceived(msg)
+        self.proto.frameReceived.assert_called_with(expected)

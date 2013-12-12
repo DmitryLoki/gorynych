@@ -8,6 +8,8 @@ from pbformat import MobileId_pb2
 from constants import FrameId
 from chunk_reader import ChunkReader
 
+import zlib
+
 
 @implementer(IParseMessage)
 class App13Parser(object):
@@ -103,6 +105,7 @@ class PathMakerParser(object):
         self.handlers = {
             FrameId.MOBILEID: self._imei_handler,
             FrameId.PATHCHUNK: self._path_handler,
+            FrameId.PATHCHUNK_ZIPPED: self._compressed_path_handler,
             # to be filled
         }
 
@@ -116,6 +119,9 @@ class PathMakerParser(object):
     def _path_handler(self, msg):
         reader = ChunkReader(msg)
         return [point for point in reader.unpack()]
+
+    def _compressed_path_handler(self, msg):
+        return self._path_handler(zlib.decompress(msg))
 
     def parse(self, frame):
         if frame.id not in self.handlers:
@@ -133,32 +139,6 @@ class PathMakerParser(object):
             return response.serialize()
 
 
-@implementer(IParseMessage)
-class SBDParser(App13Parser):
-    """
-    Method 'parse' is a little bit different: simple-packed case is allowed,
-    and message is a dict, not a string.
-    """
-
-    def parse(self, msg):
-        # if no imei encountered, raise error
-        if not msg['imei']:
-            raise ValueError('Orphan message; no imei found')
-        self.points = []
-
-        if ord(msg['data'][0]) != MAGIC_BYTE:  # simple-packed frame, no collection
-            self._parse_frame(ord(msg['data'][0]), msg['data'][1:])
-        else:
-            self._parse_collection(msg['data'])
-
-        for point in self.points:
-            point['imei'] = msg.imei
-
-        response = self.points
-        del self.points
-        return response
-
-
 class Frame(object):
 
     def __init__(self, frame_id, frame_msg):
@@ -166,7 +146,10 @@ class Frame(object):
         self.msg = frame_msg
 
     def __repr__(self):
-        return self.serialize()
+        return self.serialize().encode('string_escape')
 
     def serialize(self):
         return HEADER.pack(MAGIC_BYTE, self.id, len(self.msg)) + self.msg
+
+    def __eq__(self, other):
+        return self.id == other.id and self.msg == other.msg

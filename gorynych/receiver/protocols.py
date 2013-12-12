@@ -6,6 +6,8 @@ from struct import Struct
 from twisted.internet import protocol
 from twisted.protocols import basic
 
+from gorynych.receiver.base_protocols import FrameReceivingProtocol
+
 
 class TR203ReceivingProtocol(basic.LineOnlyReceiver):
     '''
@@ -64,108 +66,73 @@ class App13ProtobuffMobileProtocol(protocol.Protocol):
         self.factory.service.handle_message(
             data, proto='TCP', device_type=self.device_type)
 
-
+from gorynych.receiver.parsers.app13.session import PathMakerSession
 from gorynych.receiver.parsers.app13.parser import Frame
-from gorynych.receiver.parsers.app13.constants import HEADER, MAGIC_BYTE, FrameId
+from gorynych.receiver.parsers.app13.constants import FrameId, MAGIC_BYTE
 
 
-class PathMakerProtocol(protocol.Protocol):
+class PathMakerProtocol(FrameReceivingProtocol):
     """
-    New mobile application protocol, is also used by a satellite modem.
+    Hybrid tracker protocol.
     """
     device_type = 'pmtracker'
 
-    def __init__(self, *args, **kwargs):
-        self._reset()
-
-    def _reset(self):
-        from gorynych.receiver.parsers.app13.session import PathMakerSession
+    def reset(self):
         self.session = PathMakerSession()  # let's start new session
         self._buffer = ''
 
-    def dataReceived(self, data):
-        self._buffer += data
-        cursor = 0
-        while True:
-            if len(self._buffer) < HEADER.size:
-                break
-            if cursor >= len(self._buffer):
-                break
-            try:
-                magic, frame_id, payload_len = HEADER.unpack_from(self._buffer, cursor)
-            except:
-                self._reset()
-                raise ValueError('Unrecognized header')
-            if magic != MAGIC_BYTE:
-                self._reset()
-                raise ValueError('Magic byte mismatch')
-            frame_len = payload_len + HEADER.size
-            if len(self._buffer) < frame_len:  # keep accumulating
-                break
-            msg = self._buffer[cursor + HEADER.size: cursor + frame_len]
-            cursor += frame_len
-
-            # go to the parser
-            result = self.factory.service.check_message(data, proto='TCP',
-                                                        device_type=self.device_type)
-            data = Frame(frame_id, msg)
-            resp = self.factory.service.parser.get_response(data)
-            if resp:
-                self.transport.write(resp)
-            parsed = self.factory.service.parser.parse(data)
-
-            if frame_id == FrameId.MOBILEID:
-                self.session.init(parsed)
+    def frameReceived(self, frame):
+        # log'n'check
+        result = self.factory.service.check_message(frame.serialize(), proto='TCP',
+                                                    device_type=self.device_type)
+        resp = self.factory.service.parser.get_response(frame)
+        if resp:
+            self.transport.write(resp)
+        parsed = self.factory.service.parser.parse(frame)
+        if frame.id == FrameId.MOBILEID:
+            self.session.init(parsed)
+        else:
+            if self.session.is_valid():
+                for item in parsed:
+                    item.update(self.session.params)
+                print parsed
+                result.addCallback(lambda _: self.factory.service.store_point(parsed))
             else:
-                if self.session.is_valid():
-                    for item in parsed:
-                        item.update(self.session.params)
-                    result.addCallback(lambda _: self.factory.service.store_point(parsed))
-                else:
-                    self._reset()
-                    raise ValueError('Bad session: {}'.format(self.session.params))
+                self.reset()
+                raise ValueError('Bad session: {}'.format(self.session.params))
 
-        self._buffer = self._buffer[cursor:]
+from gorynych.receiver.parsers.sbd import unpack_sbd
 
 
-class IridiumSBDProtocol(protocol.Protocol):
+class PathMakerSBDProtocol(FrameReceivingProtocol):
     """
-    It's actually the same App13ProtobuffMobileProtocol encapsulated in SBD package.
-    It also sends no confirmation.
+    It's actually the same PathMakerProtocol encapsulated in SBD package.
+    There're a few differences - no confirmation sent, no session,
+    each SBD package contaits imei.
     """
-    device_type = 'new_mobile_sbd'
+    device_type = 'pmtracker_sbd'
 
-    def __init__(self):
-        self.main_struct = Struct('!BH')
-        self.element_struct = Struct('!I15sBHHI')
+    def dataReceived(self, data):
+        # override dataReceived to handle SBD and single-frame case
+        msg = unpack_sbd(data)
+        if not msg.get('imei') or not msg.get('data'):
+            raise ValueError('Bad message (no imei or data): {}'.format(msg))
+        self.imei = msg['imei']
+        if ord(msg['data'][0]) != MAGIC_BYTE:
+            # single-frame case
+            frame = Frame(ord(msg['data'][0]), msg['data'][1:])
+            self.frameReceived(frame)
+        else:
+            super(PathMakerSBDProtocol, self).dataReceived(self, msg['data'])
 
-    def _unpack_sbd(self, data):
-        msg = dict()
-
-        def parce_element(data, iei, cursor, size):
-            if iei == 1:  # header
-                msg['cdr'], msg['imei'], msg['MOStatus'], msg['MOMSN'],\
-                    msg['MTMSN'], msg['time'] = \
-                    self.element_struct.unpack_from(data, cursor)
-            elif iei == 2:  # message
-                msg['data'] = data[cursor:cursor + size]
-
-        protocol_revision, total = self.main_struct.unpack_from(data)
-        total += 3
-        cursor = 3
-        assert len(data) == total
-        while cursor < total:
-            iei, size = self.main_struct.unpack_from(data, cursor)
-            cursor += 3
-            parce_element(data, iei, cursor, size)
-            cursor += size
-        return msg
-
-    def dataRaceived(self, data):
-        msg = self._unpack_sbd(data)
-        self.factory.service.handle_message(
-            msg, proto='TCP', device_type=self.device_type)
-
+    def frameReceived(self, frame):
+        result = self.factory.service.check_message(frame.serialize(), proto='TCP',
+                                                    device_type=self.device_type)
+        parsed = self.factory.service.parser.parse(frame)
+        for item in parsed:
+            item['imei'] = self.imei
+        print parsed
+        result.addCallback(lambda _: self.factory.service.store_point(parsed))
 
 
 class RedViewGT60Protocol(protocol.Protocol):
@@ -182,3 +149,4 @@ telt_gh3000_udp_protocol = UDPTeltonikaGH3000Protocol
 app13_tcp_protocol = App13ProtobuffMobileProtocol
 gt60_tcp_protocol = RedViewGT60Protocol
 pmtracker_tcp_protocol = PathMakerProtocol
+pmtracker_sbd_tcp_protocol = PathMakerSBDProtocol

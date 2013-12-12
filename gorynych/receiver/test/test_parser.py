@@ -233,6 +233,28 @@ class PmtrackerTestCase(App13TestCase):
         self.assertRaises(
             google.protobuf.message.DecodeError, self.parser.parse, bad_frame_normal_id)
 
+from gorynych.receiver.parsers.sbd import unpack_sbd
+
+
+class TestSbdParser(unittest.TestCase):
+    # a little bit diffirent from any other
+    def test_good_message(self):
+        msg = '\x01\x00\xa4\x01\x00\x1c\x01\x02\x03\x0b300434060007200\x00\x00\x08\x00\x00R\xa8r\xce\x02\x00\x82\x03\x18\x95\x13\xd8\xfft\xe1TVY\x1bay\'\xd5\xd049\'\x8d\x0b\xfc\x06\xec\x0e2\x1e\x1aA\x1c\\l5l\xecLV"A\xec\\\xac6|\xfc,.`\x86\x94$\x9b\x0f\x98\xa1!\xcb\x91\x00Vd\xa6\xc8\x13\x04Q\xee\xa4,\x14`\x03fE\xa9\xcbx\x19\x05qr\xb1\xd7\xb1\xa4\xe9*\xb8i\x04\xb1q\xb1\xc8\x14\x18\xaa\x80%+\xcc\xd5\x8cD@"\x16\xce\x1a&`\x91"_%\x0bk0++X\xc5F\x04\x00\x8e\xd0\x1c]'
+        expected = {
+            'MOStatus': 0,
+            'MTMSN': 0,
+            'MOMSN': 8,
+            'cdr': 16909067,
+            'time': 1386771150,
+            'imei': '300434060007200',
+            'data': '\x03\x18\x95\x13\xd8\xfft\xe1TVY\x1bay\'\xd5\xd049\'\x8d\x0b\xfc\x06\xec\x0e2\x1e\x1aA\x1c\\l5l\xecLV"A\xec\\\xac6|\xfc,.`\x86\x94$\x9b\x0f\x98\xa1!\xcb\x91\x00Vd\xa6\xc8\x13\x04Q\xee\xa4,\x14`\x03fE\xa9\xcbx\x19\x05qr\xb1\xd7\xb1\xa4\xe9*\xb8i\x04\xb1q\xb1\xc8\x14\x18\xaa\x80%+\xcc\xd5\x8cD@"\x16\xce\x1a&`\x91"_%\x0bk0++X\xc5F\x04\x00\x8e\xd0\x1c]'
+        }
+        self.assertEquals(expected, unpack_sbd(msg))
+
+    def test_bad_message(self):
+        msg = "she'll be coming 'round the mountain when she comes"
+        self.assertRaises(ValueError, unpack_sbd, msg)
+
 
 if __name__ == '__main__':
     unittest.main()

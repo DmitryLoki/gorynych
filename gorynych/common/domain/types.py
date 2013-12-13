@@ -299,3 +299,32 @@ def TransactionalDict(dic):
         dic.clear()
         dic.update(backup)
         raise e
+
+
+class Title(ValueObject):
+    def __init__(self, title):
+        if isinstance(title, (str, unicode)) and len(title.strip()) > 0:
+            self.title = title.strip()
+        elif isinstance(title, Title):
+            self.title = title.title
+        else:
+            raise ValueError(
+                'Non-zero-length string or Title expected, got {} instead'
+                .format(title))
+
+    def __str__(self):
+        return self.title
+
+    __repr__ = __str__
+
+    def __eq__(self, other):
+        if isinstance(other, (str, unicode)):
+            return self.title == other
+        elif isinstance(other, Title):
+            return self.title == other.title
+
+    def __ne__(self, other):
+        if isinstance(other, (str, unicode)):
+            return self.title != other
+        elif isinstance(other, Title):
+            return self.title != other.title

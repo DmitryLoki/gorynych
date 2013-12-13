@@ -336,5 +336,40 @@ class TransactionalDictTest(unittest.TestCase):
         self.assertDictEqual(b.dic, dict(a='b'))
 
 
+class TitleTest(unittest.TestCase):
+    def test_wrong_title(self):
+        self.assertRaises(ValueError, types.Title, '')
+        self.assertRaises(ValueError, types.Title, None)
+        self.assertRaises(ValueError, types.Title, ' ')
+        self.assertRaises(ValueError, types.Title, 1)
+
+    def test_init_from_str(self):
+        t = types.Title('hello')
+        self.assertIsInstance(t.title, str)
+        self.assertEqual(t.title, 'hello')
+
+    def test_init_from_title(self):
+        t = types.Title(types.Title('hello'))
+        self.assertIsInstance(t.title, str)
+        self.assertEqual(t.title, 'hello')
+
+    def test_strip(self):
+        self.assertEqual(types.Title(' hello ').title, 'hello')
+
+    def test_str(self):
+        self.assertEqual(str(types.Title('title')), 'title')
+
+    def test_repr(self):
+        self.assertEqual(repr(types.Title('title')), 'title')
+
+    def test_equality(self):
+        self.assertEqual(types.Title('title'), types.Title('title'))
+        self.assertEqual(types.Title('title'), 'title')
+
+    def test_nonequality(self):
+        self.assertNotEqual(types.Title('title1'), types.Title('title'))
+        self.assertNotEqual(types.Title('title1'), 'title')
+
+
 if __name__ == '__main__':
     unittest.main()

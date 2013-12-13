@@ -6,7 +6,8 @@ import mock
 from gorynych.common.domain import events, model
 from gorynych.info.domain.test.helpers import create_contest, create_person, create_checkpoints
 from gorynych.info.domain import contest
-from gorynych.common.domain.types import Address, Name, Country, Phone, MappingCollection
+from gorynych.common.domain.types import Address, Name, Country, Phone, \
+    MappingCollection, Title
 from gorynych.info.domain.ids import PersonID, RaceID
 from gorynych.common.exceptions import DomainError
 
@@ -55,10 +56,10 @@ class ContestFactoryTest(unittest.TestCase):
     def test_contestid_successfull_contest_creation(self):
         cont = create_contest(1, 2)
         self.assertIsInstance(cont.address, Address)
+        self.assertIsInstance(cont.title, Title)
         self.assertEqual(cont.title, 'Hello world')
         self.assertEqual(cont.address, Address('Yrupinsk', 'RU', '45.23,-23.22'))
         self.assertEqual(cont.timezone, 'Europe/Moscow')
-        #self.assertEqual(cont.place, 'Yrupinsk')
         self.assertEquals((cont.start_time, cont.end_time), (1, 2))
         self.assertIsInstance(cont.id, contest.ContestID)
         self.assertIsNone(cont._id)
@@ -96,7 +97,6 @@ class EventsApplyingTest(unittest.TestCase):
 
 
 class ContestTest(unittest.TestCase):
-    @unittest.expectedFailure
     def test_times_changing(self):
         cont = create_contest(1, '15')
         cont.start_time = '2'
@@ -113,7 +113,7 @@ class ContestTest(unittest.TestCase):
 
     def test_change_title(self):
         cont = create_contest(1, '15')
-        cont.title = '  hello moOn  '
+        cont.title = Title('  hello moOn  ')
         self.assertEqual(cont.title, 'hello moOn')
 
     def test_change_address(self):
@@ -350,7 +350,6 @@ class StaffMemberTest(unittest.TestCase):
         self.assertRaises(AttributeError, setattr, sm, 'title', 'Hero')
 
 
-@unittest.expectedFailure
 class TestRaceToGoalTask(unittest.TestCase):
 
     def setUp(self):
@@ -452,7 +451,6 @@ class TestRaceToGoalTask(unittest.TestCase):
         self.assertFalse(t.is_task_correct())
 
 
-@unittest.expectedFailure
 class TestSpeedRunTask(unittest.TestCase):
 
     def setUp(self):
@@ -516,7 +514,6 @@ class TestSpeedRunTask(unittest.TestCase):
         self.assertFalse(t.is_task_correct())
 
 
-@unittest.expectedFailure
 class TestOpenDistanceTask(unittest.TestCase):
 
     def setUp(self):
@@ -571,7 +568,6 @@ class TestOpenDistanceTask(unittest.TestCase):
         self.assertFalse(t.is_task_correct())
 
 
-@unittest.expectedFailure
 class TestContestTasks(unittest.TestCase):
 
     def setUp(self):

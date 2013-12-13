@@ -3,14 +3,13 @@ Contest Aggregate.
 '''
 from copy import deepcopy
 import datetime
-from operator import attrgetter
 from collections import defaultdict
 
 import pytz
 
 from gorynych.info.domain import transport
 from gorynych.common.domain.model import AggregateRoot, ValueObject, DomainIdentifier
-from gorynych.common.domain.types import Address, Country, Phone, Checkpoint, MappingCollection, TransactionalDict
+from gorynych.common.domain.types import Address, Country, Phone, Checkpoint, MappingCollection, TransactionalDict, Title
 from gorynych.common.domain.events import ParagliderRegisteredOnContest
 from gorynych.common.infrastructure import persistence
 from gorynych.info.domain.ids import ContestID, RaceID, PersonID
@@ -20,7 +19,8 @@ from gorynych.common.domain.services import times_from_checkpoints
 ROLES = dict(organizer='organizers', staff='staff', winddummy='winddummies',
     paraglider='paragliders')
 def _pluralize(role):
-    plural_roles = dict(organizer='organizers', staff='staff', winddummy='winddummies', paraglider='paragliders')
+    plural_roles = dict(organizer='organizers', staff='staff',
+        winddummy='winddummies', paraglider='paragliders')
     result = plural_roles.get(role)
     if result is None:
         raise ValueError("Can't pluralize %s" % role)
@@ -37,8 +37,7 @@ class ContestFactory(object):
             contest_id = ContestID()
         if not timezone in pytz.all_timezones_set:
             raise pytz.exceptions.UnknownTimeZoneError("Wrong timezone.")
-        contest = Contest(contest_id, start_time, end_time, address)
-        contest.title = title
+        contest = Contest(contest_id, start_time, end_time, address, title)
         contest.timezone = timezone
         return contest
 
@@ -76,10 +75,10 @@ def person_only_in_one_role(cont):
 ###################################################################
 
 class Contest(AggregateRoot):
-    def __init__(self, contest_id, start_time, end_time, address):
+    def __init__(self, contest_id, start_time, end_time, address, title):
         super(Contest, self).__init__()
         self.id = ContestID(contest_id)
-        self._title = ''
+        self.title = Title(title)
         self._timezone = ''
         self._start_time = start_time
         self._end_time = end_time
@@ -91,9 +90,6 @@ class Contest(AggregateRoot):
         self.paragliders = MappingCollection()
         self.winddummies = MappingCollection()
         self.staff = MappingCollection()
-
-    title = property(attrgetter('_title'),
-        lambda self, x: setattr(self, '_title', x.strip()))
 
     @property
     def timezone(self):
@@ -126,10 +122,11 @@ class Contest(AggregateRoot):
             return
         old_start_time = self.start_time
         self._start_time = int(value)
-        if not self.check_invariants():
+        try:
+            self.check_invariants()
+        except DomainError as e:
             self._start_time = old_start_time
-            raise ValueError("Incorrect start_time violate aggregate's "
-                             "invariants.")
+            raise e
 
     @property
     def end_time(self):
@@ -141,10 +138,11 @@ class Contest(AggregateRoot):
             return
         old_end_time = self.end_time
         self._end_time = int(value)
-        if not self.check_invariants():
+        try:
+            self.check_invariants()
+        except DomainError as e:
             self._end_time = old_end_time
-            raise DomainError("Incorrect end_time violate aggregate's "
-                              "invariants.")
+            raise e
 
     @property
     def tasks(self):
@@ -343,7 +341,7 @@ class Staff(ValueObject):
         self.title = title
         self.type = type
         self.phone = Phone(phone) if phone else ''
-        self.id = DomainIdentifier(id)
+        self.id = DomainIdentifier(id) if id else DomainIdentifier()
         self.description = description
 
 
@@ -382,19 +380,13 @@ class BaseTask(ValueObject):
     """
 
     def __init__(self, task_id, title, checkpoints):
-        if isinstance(task_id, RaceID):
-            self.id = task_id
-        elif isinstance(task_id, (str, unicode)):
-            self.id = RaceID.fromstring(task_id)
-        else:
-            raise TypeError('Unexpected task id: {}'.format(task_id))
+        self.id = RaceID(task_id)
+        self.title = Title(title)
         self._check_checkpoints(checkpoints)
         st, et = times_from_checkpoints(checkpoints)
         self._check_timelimits(st, et)
         self.start_time = st
         self.deadline = et
-        self._check_title(title)
-        self._title = title
         self._checkpoints = checkpoints
 
     def _check_timelimits(self, start_time, deadline):
@@ -416,16 +408,10 @@ class BaseTask(ValueObject):
             if not isinstance(chp, Checkpoint):
                 raise TypeError("Wrong checkpoint type: {}".format(type(chp)))
 
-    def _check_title(self, title):
-        if not isinstance(title, (str, unicode)) or len(title.strip()) == 0:
-            raise ValueError(
-                'Expection non-zero-length string, got {} instead'.format(title))
-
     def is_task_correct(self):
         try:
             self._check_timelimits(self.start_time, self.deadline)
             self._check_checkpoints(self._checkpoints)
-            self._check_title(self._title)
         except (ValueError, TypeError):
             return False
         return True
@@ -442,15 +428,6 @@ class BaseTask(ValueObject):
         self.start_time = st
         self.deadline = et
         self._checkpoints = value
-
-    @property
-    def title(self):
-        return self._title
-
-    @title.setter
-    def title(self, value):
-        self._check_title(value)
-        self._title = value.strip()
 
     def __eq__(self, other):
         return self.id == other.id and self.title == other.title \

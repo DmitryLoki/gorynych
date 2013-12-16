@@ -27,7 +27,7 @@ def json_renderer(data, template_name=None):
         return json.dumps(data, cls=DomainJsonEncoder)
     except TypeError as e:
         raise TypeError('Failed to encode json response: {}'.format(e.message))
-        
+
 
 def resource_tree(filename=os.path.join(os.path.dirname(__file__),
                                 YAML_TREE_FILE)):
@@ -82,7 +82,7 @@ class APIResource(resource.Resource):
 
 
     @defer.inlineCallbacks
-    def _render_method(self, request, method_func):
+    def _render_method(self, request, method_func, request_params={}):
         '''
         Other render_METHOD methods delegate their work to this method.
         Most of the work is doing here.
@@ -95,13 +95,14 @@ class APIResource(resource.Resource):
         @rtype: C{Deferred}
         '''
         # get parameters from request
-        try:
-            request_params = self.parameters_from_request(request)
-            #log.msg("request: %r params: %s " % (request, request_params) )
-        except Exception as error:
-            self._handle_error(request, 400, "Bad input parameters or URI",
-                repr(error))
-            defer.returnValue('')
+        if not request_params:
+            try:
+                request_params = self.parameters_from_request(request)
+                #log.msg("request: %r params: %s " % (request, request_params) )
+            except Exception as error:
+                self._handle_error(request, 400, "Bad input parameters or URI",
+                    repr(error))
+                defer.returnValue('')
 
         # get service function which will handle request
         try:
@@ -240,7 +241,7 @@ class APIResource(resource.Resource):
                     transport='transport_id')
 
         result = dict()
-        if req.method == "PUT":
+        if req.method in ["PUT", "POST"]:
             content = req.content.read()
             try:
                 args = json.loads(content)

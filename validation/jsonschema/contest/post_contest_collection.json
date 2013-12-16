@@ -1,0 +1,55 @@
+{
+    "type":"object",
+    "$schema": "http://json-schema.org/draft-03/schema#",
+    "title": "New contest",
+    "description": "Add new contest",
+    "properties":{
+        "country": {
+            "type":"string",
+            "required":true,
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "Two-letter country code, like EN"
+        },
+        "start_time": {
+            "type":"number",
+            "required":true,
+            "minimum": 0,
+            "description": "Timestamp format. Start time must be lesser then end_time"
+        },
+        "end_time": {
+            "type":"number",
+            "required":true,
+            "minimum": 0,
+            "description": "Timestamp format. End time must be greater then start_time"
+        },
+        "hq_coords": {
+            "type":"array",
+            "required":true,
+            "description": "Headquarters coordinates: should be two float numbers",
+            "items": {
+                "type": "number",
+                "not": {
+                    "type": "integer"
+                }
+            },
+            "minItems": 2,
+            "maxItems": 2
+        },
+        "place": {
+            "type":"string",
+            "required":true,
+            "description": "A place where contest is hosted"
+        },
+        "timezone": {
+            "type":"string",
+            "required":true,
+            "description": "String format, like Europe/Moscow"
+        },
+        "title": {
+            "type":"string",
+            "required":true,
+            "description": "Contest title"
+        }
+    }
+}

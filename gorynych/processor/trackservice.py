@@ -5,6 +5,7 @@ from gorynych import BaseOptions
 from gorynych.processor.services.trackservice import TrackService, ProcessorService, OnlineTrashService
 from gorynych.processor.infrastructure.persistence import TrackRepository
 from gorynych.common.infrastructure import persistence
+from gorynych.common.infrastructure.messaging import RabbitMQObject
 from gorynych.eventstore.eventstore import EventStore
 from gorynych.eventstore.store import PGSQLAppendOnlyStore
 
@@ -29,10 +30,10 @@ def makeService(config, services=None):
     track_repository = TrackRepository(pool)
 
     # Online
-    online_service = OnlineTrashService(pool, track_repository,
-        host='localhost',
-        port=5672, exchange='receiver', queues_no_ack=True, exchange_type='fanout')
-
+    rabbit_connection = RabbitMQObject(host='localhost', port=5672,
+                                       exchange='receiver', queues_no_ack=True,
+                                       exchange_type='fanout')
+    online_service = OnlineTrashService(pool, track_repository, rabbit_connection)
 
     track_service = TrackService(pool, event_store, track_repository)
     processor_service = ProcessorService(pool, event_store)

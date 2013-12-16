@@ -1,7 +1,6 @@
 # encoding: utf-8
 
-from struct import Struct
-
+from gorynych.receiver.parsers.app13.constants import HEADER, MAGIC_BYTE
 from gorynych.receiver.parsers import IParseMessage
 from zope.interface import implementer
 
@@ -9,22 +8,11 @@ from pbformat import MobileId_pb2
 from constants import FrameId
 from chunk_reader import ChunkReader
 
-
-HEADER = Struct('!BBH')
-MAGIC_BYTE = 0xBA
+import zlib
 
 
-class Frame(object):
-
-    def __init__(self, frame_id, frame_msg):
-        self.id = frame_id
-        self.msg = frame_msg
-
-    def serialize(self):
-        return HEADER.pack(MAGIC_BYTE, self.id, len(self.msg)) + self.msg
-
-
-class App13Tracker(object):
+@implementer(IParseMessage)
+class App13Parser(object):
     '''
     Common class for mobile application tracker and satellite tracker.
     '''
@@ -93,18 +81,10 @@ class App13Tracker(object):
                 result.append(response.serialize())
         return result
 
-
-@implementer(IParseMessage)
-class App13Parser(App13Tracker):
-    '''
-    Parse mobile application tracker developed at the end of 2013.
-    '''
-
     def parse(self, msg):
         self.points = []
         self._parse_collection(msg)
 
-        print self.points
         # if no imei encountered, raise error
         if not self.imei:
             raise ValueError('Orphan message; no imei found')
@@ -113,31 +93,63 @@ class App13Parser(App13Tracker):
             point['imei'] = self.imei
 
         response = self.points
+        print response
         del self.points
         return response
 
 
 @implementer(IParseMessage)
-class SBDParser(App13Tracker):
-    """
-    Method 'parse' is a little bit different: simple-packed case is allowed,
-    and message is a dict, not a string.
-    """
+class PathMakerParser(object):
 
-    def parse(self, msg):
-        # if no imei encountered, raise error
-        if not msg['imei']:
-            raise ValueError('Orphan message; no imei found')
-        self.points = []
+    def __init__(self):
+        self.handlers = {
+            FrameId.MOBILEID: self._imei_handler,
+            FrameId.PATHCHUNK: self._path_handler,
+            FrameId.PATHCHUNK_ZIPPED: self._compressed_path_handler,
+            # to be filled
+        }
 
-        if ord(msg['data'][0]) != MAGIC_BYTE:  # simple-packed frame, no collection
-            self._parse_frame(ord(msg['data'][0]), msg['data'][1:])
-        else:
-            self._parse_collection(msg['data'])
+    def _imei_handler(self, msg):
+        mob_id = MobileId_pb2.MobileId()
+        mob_id.ParseFromString(msg)
+        if not mob_id.HasField('imei'):
+            raise ValueError("ID frame contains no imei")
+        return dict(imei=mob_id.imei)
 
-        for point in self.points:
-            point['imei'] = msg.imei
+    def _path_handler(self, msg):
+        reader = ChunkReader(msg)
+        return [point for point in reader.unpack()]
 
-        response = self.points
-        del self.points
-        return response
+    def _compressed_path_handler(self, msg):
+        return self._path_handler(zlib.decompress(msg))
+
+    def parse(self, frame):
+        if frame.id not in self.handlers:
+            raise ValueError('Unknown frame id')
+        return self.handlers[frame.id](frame.msg)
+
+    def check_message_correctness(self, msg):
+        return msg
+
+    def get_response(self, frame):
+        if frame.id in [FrameId.PATHCHUNK, FrameId.PATHCHUNK_ZIPPED]:
+            reader = ChunkReader(frame.msg)
+            response = Frame(
+                FrameId.PATHCHUNK_CONF, reader.make_response())
+            return response.serialize()
+
+
+class Frame(object):
+
+    def __init__(self, frame_id, frame_msg):
+        self.id = frame_id
+        self.msg = frame_msg
+
+    def __repr__(self):
+        return self.serialize().encode('string_escape')
+
+    def serialize(self):
+        return HEADER.pack(MAGIC_BYTE, self.id, len(self.msg)) + self.msg
+
+    def __eq__(self, other):
+        return self.id == other.id and self.msg == other.msg

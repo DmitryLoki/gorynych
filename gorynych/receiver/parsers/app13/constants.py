@@ -4,6 +4,10 @@
 *Proto classes contain fields as defined in the protocol. In case
 of any protocol changes you need to edit them accordingly
 """
+from struct import Struct
+
+HEADER = Struct('!BBH')
+MAGIC_BYTE = 0xBA
 
 
 class BasePointProto(object):

@@ -5,38 +5,11 @@ from struct import Struct
 
 from twisted.internet import protocol
 from twisted.protocols import basic
-from twisted.python import log
-from twisted.web.resource import Resource
 
-
-def check_device_type(msg):
-    if msg[0] == 'G':
-        result = 'tr203'
-    else:
-        result = 'telt_gh3000'
-    return result
-
-
-class UDPReceivingProtocol(protocol.DatagramProtocol):
-
-    '''
-    Unused.
-    '''
-
-    def __init__(self, service):
-        self.service = service
-
-    def datagramReceived(self, datagram, addr):
-        device_type = check_device_type(datagram)
-        if device_type == 'telt_gh3000':
-            response = self.service.parsers[device_type].get_response(datagram)
-            self.transport.write(response, addr)
-        self.service.handle_message(datagram, proto='UDP', client=addr,
-                                    device_type=device_type)
+from gorynych.receiver.base_protocols import FrameReceivingProtocol
 
 
 class TR203ReceivingProtocol(basic.LineOnlyReceiver):
-
     '''
     TCP-receiving protocol for tr203.
     '''
@@ -51,126 +24,115 @@ class TR203ReceivingProtocol(basic.LineOnlyReceiver):
 
 
 class UDPTR203Protocol(protocol.DatagramProtocol):
-
     '''
     UDP-receiving protocol for tr203.
     '''
     device_type = 'tr203'
 
-    def __init__(self, service):
-        self.service = service
+    # def __init__(self, service):
+    #     self.service = service
 
     def datagramReceived(self, datagram, sender):
-        self.service.handle_message(datagram, proto='UDP',
-                                    device_type=self.device_type)
+        self.factory.service.handle_message(datagram, proto='UDP',
+                                            device_type=self.device_type)
 
 
 class UDPTeltonikaGH3000Protocol(protocol.DatagramProtocol):
-
     '''
     UDP receiving protocol for Teltonika GH3000.
     '''
     device_type = 'telt_gh3000'
 
-    def __init__(self, service):
-        self.service = service
+    # def __init__(self, service):
+    #     self.service = service
 
     def datagramReceived(self, datagram, sender):
-        response = self.service.parsers[
-            self.device_type].get_response(datagram)
+        response = self.factory.service.parser.get_response(datagram)
         self.transport.write(response, sender)
-        self.service.handle_message(datagram, proto='UDP', client=sender,
-                                    device_type=self.device_type)
-
-
-class MobileReceivingProtocol(protocol.Protocol):
-
-    '''
-    Protocol for old unused mobile application.
-    '''
-    device_type = 'mobile'
-
-    def dataReceived(self, data):
-        self.factory.service.handle_message(
-            data, proto='TCP', device_type=self.device_type)
+        self.factory.service.handle_message(datagram, proto='UDP', client=sender,
+                                            device_type=self.device_type)
 
 
 class App13ProtobuffMobileProtocol(protocol.Protocol):
-
     """
     New mobile application protocol, is also used by a satellite modem.
     """
     device_type = 'app13'
 
     def dataReceived(self, data):
-        resp_list = self.factory.service.parsers[
-            self.device_type].get_response(data)
+        resp_list = self.factory.service.parser.get_response(data)
         for response in resp_list:
             self.transport.write(response)
         self.factory.service.handle_message(
             data, proto='TCP', device_type=self.device_type)
 
+from gorynych.receiver.parsers.app13.session import PathMakerSession
+from gorynych.receiver.parsers.app13.parser import Frame
+from gorynych.receiver.parsers.app13.constants import FrameId, MAGIC_BYTE
 
-class IridiumSBDProtocol(protocol.Protocol):
 
+class PathMakerProtocol(FrameReceivingProtocol):
     """
-    It's actually the same App13ProtobuffMobileProtocol encapsulated in SBD package.
-    It also sends no confirmation.
+    Hybrid tracker protocol.
     """
-    device_type = 'new_mobile_sbd'
+    device_type = 'pmtracker'
 
-    def __init__(self):
-        self.main_struct = Struct('!BH')
-        self.element_struct = Struct('!I15sBHHI')
+    def reset(self):
+        self.session = PathMakerSession()  # let's start new session
+        self._buffer = ''
 
-    def _unpack_sbd(self, data):
-        msg = dict()
+    def frameReceived(self, frame):
+        # log'n'check
+        result = self.factory.service.check_message(frame.serialize(), proto='TCP',
+                                                    device_type=self.device_type)
+        resp = self.factory.service.parser.get_response(frame)
+        if resp:
+            self.transport.write(resp)
+        parsed = self.factory.service.parser.parse(frame)
+        if frame.id == FrameId.MOBILEID:
+            self.session.init(parsed)
+        else:
+            if self.session.is_valid():
+                for item in parsed:
+                    item.update(self.session.params)
+                print parsed
+                result.addCallback(lambda _: self.factory.service.store_point(parsed))
+            else:
+                self.reset()
+                raise ValueError('Bad session: {}'.format(self.session.params))
 
-        def parce_element(data, iei, cursor, size):
-            if iei == 1:  # header
-                msg['cdr'], msg['imei'], msg['MOStatus'], msg['MOMSN'],\
-                    msg['MTMSN'], msg['time'] = \
-                    self.element_struct.unpack_from(data, cursor)
-            elif iei == 2:  # message
-                msg['data'] = data[cursor:cursor + size]
-
-        protocol_revision, total = self.main_struct.unpack_from(data)
-        total += 3
-        cursor = 3
-        assert len(data) == total
-        while cursor < total:
-            iei, size = self.main_struct.unpack_from(data, cursor)
-            cursor += 3
-            parce_element(data, iei, cursor, size)
-            cursor += size
-        return msg
-
-    def dataRaceived(self, data):
-        msg = self._unpack_sbd(data)
-        self.factory.service.handle_message(
-            msg, proto='TCP', device_type=self.device_type)
+from gorynych.receiver.parsers.sbd import unpack_sbd
 
 
-class HttpTR203Resource(Resource):
-    isLeaf = True
-    device_type = 'tr203'
+class PathMakerSBDProtocol(FrameReceivingProtocol):
+    """
+    It's actually the same PathMakerProtocol encapsulated in SBD package.
+    There're a few differences - no confirmation sent, no session,
+    each SBD package contaits imei.
+    """
+    device_type = 'pmtracker_sbd'
 
-    def __init__(self, service):
-        Resource.__init__(self)
-        self.service = service
+    def dataReceived(self, data):
+        # override dataReceived to handle SBD and single-frame case
+        msg = unpack_sbd(data)
+        if not msg.get('imei') or not msg.get('data'):
+            raise ValueError('Bad message (no imei or data): {}'.format(msg))
+        self.imei = msg['imei']
+        if ord(msg['data'][0]) != MAGIC_BYTE:
+            # single-frame case
+            frame = Frame(ord(msg['data'][0]), msg['data'][1:])
+            self.frameReceived(frame)
+        else:
+            FrameReceivingProtocol.dataReceived(self, msg['data'])
 
-    def _handle(self, msg):
-        self.service.handle_message(msg, proto='HTTP',
-                                    device_type=self.device_type)
-        return 'OK'
-
-    def render_GET(self, msg):
-        log.msg('GET: {}, args: {}'.format(msg, msg.args))
-        return self._handle(msg.content.read())
-
-    def render_POST(self, msg):
-        log.msg('POST: {}, args: {}'.format(msg, msg.args))
-        return self._handle(msg.content.read())
+    def frameReceived(self, frame):
+        result = self.factory.service.check_message(frame.serialize(), proto='TCP',
+                                                    device_type=self.device_type)
+        parsed = self.factory.service.parser.parse(frame)
+        for item in parsed:
+            item['imei'] = self.imei
+        print parsed
+        result.addCallback(lambda _: self.factory.service.store_point(parsed))
 
 
 class RedViewGT60Protocol(protocol.Protocol):
@@ -179,3 +141,12 @@ class RedViewGT60Protocol(protocol.Protocol):
     def dataReceived(self, data):
         self.factory.service.handle_message(
             data, proto='TCP', device_type=self.device_type)
+
+
+tr203_tcp_protocol = TR203ReceivingProtocol
+tr203_udp_protocol = UDPTR203Protocol
+telt_gh3000_udp_protocol = UDPTeltonikaGH3000Protocol
+app13_tcp_protocol = App13ProtobuffMobileProtocol
+gt60_tcp_protocol = RedViewGT60Protocol
+pmtracker_tcp_protocol = PathMakerProtocol
+pmtracker_sbd_tcp_protocol = PathMakerSBDProtocol

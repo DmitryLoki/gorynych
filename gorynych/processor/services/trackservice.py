@@ -11,9 +11,7 @@ from gorynych.common.exceptions import NoGPSData
 from gorynych.common.infrastructure import persistence as pe
 from gorynych.processor.domain import TrackArchive, track
 from gorynych.common.application import EventPollingService
-from gorynych.common.domain.services import APIAccessor
-
-from gorynych.receiver.receiver import RabbitMQService
+from gorynych.common.domain.services import APIAccessor, SinglePollerService
 
 API = APIAccessor()
 
@@ -207,33 +205,26 @@ class TrackService(EventPollingService):
         return d
 
 
-class OnlineTrashService(RabbitMQService):
+class OnlineTrashService(SinglePollerService):
     '''
     receive messages with track data from rabbitmq queue.
     '''
 
-    def __init__(self, pool, repo, **kw):
-        RabbitMQService.__init__(self, **kw)
+    def __init__(self, pool, repo, connection, **kw):
+        poll_interval = kw.get('interval', 0.0)
+        SinglePollerService.__init__(self, connection, poll_interval, queue_name='rdp')
         self.pool = pool
         self.did_aid = {}
         self.repo = repo
         # {race_id:{track_id:Track}}
         self.tracks = defaultdict(dict)
         self.processor = task.LoopingCall(self.process)
+        # TODO: remove this from constructor.
         self.processor.start(60, False)
         # device_id:(race_id, contest_number, time)
         self.devices = dict()
 
-    def when_started(self):
-        d = defer.Deferred()
-        d.addCallback(self.open)
-        d.addCallback(lambda x: task.LoopingCall(self.read, x))
-        d.addCallback(lambda lc: lc.start(0.00))
-        d.callback('rdp')
-        return d
-
-    def handle_payload(self, queue_name, channel, method_frame, header_frame,
-            body):
+    def handle_payload(self, channel, method_frame, header_frame, body, queue_name):
         data = cPickle.loads(body)
         if not data.has_key('ts'):
             # ts key MUST be in a data.

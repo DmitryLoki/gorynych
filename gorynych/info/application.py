@@ -3,17 +3,15 @@
 Application Services for info context.
 '''
 import cPickle
-import simplejson as json
 
 from twisted.internet import defer, task
 from twisted.python import log
 
 from gorynych.info.domain import contest, person, race, tracker, transport, interfaces
 from gorynych.common.infrastructure import persistence
-from gorynych.common.domain.types import checkpoint_from_geojson
 from gorynych.common.domain.events import ContestRaceCreated
+from gorynych.common.domain.services import SinglePollerService
 from gorynych.common.application import DBPoolService
-from gorynych.receiver.receiver import RabbitMQService
 
 
 class BaseApplicationService(DBPoolService):
@@ -207,7 +205,7 @@ class ApplicationService(BaseApplicationService):
         transport_list = yield self.pool.runQuery(
             persistence.select('transport_for_contest', 'transport'),
                               (str(cont.id),))
-        
+
         new_race = race.create_race_for_contest(cont,
                                            person_list,
                                            transport_list,
@@ -218,7 +216,7 @@ class ApplicationService(BaseApplicationService):
             cont.id, new_race.id)))
         yield d
         defer.returnValue(new_race)
-        
+
     def get_contest_races(self, params):
         '''
         Return list of races for contest.
@@ -332,23 +330,16 @@ class ApplicationService(BaseApplicationService):
             transport.change_transport)
 
 
-class LastPointApplication(RabbitMQService):
-    def __init__(self, pool, **kw):
-        RabbitMQService.__init__(self, **kw)
+class LastPointApplication(SinglePollerService):
+    def __init__(self, pool, connection, **kw):
+        poll_interval = kw.get('interval', 0.0)
+        SinglePollerService.__init__(self, connection, poll_interval, queue_name='last_point')
         self.pool = pool
         # imei:ts
         self.points = dict()
 
-    def when_started(self):
-        d = defer.Deferred()
-        d.addCallback(self.open)
-        d.addCallback(lambda x: task.LoopingCall(self.read, x))
-        d.addCallback(lambda lc: lc.start(0.00))
-        d.callback('last_point')
-        return d
-
-    def handle_payload(self, queue_name, channel, method_frame, header_frame,
-            body):
+    def handle_payload(self, channel, method_frame, header_frame,
+            body, queue_name):
         data = cPickle.loads(body)
         if not data.has_key('ts'):
             # ts key MUST be in a data.

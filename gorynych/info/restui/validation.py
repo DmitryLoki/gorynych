@@ -28,7 +28,8 @@ def patched_render(self, request, method_func):
         try:
             params = self.parameters_from_request(request)
             self._validation.validate(params, validation_path)
-            APIResource._render_method(self, request, method_func, request_params=params)
+            APIResource._render_method(
+                self, request, method_func, request_params=params)
         except Exception as e:  # could be different kinds of exception
             self._handle_error(request, 400, "Bad input parameters or URI",
                                repr(e))
@@ -37,42 +38,33 @@ def patched_render(self, request, method_func):
 
 
 class ValidationRule(object):
+
     """
     A rule produced by ApiValidator. Contains a tree, validation_method,
     provides access to the required schema and incapsulates 'validate' method.
     """
-    def __init__(self, tree, validation_method):
+
+    def __init__(self, tree, schemas):
         self.tree = tree
-        self.validation_method = validation_method
+        self.schemas = schemas
 
     def _load_schema(self, path):
-
-        filepath = os.path.join(BASEDIR,
-                                '..',
-                                'validation',
-                                self.validation_method,
-                                *[p for p in path[1:] if p != 'collection'])
-        filepath = os.path.join(filepath, '_'.join(path).lower() + '.json')
-        if os.path.isfile(filepath):
-            with open(filepath, 'r') as f:
-                schema = f.read()
-            return schema
+        name = '_'.join(path).lower()
+        print name
+        print '\n'
+        return self.schemas.get(name)
 
     def validate(self, params, path):
-        raw_schema = self._load_schema(path)
-        method = getattr(self, '_validate_' + self.validation_method)
-        if not raw_schema or not method:
+        schema = self._load_schema(path)
+        if not schema:
             # no validation supplied. shall I raise the alarm?
             pass
         else:
-            method(params, raw_schema)
-
-    def _validate_jsonschema(self, params, raw_schema):
-        schema = json.loads(raw_schema)
-        jsonschema.validate(params, schema)
+            jsonschema.validate(params, schema)
 
 
 class ApiValidator(object):
+
     """
     Monkey-patches API so it would call "validate" method
     on any not-GET calls against specified validation mechanism
@@ -90,6 +82,7 @@ class ApiValidator(object):
         self.resources = []
         self.validation_method = validation_method
         self.add_tree(apitree)
+        self._load_schemas()
 
     def add_tree(self, tree):
         # accepts apitree extracted from yaml config
@@ -117,11 +110,24 @@ class ApiValidator(object):
         self.resources = leaves
         self.tree = tree
 
+    def _load_schemas(self):
+        schemas = {}
+        validation_dir = os.path.join(BASEDIR,
+                                      '..',
+                                      'validation',
+                                      self.validation_method)
+        for directory, dirnames, filenames in os.walk(validation_dir):
+            if filenames:
+                for fname in filenames:
+                    with open(os.path.join(directory, fname), 'r') as f:
+                        schema = json.loads(f.read())
+                        cleared_fname = fname[: fname.rindex('.')]
+                        schemas[cleared_fname] = schema
+        self.schemas = schemas
+
     def apply(self):
         if not self.resources:
             raise Exception('Nothing to validate: add some resources first')
         for r in self.resources:
-            r._validation = ValidationRule(self.tree, self.validation_method)
+            r._validation = ValidationRule(self.tree, self.schemas)
             r._render_method = patched_render
-
-

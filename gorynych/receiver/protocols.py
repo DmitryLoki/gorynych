@@ -1,12 +1,11 @@
 '''
 Twisted protocols for message receiving.
 '''
-from struct import Struct
-
 from twisted.internet import protocol
 from twisted.protocols import basic
-
-from gorynych.receiver.base_protocols import FrameReceivingProtocol
+from gorynych.receiver.parsers.app13.constants import HEADER, MAGIC_BYTE, FrameId
+from gorynych.receiver.parsers.app13.parser import Frame
+from gorynych.receiver.parsers.app13.session import PathMakerSession
 
 
 class TR203ReceivingProtocol(basic.LineOnlyReceiver):
@@ -29,11 +28,11 @@ class UDPTR203Protocol(protocol.DatagramProtocol):
     '''
     device_type = 'tr203'
 
-    # def __init__(self, service):
-    #     self.service = service
+    def __init__(self, service):
+         self.service = service
 
     def datagramReceived(self, datagram, sender):
-        self.factory.service.handle_message(datagram, proto='UDP',
+        self.service.handle_message(datagram, proto='UDP',
                                             device_type=self.device_type)
 
 
@@ -43,13 +42,13 @@ class UDPTeltonikaGH3000Protocol(protocol.DatagramProtocol):
     '''
     device_type = 'telt_gh3000'
 
-    # def __init__(self, service):
-    #     self.service = service
+    def __init__(self, service):
+         self.service = service
 
     def datagramReceived(self, datagram, sender):
-        response = self.factory.service.parser.get_response(datagram)
+        response = self.service.parser.get_response(datagram)
         self.transport.write(response, sender)
-        self.factory.service.handle_message(datagram, proto='UDP', client=sender,
+        self.service.handle_message(datagram, proto='UDP', client=sender,
                                             device_type=self.device_type)
 
 
@@ -66,9 +65,49 @@ class App13ProtobuffMobileProtocol(protocol.Protocol):
         self.factory.service.handle_message(
             data, proto='TCP', device_type=self.device_type)
 
-from gorynych.receiver.parsers.app13.session import PathMakerSession
-from gorynych.receiver.parsers.app13.parser import Frame
-from gorynych.receiver.parsers.app13.constants import FrameId, MAGIC_BYTE
+
+class FrameReceivingProtocol(protocol.Protocol):
+    """
+    lineReceiver-like class, accumulates received data in buffer,
+    then fires frameReceived, when an app13 frame can be extracted from buffer
+    """
+
+    def __init__(self, *args, **kwargs):
+        self._buffer = ''
+        self.reset()
+
+    def reset(self):
+        # override this method some session-like behaviour is desired
+        pass
+
+    def frameReceived(self, frame):
+        # override this method to do something with received frame
+        raise NotImplementedError
+
+    def dataReceived(self, data):
+        self._buffer += data
+        cursor = 0
+        while True:
+            if len(self._buffer) < HEADER.size:
+                break
+            if cursor >= len(self._buffer):
+                break
+            try:
+                magic, frame_id, payload_len = HEADER.unpack_from(self._buffer, cursor)
+            except:
+                self.reset()
+                raise ValueError('Unrecognized header')
+            if magic != MAGIC_BYTE:
+                self.reset()
+                raise ValueError('Magic byte mismatch')
+            frame_len = payload_len + HEADER.size
+            if len(self._buffer) < frame_len:  # keep accumulating
+                break
+            msg = self._buffer[cursor + HEADER.size: cursor + frame_len]
+            cursor += frame_len
+            frame = Frame(frame_id, msg)
+            self.frameReceived(frame)
+        self._buffer = self._buffer[cursor:]
 
 
 class PathMakerProtocol(FrameReceivingProtocol):

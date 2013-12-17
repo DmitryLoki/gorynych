@@ -2,10 +2,9 @@ import mock
 
 from twisted.trial import unittest
 from twisted.test import proto_helpers
+from twisted.internet.base import DelayedCall
 
-from gorynych.receiver.protocols import UDPTR203Protocol, UDPTeltonikaGH3000Protocol, \
-    RedViewGT60Protocol, App13ProtobuffMobileProtocol, PathMakerProtocol, TR203ReceivingProtocol, \
-    PathMakerSBDProtocol
+from gorynych.receiver.protocols import UDPTR203Protocol, UDPTeltonikaGH3000Protocol, RedViewGT60Protocol, App13ProtobuffMobileProtocol, PathMakerProtocol, TR203ReceivingProtocol, PathMakerSBDProtocol
 from gorynych.receiver.receiver import ReceiverService
 from gorynych.receiver.factories import ReceivingFactory
 
@@ -19,20 +18,33 @@ class BaseProtoTestCase(unittest.TestCase):
      * transport_type ('udp' or 'tcp')
      * also if need to mock parser (f.e. to get responses), look up the next method
     """
+    #transport_type = 'tcp'
 
     def setUp(self):
+        #DelayedCall.debug = True
         self.service = mock.Mock(spec=ReceiverService)
         mockparser = mock.Mock()
         mockparser.get_response.return_value = 'some response'
         self.service.parser = mockparser
-        self.proto = self.protocol_type()
+        try:
+            self.proto = self.protocol_type()
+        except AttributeError:
+            self.proto = mock.MagicMock()
         self.proto.factory = ReceivingFactory(self.service)
-        if self.transport_type == 'tcp':
-            self.tr = proto_helpers.StringTransport()
-            self.proto.makeConnection(self.tr)
-        elif self.transport_type == 'udp':
-            self.tr = proto_helpers.FakeDatagramTransport()
+        if not hasattr(self, 'transport_type'):
+            self.tr = mock.MagicMock()
+        else:
+            if self.transport_type == 'tcp':
+                self.tr = proto_helpers.StringTransport()
+                self.proto.makeConnection(self.tr)
+            elif self.transport_type == 'udp':
+                self.tr = proto_helpers.FakeDatagramTransport()
         self.proto.transport = self.tr
+
+    def tearDown(self):
+        del self.service
+        del self.proto
+        del self.tr
 
 
 class TestTR203_UDP(BaseProtoTestCase):
@@ -44,7 +56,7 @@ class TestTR203_UDP(BaseProtoTestCase):
         addr = ('127.0.0.1', 10000)
         self.proto.datagramReceived(dgram, addr)
         self.service.handle_message.assert_called_with(dgram, proto='UDP',
-                                                       device_type='tr203')
+            device_type='tr203')
         self.assertEquals(self.tr.written, [])
 
 
@@ -57,7 +69,7 @@ class TestTR203_TCP(BaseProtoTestCase):
         self.proto.lineReceived(data)
         # exclamation mark is a delimiter
         self.service.handle_message.assert_called_with(data + '!', proto='TCP',
-                                                       device_type='tr203')
+            device_type='tr203')
         self.assertEquals(self.tr.value(), '')
 
 
@@ -70,10 +82,9 @@ class TestTeltonicaGH3000_UDP(BaseProtoTestCase):
         addr = ('127.0.0.1', 10000)
         self.proto.datagramReceived(dgram, addr)
         self.service.handle_message.assert_called_with(dgram, proto='UDP',
-                                                       client=addr,
-                                                       device_type='telt_gh3000')
-        self.assertEquals(self.tr.written, [
-                          ('some response', ('127.0.0.1', 10000))])
+            client=addr, device_type='telt_gh3000')
+        self.assertEquals(self.tr.written,
+            [('some response', ('127.0.0.1', 10000))])
 
 
 class TestRedViewGT60_TCP(BaseProtoTestCase):
@@ -84,7 +95,7 @@ class TestRedViewGT60_TCP(BaseProtoTestCase):
         data = 'hello'
         self.proto.dataReceived(data)
         self.service.handle_message.assert_called_with(data, proto='TCP',
-                                                       device_type='gt60')
+            device_type='gt60')
         self.assertEquals(self.tr.value(), '')
 
 
@@ -96,7 +107,7 @@ class TestApp13_TCP(BaseProtoTestCase):
         data = 'hello'
         self.proto.dataReceived(data)
         self.service.handle_message.assert_called_with(data, proto='TCP',
-                                                       device_type='app13')
+            device_type='app13')
         self.assertEquals(self.tr.value(), 'some response')
 
 
@@ -173,6 +184,7 @@ class TestPathMakerSBD_TCP(BaseProtoTestCase):
     def test_send_sbd_message(self):
         # SBD protocols contain two parsers, so need to send actual message
         msg = '\x01\x00\xa3\x01\x00\x1c\x01\x02\x03\x08300434060007200\x00\x00\x05\x00\x00R\xa8r\xa1\x02\x00\x81\x03\x18\x95\x13\x98\xf4t\xe1TV\xd9\x93\x82\xf2N\xaa\x9cYrN\x1ao\xf8\rX\x1cD=\x84\x83\xd8\xb9Xm\xd8\xb8\x19=\x82\xd8\xb8X,x\x99y\xc0\x02\\\xa2\xac\x1a`\x86\x804\xbb\t\x98!\xa1\xcci\x01f\xc8ir\x1b\x05qp\xb1\xd5\xa8\x98\xf2;\xa9\x83\x84btl\x05\xc1\xe6\xe4\x98y\xfa0\x80\xe5l\x02y-\xc0\x06\xe4\xb8\x84\xdb0\x80\x8c\xd6\xf1Kt\x03K\x85\xa5\xf3\xdb@T\'\x14\xfb0\x00\x00-\x9b\x1a\xc1'
-        expected = Frame(FrameId.PATHCHUNK_ZIPPED, '\x18\x95\x13\x98\xf4t\xe1TV\xd9\x93\x82\xf2N\xaa\x9cYrN\x1ao\xf8\rX\x1cD=\x84\x83\xd8\xb9Xm\xd8\xb8\x19=\x82\xd8\xb8X,x\x99y\xc0\x02\\\xa2\xac\x1a`\x86\x804\xbb\t\x98!\xa1\xcci\x01f\xc8ir\x1b\x05qp\xb1\xd5\xa8\x98\xf2;\xa9\x83\x84btl\x05\xc1\xe6\xe4\x98y\xfa0\x80\xe5l\x02y-\xc0\x06\xe4\xb8\x84\xdb0\x80\x8c\xd6\xf1Kt\x03K\x85\xa5\xf3\xdb@T\'\x14\xfb0\x00\x00-\x9b\x1a\xc1')
+        expected = Frame(FrameId.PATHCHUNK_ZIPPED,
+            '\x18\x95\x13\x98\xf4t\xe1TV\xd9\x93\x82\xf2N\xaa\x9cYrN\x1ao\xf8\rX\x1cD=\x84\x83\xd8\xb9Xm\xd8\xb8\x19=\x82\xd8\xb8X,x\x99y\xc0\x02\\\xa2\xac\x1a`\x86\x804\xbb\t\x98!\xa1\xcci\x01f\xc8ir\x1b\x05qp\xb1\xd5\xa8\x98\xf2;\xa9\x83\x84btl\x05\xc1\xe6\xe4\x98y\xfa0\x80\xe5l\x02y-\xc0\x06\xe4\xb8\x84\xdb0\x80\x8c\xd6\xf1Kt\x03K\x85\xa5\xf3\xdb@T\'\x14\xfb0\x00\x00-\x9b\x1a\xc1')
         self.proto.dataReceived(msg)
         self.proto.frameReceived.assert_called_with(expected)

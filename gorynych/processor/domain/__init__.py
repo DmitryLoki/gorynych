@@ -87,7 +87,6 @@ class TrackArchive(ValueObject):
             f.write(arc.open(fn).read())
             f.close()
             namelist.append('/'.join((unpack_dir, fne)))
-        print namelist
         return namelist
 
     def get_race_paragliders(self):

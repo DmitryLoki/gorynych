@@ -102,7 +102,6 @@ class SinglePollerService(Service):
         """
         Override this method
         """
-        print payload, kwargs
         pass
 
     def startService(self):

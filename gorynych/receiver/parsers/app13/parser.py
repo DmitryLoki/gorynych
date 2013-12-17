@@ -93,7 +93,6 @@ class App13Parser(object):
             point['imei'] = self.imei
 
         response = self.points
-        print response
         del self.points
         return response
 

@@ -95,7 +95,6 @@ class PathMakerProtocol(FrameReceivingProtocol):
             if self.session.is_valid():
                 for item in parsed:
                     item.update(self.session.params)
-                print parsed
                 result.addCallback(lambda _: self.factory.service.store_point(parsed))
             else:
                 self.reset()
@@ -131,7 +130,6 @@ class PathMakerSBDProtocol(FrameReceivingProtocol):
         parsed = self.factory.service.parser.parse(frame)
         for item in parsed:
             item['imei'] = self.imei
-        print parsed
         result.addCallback(lambda _: self.factory.service.store_point(parsed))
 
 

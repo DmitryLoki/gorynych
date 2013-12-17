@@ -136,12 +136,12 @@ class TrackRepository(object):
             tdiff))
 
         def try_insert_points(points):
-            points['id'] = np.ones(len(points)) * obj._id
             data = np_as_text(points)
             cur = con._connection.cursor()
             cur.copy_expert("COPY track_data FROM STDIN ", data)
 
         points = obj.points
+        points['id'] = np.ones(len(points)) * obj._id
 
         while True:
             try:

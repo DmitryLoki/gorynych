@@ -50,8 +50,6 @@ class ValidationRule(object):
 
     def _load_schema(self, path):
         name = '_'.join(path).lower()
-        print name
-        print '\n'
         return self.schemas.get(name)
 
     def validate(self, params, path):

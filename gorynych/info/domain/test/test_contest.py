@@ -3,7 +3,7 @@ import time
 
 import mock
 
-from gorynych.common.domain import events, model
+from gorynych.common.domain import events, model, types
 from gorynych.info.domain.test.helpers import create_contest, create_person, create_checkpoints
 from gorynych.info.domain import contest
 from gorynych.common.domain.types import Address, Name, Country, Phone, \
@@ -57,6 +57,7 @@ class ContestFactoryTest(unittest.TestCase):
         cont = create_contest(1, 2)
         self.assertIsInstance(cont.address, Address)
         self.assertIsInstance(cont.title, Title)
+        self.assertIsInstance(cont.times, types.DateRange)
         self.assertEqual(cont.title, 'Hello world')
         self.assertEqual(cont.address, Address('Yrupinsk', 'RU', '45.23,-23.22'))
         self.assertEqual(cont.timezone, 'Europe/Moscow')
@@ -75,8 +76,6 @@ class ContestFactoryTest(unittest.TestCase):
 
     def test_str_successfull_contest_creation(self):
         cont = create_contest(1, 3, id='cnts-130422-12345')
-        self.assertEqual(cont.end_time, 3)
-        self.assertEqual(cont.start_time, 1)
         self.assertEqual(cont.id, 'cnts-130422-12345')
         self.assertIsInstance(cont.id, contest.ContestID)
 
@@ -98,18 +97,15 @@ class EventsApplyingTest(unittest.TestCase):
 
 class ContestTest(unittest.TestCase):
     def test_times_changing(self):
-        cont = create_contest(1, '15')
-        cont.start_time = '2'
-        self.assertEqual(cont.start_time, 2)
-        cont.end_time = '8'
-        self.assertEqual(cont.end_time, 8)
-        self.assertRaises(ValueError, setattr, cont, 'start_time', 8)
-        self.assertRaises(ValueError, setattr, cont, 'start_time', 9)
-        self.assertRaises(DomainError, setattr, cont, 'end_time', 2)
-        self.assertRaises(DomainError, setattr, cont, 'end_time', 1)
+        cont = create_contest(1, 15)
+        self.assertRaises(AttributeError, setattr, cont, 'start_time', 2)
+        self.assertRaises(AttributeError, setattr, cont, 'end_time', 6)
+        self.assertEqual(cont.start_time, 1)
+        self.assertEqual(cont.end_time, 15)
         cont.change_times('10', '16')
         self.assertEqual((cont.start_time, cont.end_time), (10, 16))
         self.assertRaises(ValueError, cont.change_times, '10', '8')
+        self.assertEqual((cont.start_time, cont.end_time), (10, 16))
 
     def test_change_title(self):
         cont = create_contest(1, '15')
@@ -141,6 +137,14 @@ class TestInvariants(unittest.TestCase):
         self.cont.paragliders[1] = 1
         self.cont.organizers[2] = 1
         self.assertIsNone(contest.person_only_in_one_role(self.cont))
+
+    def test_contest_times_are_good(self):
+        self.assertIsNone(contest.contest_times_are_good(self.cont))
+        t = mock.MagicMock()
+        t.is_empty.return_value = True
+        self.cont.times = t
+        self.assertRaises(DomainError, contest.contest_times_are_good,
+            self.cont)
 
 
 class ContestTestWithRegisteredParagliders(unittest.TestCase):
@@ -514,7 +518,7 @@ class TestSpeedRunTask(unittest.TestCase):
         self.assertFalse(t.is_task_correct())
 
 
-class TestOpenDistanceTask(unittest.TestCase):
+class OpenDistanceTaskTest(unittest.TestCase):
 
     def setUp(self):
         self.chps = create_checkpoints()
@@ -545,27 +549,6 @@ class TestOpenDistanceTask(unittest.TestCase):
             title='Test task', task_id=self.task_id, checkpoints=self.chps)
         self.assertRaises(ValueError, contest.OpenDistanceTask, bearing='bear it hard',
             title='Test task', task_id=self.task_id, checkpoints=self.chps)
-
-    def test_incorrect_modification(self):
-        def make_correct_task():
-            return contest.OpenDistanceTask(bearing=10, title='Test task',
-                task_id=self.task_id, checkpoints=self.chps)
-
-        t = make_correct_task()
-        self.assertRaises(ValueError, setattr, t, 'title', 721)
-        self.assertRaises(ValueError, setattr, t, 'title', '   ')
-        bad_checkpoints = self.chps[:]
-        bad_checkpoints[2] = '...'
-        self.assertRaises(TypeError, setattr, t, 'checkpoints', bad_checkpoints)
-        self.assertRaises(ValueError, setattr, t, 'checkpoints', [])
-
-        t = make_correct_task()
-        t.bearing = 650
-        self.assertFalse(t.is_task_correct())
-
-        t = make_correct_task()
-        t.bearing = 'none'
-        self.assertFalse(t.is_task_correct())
 
 
 class TestContestTasks(unittest.TestCase):
@@ -730,6 +713,7 @@ class ParagliderTest(unittest.TestCase):
         p2 = contest.Paraglider(PersonID(), '0', ' aXis The 2', self.p.country,
             self.p.name, phone='+713')
         self.assertNotEqual(p1, p2)
+
 
 class WinddummyTest(unittest.TestCase):
     def setUp(self):

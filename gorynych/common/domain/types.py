@@ -328,3 +328,48 @@ class Title(ValueObject):
             return self.title != other
         elif isinstance(other, Title):
             return self.title != other.title
+
+
+class Range(ValueObject):
+    def __init__(self, start, end):
+        if not end >= start:
+            raise ValueError("End should be greater or equal to start.")
+        if not isinstance(start, end.__class__):
+            raise TypeError("Start and end should be the same class.")
+        self.start, self.end = start, end
+
+    def include(self, elem):
+        return self.start <= elem <= self.end
+
+    def overlap(self, range):
+        assert isinstance(range, Range), "Range expected but %r found" % range
+        return self.start <= range.start and range.end <= self.end
+
+    def is_empty(self):
+        return self.start == self.end
+
+    def __getitem__(self, index):
+        if not isinstance(index, int):
+            raise TypeError("Index should be int.")
+        if int(index) == 0:
+            return self.start
+        elif int(index) == 1:
+            return self.end
+        else:
+            raise IndexError("Index %s out of range 0-1" % str(index))
+
+    def __contains__(self, item):
+        return self.include(item)
+
+    def __nonzero__(self):
+        return not self.is_empty()
+
+
+class DateRange(Range):
+    def __init__(self, start, end):
+        start, end = int(start), int(end)
+        assert start > 0, "This time from dark ages, I don't remember it..."
+        super(DateRange, self).__init__(start, end)
+
+
+

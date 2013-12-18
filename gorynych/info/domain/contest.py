@@ -4,12 +4,13 @@ Contest Aggregate.
 from copy import deepcopy
 import datetime
 from collections import defaultdict
+import simplejson as json
 
 import pytz
 
 from gorynych.info.domain import transport
 from gorynych.common.domain.model import AggregateRoot, ValueObject, DomainIdentifier
-from gorynych.common.domain.types import Address, Country, Phone, Checkpoint, MappingCollection, TransactionalDict, Title
+from gorynych.common.domain.types import Address, Country, Phone, Checkpoint, MappingCollection, TransactionalDict, Title, DateRange
 from gorynych.common.domain.events import ParagliderRegisteredOnContest
 from gorynych.common.infrastructure import persistence
 from gorynych.info.domain.ids import ContestID, RaceID, PersonID
@@ -72,6 +73,16 @@ def person_only_in_one_role(cont):
                             role.capitalize(), str(p_id), counts[p_id][0]))
 
 
+def contest_times_are_good(cont):
+    '''
+    Contest should last for some time.
+    @param cont: checked contest
+    @type cont: Contest
+    @raise DomainError
+    '''
+    if cont.times.is_empty():
+        raise DomainError("Contest times are wrong: %r" % cont.times)
+
 ###################################################################
 
 class Contest(AggregateRoot):
@@ -79,9 +90,8 @@ class Contest(AggregateRoot):
         super(Contest, self).__init__()
         self.id = ContestID(contest_id)
         self.title = Title(title)
+        self.times = DateRange(start_time, end_time)
         self._timezone = ''
-        self._start_time = start_time
-        self._end_time = end_time
         self.address = Address(address)
         self._participants = dict()
         self.retrieve_id = None
@@ -114,35 +124,11 @@ class Contest(AggregateRoot):
 
     @property
     def start_time(self):
-        return self._start_time
-
-    @start_time.setter
-    def start_time(self, value):
-        if int(value) == self.start_time:
-            return
-        old_start_time = self.start_time
-        self._start_time = int(value)
-        try:
-            self.check_invariants()
-        except DomainError as e:
-            self._start_time = old_start_time
-            raise e
+        return self.times[0]
 
     @property
     def end_time(self):
-        return self._end_time
-
-    @end_time.setter
-    def end_time(self, value):
-        if int(value) == self.end_time:
-            return
-        old_end_time = self.end_time
-        self._end_time = int(value)
-        try:
-            self.check_invariants()
-        except DomainError as e:
-            self._end_time = old_end_time
-            raise e
+        return self.times[1]
 
     @property
     def tasks(self):
@@ -207,43 +193,27 @@ class Contest(AggregateRoot):
         @type start_time: C{int}
         @param end_time:
         @type end_time: C{int}
-        @return:
-        @rtype:
         @raise: ValueError if times violate aggregate's invariants.
         '''
-        start_time = int(start_time)
-        end_time = int(end_time)
-        if int(start_time) >= int(end_time):
-            raise ValueError("Start_time must be less then end_time.")
-        if start_time == self.start_time:
-            self.end_time = end_time
-        elif end_time == self.end_time:
-            self.start_time = start_time
-        else:
-            old_start_time = self.start_time
-            old_end_time = self.end_time
-            self._start_time = start_time
-            self._end_time = end_time
-            if not self.check_invariants():
-                self._start_time = old_start_time
-                self._end_time = old_end_time
-                raise ValueError("Times values violate aggregate's "
-                                 "invariants.")
+        old_times = self.times
+        self.times = DateRange(start_time, end_time)
+        try:
+            self.check_invariants()
+        except Exception as e:
+            self.times = old_times
+            raise e
 
     def check_invariants(self):
         """
         Check next invariants for contest:
         every paraglider has unique contest_number
-        context start_time is less then end_time
         person can be only in one role
         not implemented:
         tasks are not overlapping
         """
         contest_numbers_are_unique(self)
         person_only_in_one_role(self)
-        end_after_start = int(self.start_time) < int(self.end_time)
-
-        assert end_after_start, "Start time must be before end time."
+        contest_times_are_good(self)
 
 
 # Meta adding

@@ -371,5 +371,57 @@ class TitleTest(unittest.TestCase):
         self.assertNotEqual(types.Title('title1'), 'title')
 
 
+class RangeTest(unittest.TestCase):
+    def setUp(self):
+        self.r = types.Range(1, 3)
+
+    def test_get_boundaries_by_fields(self):
+        self.assertEqual(self.r.start, 1)
+        self.assertEqual(self.r.end, 3)
+
+    def test_boundaries_by_index(self):
+        self.assertEqual(self.r[0], 1)
+        self.assertEqual(self.r[1], 3)
+
+    def test_iterate_boundaries(self):
+        a, b = self.r
+        self.assertEqual(a, 1)
+        self.assertEqual(b, 3)
+
+    def test_include(self):
+        self.assertTrue(self.r.include(1))
+        self.assertTrue(self.r.include(2))
+        self.assertTrue(self.r.include(3))
+        self.assertFalse(self.r.include(4))
+        self.assertFalse(self.r.include(0))
+        self.assertTrue(2 in self.r)
+
+    def test_equality(self):
+        self.assertEqual(self.r, types.Range(1, 3))
+        self.assertNotEqual(self.r, types.Range(1, 4))
+
+    def test_overlap(self):
+        self.assertTrue(types.Range(-1, 6).overlap(self.r))
+        self.assertFalse(self.r.overlap(types.Range(-2, -1)))
+
+    def test_isempty(self):
+        self.assertFalse(types.Range(1, 3).is_empty())
+        self.assertTrue(types.Range(1, 1).is_empty())
+        self.assertFalse(types.Range(1, 1))
+        self.assertTrue(types.Range(1, 3))
+
+    def test_subtract(self):
+        self.skipTest("Not sure about uscases.")
+        self.assertIsInstance(types.Range(1, 6).subtract(self.r), types.Range)
+        self.assertIsInstance(self.r.subtract(self.r), types.Range)
+        self.assertTrue(self.r.subtract(self.r).is_empty)
+
+
+class DateRangeTest(unittest.TestCase):
+    def test_int_init(self):
+        self
+
+
+
 if __name__ == '__main__':
     unittest.main()

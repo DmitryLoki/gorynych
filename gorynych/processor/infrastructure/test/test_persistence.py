@@ -56,6 +56,16 @@ class TrackRepositoryTestCase(MockeryTestCase):
                 points[i][key] = item[key]
         return points
 
+    def _compare_points(self, fromdb, expected):
+        cleaned_data = []
+        for row in fromdb:
+            lrow = list(row)[1:]
+            p = {}
+            p['timestamp'], p['lat'], p['lon'], p['alt'], p['g_speed'], \
+                p['v_speed'], p['distance'] = lrow
+            cleaned_data.append(p)
+        self.assertEquals(cleaned_data, expected)
+
     @defer.inlineCallbacks
     def test_add_normal_points(self):
         track = self._sample()
@@ -63,14 +73,7 @@ class TrackRepositoryTestCase(MockeryTestCase):
         yield self.repo.save(track)
         retrieved_data = yield POOL.runQuery(DATA_QUERY, (str(track.id),))
         self.assertEquals(len(retrieved_data), 2)
-        cleaned_data = []
-        for row in retrieved_data:
-            lrow = list(row)[1:]
-            p = {}
-            p['timestamp'], p['lat'], p['lon'], p['alt'], p['g_speed'], \
-                p['v_speed'], p['distance'] = lrow
-            cleaned_data.append(p)
-        self.assertEquals(cleaned_data, self.data)
+        self._compare_points(retrieved_data, self.data)
 
     @defer.inlineCallbacks
     def test_add_duplicate_points(self):
@@ -93,14 +96,7 @@ class TrackRepositoryTestCase(MockeryTestCase):
         yield self.repo.save(track)
         retrieved_data = yield POOL.runQuery(DATA_QUERY, (str(track.id),))
         self.assertEquals(len(retrieved_data), 3)  # should be 3 points, new unique must survive
-        cleaned_data = []
-        for row in retrieved_data:
-            lrow = list(row)[1:]
-            p = {}
-            p['timestamp'], p['lat'], p['lon'], p['alt'], p['g_speed'], \
-                p['v_speed'], p['distance'] = lrow
-            cleaned_data.append(p)
-        self.assertEquals(cleaned_data, newdata)
+        self._compare_points(retrieved_data, newdata)
 
     @defer.inlineCallbacks
     def test_add_completely_duplicate_points(self):
@@ -114,11 +110,18 @@ class TrackRepositoryTestCase(MockeryTestCase):
         yield self.repo.save(track)
         retrieved_data = yield POOL.runQuery(DATA_QUERY, (str(track.id),))
         self.assertEquals(len(retrieved_data), 2)
-        cleaned_data = []
-        for row in retrieved_data:
-            lrow = list(row)[1:]
-            p = {}
-            p['timestamp'], p['lat'], p['lon'], p['alt'], p['g_speed'], \
-                p['v_speed'], p['distance'] = lrow
-            cleaned_data.append(p)
-        self.assertEquals(cleaned_data, self.data)
+        self._compare_points(retrieved_data, self.data)
+
+    @defer.inlineCallbacks
+    def test_save_track_with_points_then_without_points(self):
+        track = self._sample()
+        track.points = self._get_points(self.data)
+        yield self.repo.save(track)
+        retrieved_data = yield POOL.runQuery(DATA_QUERY, (str(track.id),))
+        self.assertEquals(len(retrieved_data), 2)
+        # now insert some duplicate points
+        track.points = np.array([], dtype=DTYPE)
+        yield self.repo.save(track)
+        retrieved_data = yield POOL.runQuery(DATA_QUERY, (str(track.id),))
+        self.assertEquals(len(retrieved_data), 2)
+        self._compare_points(retrieved_data, self.data)

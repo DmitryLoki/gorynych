@@ -4,6 +4,7 @@ import time
 import cPickle
 from collections import defaultdict
 import json
+import re
 
 import numpy as np
 from twisted.internet import defer
@@ -44,6 +45,8 @@ def find_snapshots(data):
     state = data._state
     # Every track is in air from it's first point by default.
     # TODO: change it someday.
+    if len(data.points) == 0:
+        return result
     result[int(data.points['timestamp'][0])].add('in_air_true')
     if not state.in_air and state.in_air_changed:
         result[int(state.in_air_changed)].add('in_air_false')
@@ -57,6 +60,9 @@ def find_snapshots(data):
 
 
 class TrackRepository(object):
+
+    duplicate_key_ts = r'Key.*\((\d*)\,.*already exists'
+
     def __init__(self, pool):
         self.pool = pool
 
@@ -84,7 +90,7 @@ class TrackRepository(object):
             d.addCallback(lambda _: self.pool.runInteraction(self._save_new,
                 obj))
         else:
-            d.addCallback(lambda _: self.pool.runInteraction(self._update,
+            d.addCallback(lambda _: self.pool.runWithConnection(self._update,
                 obj))
             d.addCallback(self._update_times)
         d.addCallback(self._save_snapshots)
@@ -123,22 +129,41 @@ class TrackRepository(object):
                         (snap, snaps[snap], obj._id, e))
         defer.returnValue(obj)
 
-    def _update(self, cur, obj):
+    def _update(self, con, obj):
         if len(obj.points) == 0:
             return obj
         tdiff = int(time.time()) - obj.points[0]['timestamp']
         log.msg("Save %s points for track %s" % (len(obj.points), obj._id))
         log.msg("First points for track %s was %s second ago." % (obj._id,
             tdiff))
+
+        def try_insert_points(points):
+            data = np_as_text(points)
+            cur = con._connection.cursor()
+            cur.copy_expert("COPY track_data FROM STDIN ", data)
+
         points = obj.points
         points['id'] = np.ones(len(points)) * obj._id
-        data = np_as_text(points)
-        try:
-            cur.copy_expert("COPY track_data FROM STDIN ", data)
-        except Exception as e:
-            log.err("Error occured while COPY data on update for track %s: "
-                    "%r" % (obj._id, e))
-            obj.buffer = np.empty(0, dtype=track.DTYPE)
+
+        while True:
+            try:
+                try_insert_points(points)
+                break
+            except Exception as e:
+                if e.pgcode == '23505':
+                    dup_tc = re.findall(self.duplicate_key_ts, e.message)
+                    if not dup_tc:
+                        break
+                    dup_tc = int(dup_tc[0])
+                    idx = np.where(points['timestamp'] != dup_tc)
+                    points = points[idx]
+                    if len(points) == 0:
+                        break
+                    con._connection.rollback()
+                else:
+                    log.err("Error occured while COPY data on update for track %s: "
+                            "%r" % (obj._id, e))
+                    obj.buffer = np.empty(0, dtype=track.DTYPE)
         return obj
 
     def _update_times(self, obj):

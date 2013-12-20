@@ -340,12 +340,20 @@ class LastPointApplication(SinglePollerService):
 
     def handle_payload(self, channel, method_frame, header_frame,
             body, queue_name):
+
+        def update_last_point(cur, data):
+            query = persistence.update('last_point', 'tracker')
+            try:
+                cur.execute(query, (data['lat'], data['lon'], data['alt'], data['ts'],
+                data.get('battery'), data['h_speed'], data['imei']))
+                self.points[data['imei']] = data['ts']
+            except Exception as e:
+                log.msg('Error while updating last_point, {}, data: {}'.format(e.message, data))
+
         data = cPickle.loads(body)
-        if not data.has_key('ts'):
+        if 'ts' not in data:
             # ts key MUST be in a data.
             return
         if self.points.get(data['imei']) < data['ts']:
-            self.points[data['imei']] = data['ts']
-            return self.pool.runOperation(persistence.update('last_point',
-                'tracker'), (data['lat'], data['lon'], data['alt'], data['ts'],
-            data.get('battery'), data['h_speed'], data['imei']))
+            # self.points[data['imei']] = data['ts']
+            return self.pool.runInteraction(update_last_point, data)

@@ -329,11 +329,15 @@ class Title(ValueObject):
         elif isinstance(other, Title):
             return self.title != other.title
 
+    def __hash__(self):
+        return hash(self.title)
+
 
 class Range(ValueObject):
     def __init__(self, start, end):
         if not end >= start:
-            raise ValueError("End should be greater or equal to start.")
+            raise ValueError("End %s should be greater or equal to start %s"
+                             "." % (end, start))
         if not isinstance(start, end.__class__):
             raise TypeError("Start and end should be the same class.")
         self.start, self.end = start, end

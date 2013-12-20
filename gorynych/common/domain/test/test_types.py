@@ -370,6 +370,10 @@ class TitleTest(unittest.TestCase):
         self.assertNotEqual(types.Title('title1'), types.Title('title'))
         self.assertNotEqual(types.Title('title1'), 'title')
 
+    def test_hash(self):
+        self.assertSetEqual(set([types.Title('hello')]),
+            set([types.Title('hello')]))
+
 
 class RangeTest(unittest.TestCase):
     def setUp(self):
@@ -409,18 +413,6 @@ class RangeTest(unittest.TestCase):
         self.assertTrue(types.Range(1, 1).is_empty())
         self.assertFalse(types.Range(1, 1))
         self.assertTrue(types.Range(1, 3))
-
-    def test_subtract(self):
-        self.skipTest("Not sure about uscases.")
-        self.assertIsInstance(types.Range(1, 6).subtract(self.r), types.Range)
-        self.assertIsInstance(self.r.subtract(self.r), types.Range)
-        self.assertTrue(self.r.subtract(self.r).is_empty)
-
-
-class DateRangeTest(unittest.TestCase):
-    def test_int_init(self):
-        self
-
 
 
 if __name__ == '__main__':

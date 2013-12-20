@@ -1,3 +1,4 @@
+import json
 import unittest
 import time
 
@@ -6,8 +7,7 @@ import mock
 from gorynych.common.domain import events, model, types
 from gorynych.info.domain.test.helpers import create_contest, create_person, create_checkpoints
 from gorynych.info.domain import contest
-from gorynych.common.domain.types import Address, Name, Country, Phone, \
-    MappingCollection, Title
+from gorynych.common.domain.types import Address, Name, Country, Phone, MappingCollection, Title
 from gorynych.info.domain.ids import PersonID, RaceID
 from gorynych.common.exceptions import DomainError
 
@@ -47,8 +47,8 @@ def create_role(rolename, pers=None, **kw):
             raise ValueError(
                 "Wrong argument passed during role creation: %s" % rolename)
     except Exception as e:
-        raise unittest.SkipTest("ERROR: contest.%s can't be created: %r" %
-                                (rolename.capitalize(), e))
+        raise unittest.SkipTest("ERROR: contest.%s can't be created: %r" % (
+            rolename.capitalize(), e))
     return pers, result
 
 
@@ -107,6 +107,14 @@ class ContestTest(unittest.TestCase):
         self.assertRaises(ValueError, cont.change_times, '10', '8')
         self.assertEqual((cont.start_time, cont.end_time), (10, 16))
 
+    def test_times_changing_violate_contest_invariants(self):
+        cont = create_contest(1, 15)
+        def raiser():
+            raise DomainError()
+        cont.check_invariants = raiser
+        self.assertEqual((1, 15), (cont.start_time, cont.end_time))
+        self.assertRaises(DomainError, cont.change_times, '10', '16')
+
     def test_change_title(self):
         cont = create_contest(1, '15')
         cont.title = Title('  hello moOn  ')
@@ -118,6 +126,17 @@ class ContestTest(unittest.TestCase):
         self.assertEqual(cont.address, Address('Severodvinsk', 'tw', (15, 0)))
 
 
+class TaskForTests(object):
+    def __init__(self, st, et, id=1, title='TestTask'):
+        self.title = Title(title)
+        self.window_open = int(st)
+        self.deadline = int(et)
+        self.id = id
+
+    def __repr__(self):
+        return str((self.window_open, self.deadline, self.id))
+
+
 class TestInvariants(unittest.TestCase):
     def setUp(self):
         self.cont = create_contest(time.time(), time.time() + 3600)
@@ -126,7 +145,8 @@ class TestInvariants(unittest.TestCase):
         del self.cont
 
     def test_person_only_in_one_role_fail(self):
-        p1 = mock.MagicMock(); p1.id = 1
+        p1 = mock.MagicMock()
+        p1.id = 1
         self.cont.paragliders[1] = p1
         self.cont.staff[0] = p1
         self.cont.organizers[1] = p1
@@ -146,6 +166,42 @@ class TestInvariants(unittest.TestCase):
         self.assertRaises(DomainError, contest.contest_times_are_good,
             self.cont)
 
+    def test_task_outside_of_contest(self):
+        self.cont.tasks[1] = TaskForTests(1, 2)
+        self.cont.paragliders = range(2)
+        try:
+            contest.contest_tasks_are_correct(self.cont)
+        except DomainError as e:
+            self.assertTrue(e.message.startswith("Task 1 is out of contest"))
+
+    def test_tasks_overlaps(self):
+        time1 = int(time.time()) + 10
+        self.cont.tasks[1] = TaskForTests(time1, time1 + 10)
+        self.cont.tasks[2] = TaskForTests(time1 + 10, time1 + 20, id=2,
+            title='Title2')
+        self.cont.paragliders = range(3)
+        try:
+            contest.contest_tasks_are_correct(self.cont)
+        except DomainError as e:
+            self.assertTrue(e.message.startswith("Task 2 follow immediately"))
+
+    def test_no_paragliders_for_task(self):
+        self.cont.tasks[1] = TaskForTests(int(time.time()) + 10,
+            int(time.time()) + 20)
+        try:
+            contest.contest_tasks_are_correct(self.cont)
+        except DomainError as e:
+            self.assertTrue(e.message.startswith("No paragliders on contest"))
+
+    def test_contest_tasks_are_correct(self):
+        time1 = int(time.time()) + 10
+        t1 = TaskForTests(time1, time1 + 10)
+        t2 = TaskForTests(time1 + 10, time1 + 20, id=2)
+        self.cont.tasks[1] = t1
+        self.cont.tasks[2] = t2
+        self.cont.paragliders = range(1)
+        self.assertIsNone(contest.contest_times_are_good(self.cont))
+
 
 class ContestTestWithRegisteredParagliders(unittest.TestCase):
     def setUp(self):
@@ -161,12 +217,12 @@ class ContestTestWithRegisteredParagliders(unittest.TestCase):
                 cnum='757')
             _, par1 = create_role('paraglider', pers=self.p1, glider='gin',
                 cnum='747')
-            _, org = create_role('organizer', self.p3,
-                                email='john@example.org')
+            _, org = create_role('organizer', self.p3, email='john@example.org')
             cont.add_paraglider(par1)
             cont.add_paraglider(par2)
             cont.add_organizer(org)
             return cont, par1, par2
+
         try:
             self.cont, self.person1, self.person2 = fixture()
         except Exception as e:
@@ -180,7 +236,7 @@ class ContestTestWithRegisteredParagliders(unittest.TestCase):
 
     def test_correct_change_participant_data(self):
         cont = contest.change_participant(self.cont, 'paraglider', self.p1.id,
-                                      glider='ajAx', contest_number='0')
+            glider='ajAx', contest_number='0')
         self.assertIsInstance(cont, contest.Contest)
         self.assertEqual(self.cont.paragliders[self.p1.id].glider, 'ajax')
         self.assertEqual(self.cont.paragliders[self.p1.id].contest_number, 0)
@@ -203,14 +259,13 @@ class ContestTestWithRegisteredParagliders(unittest.TestCase):
             'paraglider', self.p1.id, glider='ajax', contest_number=757)
 
     def test_change_organizer(self):
-        cont = contest.change_participant(self.cont, 'organizer',
-            self.p3.id, email='vas@mail.ru', name=Name('Vasisualy', 'Lohankin'))
+        cont = contest.change_participant(self.cont, 'organizer', self.p3.id,
+            email='vas@mail.ru', name=Name('Vasisualy', 'Lohankin'))
         self.assertIsInstance(cont, contest.Contest)
         self.assertIsInstance(cont.organizers[self.p3.id], contest.Organizer)
 
 
 class TestAddingToContest(unittest.TestCase):
-
     def setUp(self):
         self.cont = create_contest(time.time(), time.time() + 3600)
 
@@ -285,10 +340,8 @@ class TestAddingToContest(unittest.TestCase):
         p3, par3 = create_role('paraglider', cnum='1', glider='mantra')
         self.assertRaises(DomainError, self.cont.add_paraglider, par3)
         self.assertEqual(len(self.cont.paragliders), 2)
-        self.assertIn(1,self.cont.paragliders.get_attribute_values(
-            'contest_number'))
-        self.assertIn(0,self.cont.paragliders.get_attribute_values(
-            'contest_number'))
+        self.assertIn(1, self.cont.paragliders.get_attribute_values('contest_number'))
+        self.assertIn(0, self.cont.paragliders.get_attribute_values('contest_number'))
 
         mock_calls = event_store.mock_calls
         self.assertEqual(len(mock_calls), 2)
@@ -310,7 +363,7 @@ class TestAddingToContest(unittest.TestCase):
 class StaffMemberTest(unittest.TestCase):
     def test_type(self):
         self.assertRaises(TypeError, contest.Staff, title='Scruffy the janitor',
-            type='janitor',  description="Don't know who that guy is")
+            type='janitor', description="Don't know who that guy is")
         sm = contest.Staff(title="Chip'n'Dale", type='rescuer',
             description='rescue ranger!')
         self.assertIsInstance(sm, contest.Staff)
@@ -354,290 +407,12 @@ class StaffMemberTest(unittest.TestCase):
         self.assertRaises(AttributeError, setattr, sm, 'title', 'Hero')
 
 
-class TestRaceToGoalTask(unittest.TestCase):
-
+class TaskAddingTest(unittest.TestCase):
     def setUp(self):
-        self.chps = create_checkpoints()
-        self.task_id = RaceID()
+        self.cont = create_contest(time.time(), time.time() + 3600)
 
-    def test_incorrect_base_properties(self):
-        corrupted_chps = self.chps[:]
-        corrupted_chps[2] = 'Cheekpoynt'
-        self.assertRaises(TypeError, contest.RaceToGoalTask, window_open=1347711300 + 3600, window_close=1347711300 + 7200,
-            title='Test task', task_id=self.task_id, checkpoints=corrupted_chps)
-        self.assertRaises(TypeError, contest.RaceToGoalTask, window_open=1347711300 + 3600, window_close=1347711300 + 7200,
-            title='Test task', task_id=123, checkpoints=self.chps)
-        self.assertRaises(ValueError, contest.RaceToGoalTask, window_open=1347711300 + 3600, window_close=1347711300 + 7200,
-            title=123, task_id=self.task_id, checkpoints=self.chps)
-
-    def test_correct_creation(self):
-        t = contest.RaceToGoalTask(window_open=1347711300 + 3600, window_close=1347711300 + 7200,
-            race_gates_number=2, race_gates_interval=15, title='Test task',
-            task_id=self.task_id, checkpoints=self.chps)
-        self.assertEquals(t.start_time, 1347711300)
-        self.assertEquals(t.deadline, 1347732000)
-        self.assertEquals(t.title, 'Test task')
-        self.assertEquals(t.id, self.task_id)
-        self.assertEquals(t.checkpoints, self.chps)
-        self.assertEquals(t.window_open, 1347711300 + 3600)
-        self.assertEquals(t.window_close, 1347711300 + 7200)
-        self.assertEquals(t.race_gates_number, 2)
-        self.assertEquals(t.race_gates_interval, 15)
-        self.assertTrue(t.is_task_correct())
-
-        # correst set of params with 1 race gate
-        t = contest.RaceToGoalTask(window_open=1347711300 + 3600, window_close=1347711300 + 7200,
-            race_gates_number=1, title='Test task', task_id=self.task_id,
-            checkpoints=self.chps)
-        self.assertEquals(t.start_time, 1347711300)
-        self.assertEquals(t.deadline, 1347732000)
-        self.assertEquals(t.title, 'Test task')
-        self.assertEquals(t.id, self.task_id)
-        self.assertEquals(t.checkpoints, self.chps)
-        self.assertEquals(t.window_open, 1347711300 + 3600)
-        self.assertEquals(t.window_close, 1347711300 + 7200)
-        self.assertEquals(t.race_gates_number, 1)
-        self.assertEquals(t.race_gates_interval, None)
-        self.assertTrue(t.is_task_correct())
-
-    def test_incorrect_window(self):
-        # window bounds outwide the task
-        self.assertRaises(ValueError, contest.RaceToGoalTask, window_open=1347711300 - 3600,
-            window_close=1347711300 + 7200, title='Test task', task_id=self.task_id,
-            checkpoints=self.chps)
-        # incorrect params: window bounds are incorrect by itself
-        self.assertRaises(ValueError, contest.RaceToGoalTask, window_open=1347711300 + 3600,
-            window_close=1347711300 - 3600, title='Test task', task_id=self.task_id,
-            checkpoints=self.chps)
-        self.assertRaises(TypeError, contest.RaceToGoalTask, window_open='at the morning',
-            window_close='when its done', title='Test task', task_id=self.task_id,
-            checkpoints=self.chps)
-
-    def test_incorrect_gates(self):
-        # multiple race gates, none interval
-        self.assertRaises(ValueError, contest.RaceToGoalTask, window_open=1347711300 + 3600,
-            window_close=1347711300 + 7200, race_gates_number=2, title='Test task',
-            task_id=self.task_id, checkpoints=self.chps)
-        # one race gate, multiple intervals
-        self.assertRaises(ValueError, contest.RaceToGoalTask, window_open=1347711300 + 3600,
-            window_close=1347711300 + 7200, race_gates_number=1,
-            race_gates_interval=10, title='Test task', task_id=self.task_id,
-            checkpoints=self.chps)
-
-    def test_incorrect_modification(self):
-        def make_correct_task():
-            return contest.RaceToGoalTask(window_open=1347711300 + 3600,
-                window_close=1347711300 + 7200, title='Test task', task_id=self.task_id,
-                checkpoints=self.chps)
-        t = make_correct_task()
-        self.assertRaises(ValueError, setattr, t, 'title', 721)
-        self.assertRaises(ValueError, setattr, t, 'title', '   ')
-        bad_checkpoints = self.chps[:]
-        bad_checkpoints[2] = '...'
-        self.assertRaises(TypeError, setattr, t, 'checkpoints', bad_checkpoints)
-        self.assertRaises(ValueError, setattr, t, 'checkpoints', [])
-
-        t.race_gates_number = 1
-        t.race_gates_interval = 10
-        self.assertFalse(t.is_task_correct())
-
-        t = make_correct_task()
-        t.race_gates_number = 2
-        t.race_gates_interval = None
-        self.assertFalse(t.is_task_correct())
-
-        t = make_correct_task()
-        t.window_close = 0
-        self.assertFalse(t.is_task_correct())
-
-        t = make_correct_task()
-        t.window_open = 'sometime'
-        self.assertFalse(t.is_task_correct())
-
-
-class TestSpeedRunTask(unittest.TestCase):
-
-    def setUp(self):
-        self.chps = create_checkpoints()
-        self.task_id = RaceID()
-
-    def test_incorrect_base_properties(self):
-        corrupted_chps = self.chps[:]
-        corrupted_chps[2] = 'Cheekpoynt'
-        self.assertRaises(TypeError, contest.SpeedRunTask, window_open=1347711300 + 3600, window_close=1347711300 + 7200,
-            title='Test task', task_id=self.task_id, checkpoints=corrupted_chps)
-        self.assertRaises(TypeError, contest.SpeedRunTask, window_open=1347711300 + 3600, window_close=1347711300 + 7200,
-            title='Test task', task_id=123, checkpoints=self.chps)
-        self.assertRaises(ValueError, contest.SpeedRunTask, window_open=1347711300 + 3600, window_close=1347711300 + 7200,
-            title=123, task_id=self.task_id, checkpoints=self.chps)
-
-    def test_correct_creation(self):
-        t = contest.SpeedRunTask(window_open=1347711300 + 3600, window_close=1347711300 + 7200,
-            title='Test task', task_id=self.task_id, checkpoints=self.chps)
-        self.assertEquals(t.start_time, 1347711300)
-        self.assertEquals(t.deadline, 1347732000)
-        self.assertEquals(t.title, 'Test task')
-        self.assertEquals(t.id, self.task_id)
-        self.assertEquals(t.checkpoints, self.chps)
-        self.assertEquals(t.window_open, 1347711300 + 3600)
-        self.assertEquals(t.window_close, 1347711300 + 7200)
-        self.assertTrue(t.is_task_correct())
-
-    def test_incorrect_window(self):
-        # window bounds outwide the task
-        self.assertRaises(ValueError, contest.SpeedRunTask, window_open=1347711300 - 3600,
-            window_close=1347711300 + 7200, title='Test task', task_id=self.task_id,
-            checkpoints=self.chps)
-        # incorrect params: window bounds are incorrect by itself
-        self.assertRaises(ValueError, contest.SpeedRunTask, window_open=1347711300 + 3600,
-            window_close=1347711300 - 3600, title='Test task', task_id=self.task_id,
-            checkpoints=self.chps)
-        self.assertRaises(TypeError, contest.SpeedRunTask, window_open='at the morning',
-            window_close='when its done', title='Test task', task_id=self.task_id,
-            checkpoints=self.chps)
-
-    def test_incorrect_modification(self):
-        def make_correct_task():
-            return contest.SpeedRunTask(window_open=1347711300 + 3600,
-                window_close=1347711300 + 7200, title='Test task', task_id=self.task_id,
-                checkpoints=self.chps)
-        t = make_correct_task()
-        self.assertRaises(ValueError, setattr, t, 'title', 721)
-        self.assertRaises(ValueError, setattr, t, 'title', '   ')
-        bad_checkpoints = self.chps[:]
-        bad_checkpoints[2] = '...'
-        self.assertRaises(TypeError, setattr, t, 'checkpoints', bad_checkpoints)
-        self.assertRaises(ValueError, setattr, t, 'checkpoints', [])
-
-        t = make_correct_task()
-        t.window_close = 0
-        self.assertFalse(t.is_task_correct())
-
-        t = make_correct_task()
-        t.window_open = 'sometime'
-        self.assertFalse(t.is_task_correct())
-
-
-class OpenDistanceTaskTest(unittest.TestCase):
-
-    def setUp(self):
-        self.chps = create_checkpoints()
-        self.task_id = RaceID()
-
-    def test_incorrect_base_properties(self):
-        corrupted_chps = self.chps[:]
-        corrupted_chps[2] = 'Cheekpoynt'
-        self.assertRaises(TypeError, contest.OpenDistanceTask, bearing=1, title='Test task', task_id=self.task_id,
-            checkpoints=corrupted_chps)
-        self.assertRaises(TypeError, contest.OpenDistanceTask, bearing=1, title='Test task', task_id=123, checkpoints=self.chps)
-        self.assertRaises(ValueError, contest.OpenDistanceTask, bearing=1,
-            title=123, task_id=self.task_id, checkpoints=self.chps)
-
-    def test_correct_creation(self):
-        t = contest.OpenDistanceTask(bearing=5, title='Test task', task_id=self.task_id,
-            checkpoints=self.chps)
-        self.assertEquals(t.start_time, 1347711300)
-        self.assertEquals(t.deadline, 1347732000)
-        self.assertEquals(t.title, 'Test task')
-        self.assertEquals(t.id, self.task_id)
-        self.assertEquals(t.checkpoints, self.chps)
-        self.assertEquals(t.bearing, 5)
-        self.assertTrue(t.is_task_correct())
-
-    def test_incorrect_bearing(self):
-        self.assertRaises(ValueError, contest.OpenDistanceTask, bearing=361,
-            title='Test task', task_id=self.task_id, checkpoints=self.chps)
-        self.assertRaises(ValueError, contest.OpenDistanceTask, bearing='bear it hard',
-            title='Test task', task_id=self.task_id, checkpoints=self.chps)
-
-
-class TestContestTasks(unittest.TestCase):
-
-    def setUp(self):
-        self.cont = create_contest(1347711300 - 3600, 1347732000 + 3600)
-
-    def _make_test_task(self, title, checkpoints):
-        return contest.OpenDistanceTask(bearing=5, title=title, task_id=RaceID(),
-            checkpoints=checkpoints)
-
-    def _shift_checkpoints(self, checkpoints, shift=24 * 3600):
-        # shifts each checkpoint open and close time to n seconds forward
-        new_chps = []
-        for chp in checkpoints:
-            new_chp = chp
-            if new_chp.open_time:
-                new_chp.open_time += shift
-            if new_chp.close_time:
-                new_chp.close_time += shift
-            new_chps.append(new_chp)
-        return new_chps
-
-    def test_correct_adding_one_task(self):
-        t = self._make_test_task('The only task', create_checkpoints())
-        self.cont.add_task(t)
-        self.assertEquals(len(self.cont.tasks), 1)
-        self.assertEquals(self.cont.tasks[0], t)
-        self.assertEquals(self.cont.get_task(t.id), t)
-
-    def test_add_one_violating_task(self):
-        chps = create_checkpoints()
-        shifted_chps = self._shift_checkpoints(chps, 1000 * 365 * 24 * 3600)
-        t = self._make_test_task('Thousand years late task', shifted_chps)
-        self.assertRaises(ValueError, self.cont.add_task, t)
-
-    def test_add_not_task(self):
-        self.assertRaises(TypeError, self.cont.add_task, 'hello!')
-
-    def test_correct_modify_task(self):
-        t = self._make_test_task('The only task', create_checkpoints())
-        self.cont.add_task(t)
-        self.cont.edit_task(t.id, title='Some other task')
-        self.assertEquals(self.cont.get_task(t.id).title, 'Some other task')
-        new_chps = create_checkpoints()[:-1]
-        self.cont.edit_task(t.id, checkpoints=new_chps)
-        self.assertEquals(self.cont.get_task(t.id).checkpoints, new_chps)
-
-    def test_incorrect_modify_task(self):
-        t = self._make_test_task('The only task', create_checkpoints())
-        self.cont.add_task(t)
-        self.assertRaises(ValueError, self.cont.edit_task, task_id=t.id, title='  ')
-        self.assertRaises(ValueError, self.cont.edit_task, task_id=t.id,
-            checkpoints=[])
-
-    def test_correct_adding_two_tasks(self):
-        self.cont.end_time += 24 * 3600
-        chps = create_checkpoints()
-        t1 = self._make_test_task('Task 1', chps)
-        nextday_chps = self._shift_checkpoints(chps, 24 * 3600)
-        t2 = self._make_test_task('Task 2', nextday_chps)
-
-        self.cont.add_task(t1)
-        self.cont.add_task(t2)
-        self.assertEquals(len(self.cont.tasks), 2)
-        self.assertIn(t1, self.cont.tasks)
-        self.assertIn(t2, self.cont.tasks)
-        self.assertEquals(self.cont.get_task(t1.id), t1)
-        self.assertEquals(self.cont.get_task(t2.id), t2)
-
-    def test_add_good_task_then_bad_task(self):
-        self.cont.end_time += 24 * 3600
-        chps = create_checkpoints()
-        t1 = self._make_test_task('Task 1', chps)
-        minutelater_chps = self._shift_checkpoints(chps, 60)
-        t2 = self._make_test_task('Task 2', minutelater_chps)
-        self.cont.add_task(t1)
-        # overlapping
-        self.assertRaises(ValueError, self.cont.add_task, t2)
-        self.assertEquals(len(self.cont.tasks), 1)
-        self.assertEquals(self.cont.tasks[0], t1)
-        self.assertEquals(self.cont.get_task(t1.id), t1)
-
-        # incorrect task
-        t2.start_time = 'never'
-        self.assertRaises(ValueError, self.cont.add_task, t2)
-        self.assertEquals(len(self.cont.tasks), 1)
-        self.assertEquals(self.cont.tasks[0], t1)
-        self.assertEquals(self.cont.get_task(t1.id), t1)
+    def tearDown(self):
+        del self.cont
 
 
 class OrganizerTest(unittest.TestCase):
@@ -726,3 +501,162 @@ class WinddummyTest(unittest.TestCase):
         self.assertIsInstance(w.name, Name)
         self.assertTupleEqual((w.id, w.phone, w.name),
             (self.p.id, Phone('+7322'), self.p.name))
+
+
+class _PreparedTask(unittest.TestCase):
+    def setUp(self):
+        self.task = mock.Mock()
+        chps = json.loads(types.geojson_feature_collection(create_checkpoints()))
+        self.task.checkpoints = chps
+        self.task.window_open = 10
+        self.task.window_close = 20
+        self.task.start_time = 20
+        self.task.deadline = 30
+
+    def tearDown(self):
+        del self.task
+
+
+class CheckpointTypesSpecificationTest(_PreparedTask):
+    def test_four_point_success(self):
+        spec = contest.CheckpointTypesSpecification(['to', 'es', 'ss', 'goal'])
+        self.assertTrue(spec.is_satisfied_by(self.task))
+
+    def test_four_point_failure(self):
+        spec = contest.CheckpointTypesSpecification(['to', 'es', 'ss', 'goal'])
+        del self.task.checkpoints['features'][0]
+        self.assertFalse(spec.is_satisfied_by(self.task))
+
+    def test_one_point_success(self):
+        spec = contest.CheckpointTypesSpecification(['to'])
+        self.assertTrue(spec.is_satisfied_by(self.task))
+
+    def test_one_point_failure(self):
+        spec = contest.CheckpointTypesSpecification()
+        del self.task.checkpoints['features'][0]
+        self.assertFalse(spec.is_satisfied_by(self.task))
+
+
+class GoalTypeSpecification(_PreparedTask):
+    def test_success(self):
+        self.assertTrue(contest.GoalTypeSpecification().is_satisfied_by(self.task))
+
+    def test_no_goal(self):
+        del self.task.checkpoints['features'][-1]
+        self.assertFalse(contest.GoalTypeSpecification().is_satisfied_by(self.task))
+
+    def test_wrong_goal_type(self):
+        self.task.checkpoints['features'][-1]['geometry']['type'] = 'Wrong'
+        self.assertFalse(contest.GoalTypeSpecification().is_satisfied_by(self.task))
+
+    def test_new_goal_type(self):
+        self.task.checkpoints['features'][-1]['geometry']['type'] = 'Line'
+        self.assertTrue(contest.GoalTypeSpecification(['Point', 'Line']).is_satisfied_by(
+            self.task))
+
+
+class TimesSpecificationTest(_PreparedTask):
+    def test_two_times(self):
+        self.assertTrue(contest.TimesSpecification().is_satisfied_by(self.task))
+
+    def test_two_times_fail(self):
+        self.task.window_open = self.task.deadline
+        self.assertFalse(contest.TimesSpecification(2).is_satisfied_by(self.task))
+
+    def test_four_times(self):
+        self.assertTrue(contest.TimesSpecification(4).is_satisfied_by(self.task))
+
+    def test_four_times_fail(self):
+        self.task.start_time = self.task.window_open - 1
+        self.assertFalse(contest.TimesSpecification(4).is_satisfied_by(self.task))
+
+
+class TasksTest(unittest.TestCase):
+    '''
+    It's not a test really but a fix what are tasks should be.
+    '''
+
+    def setUp(self):
+        self.chps = json.loads(types.geojson_feature_collection(create_checkpoints()))
+        self.id = RaceID()
+
+    def test_opendistance(self):
+        t = contest.OpenDistanceTask('Title', self.chps, 10, 20, 245, self.id)
+        self._common_check(t)
+        self.assertRaises(ValueError, contest.OpenDistanceTask.read_bearing,
+            -1)
+        self.assertIsNone(contest.OpenDistanceTask.read_bearing(None))
+        self.assertEqual(0, contest.OpenDistanceTask.read_bearing(0))
+        self.assertIsInstance(t.bearing, int)
+        t = contest.OpenDistanceTask('Title', self.chps, 10, 20, None, self.id)
+        self._common_check(t)
+        self.assertIsNone(t.bearing)
+
+    def test_racetogoal(self):
+        t = contest.RaceToGoalTask('Title', self.chps, types.DateRange(10, 12),
+            types.DateRange(13, 20), 1, 0, self.id)
+        self._common_check(t)
+        self.assertEqual(1, t.gates_number)
+        self.assertEqual(0, t.gates_interval)
+        self.assertEqual(t.window_close, 12)
+        self.assertEqual(t.start_time, 13)
+
+    def test_speedrun(self):
+        t = contest.SpeedRunTask('Title', self.chps, types.DateRange(10, 13),
+            types.DateRange(13, 20), self.id)
+        self._common_check(t)
+        self.assertEqual(t.window_close, 13)
+        self.assertEqual(t.start_time, 13)
+
+    def _common_check(self, t):
+        self.assertIsInstance(t.id, RaceID)
+        self.assertIsInstance(t.title, Title)
+        self.assertIsInstance(t.checkpoints, dict)
+        self.assertEqual(10, contest.OpenDistanceTask.read_bearing(10))
+        self.assertEqual(t.window_open, 10)
+        self.assertEqual(t.deadline, 20)
+
+
+class CreatingContestTaskTest(unittest.TestCase):
+    def setUp(self):
+        self.cont = create_contest(1347711300 - 3600, 1347732000 + 3600)
+        self.chps = json.loads(types.geojson_feature_collection(create_checkpoints()))
+
+        class P:
+            contest_number = 1
+
+        self.cont.paragliders[1] = P()
+
+    def test_create_racetogoal(self):
+        wo = self.cont.start_time + 10
+        self.cont.create_task('First', 'racetogoal', self.chps, window_open=wo,
+            window_close=wo + 10, start_time=wo + 9, deadline=wo + 19,
+            start_gates_interval=0, start_gates_number=1)
+        self.assertIsInstance(self.cont.tasks.values()[0], contest.RaceToGoalTask)
+        self.assertEqual(1, len(self.cont.tasks))
+
+    def test_without_paragliders(self):
+        wo = self.cont.start_time + 10
+        self.cont.paragliders = MappingCollection()
+        self.assertRaises(DomainError, self.cont.create_task, 'First',
+            'racetogoal', self.chps, window_open=wo, window_close=wo + 10,
+            start_time=wo + 9, deadline=wo + 19, start_gates_interval=0,
+            start_gates_number=1)
+
+    def test_create_speedrun(self):
+        wo = self.cont.start_time + 10
+        self.cont.create_task('First', 'speedrun', self.chps, window_open=wo,
+            window_close=wo + 10, start_time=wo + 9, deadline=wo + 19)
+        self.assertIsInstance(self.cont.tasks.values()[0],
+            contest.SpeedRunTask)
+
+    def test_create_opendistance(self):
+        wo = self.cont.start_time + 10
+        self.cont.create_task('Title', 'opendistance', self.chps,
+            window_open=wo, deadline=wo + 20)
+        self.assertIsInstance(self.cont.tasks.values()[0],
+            contest.OpenDistanceTask)
+        self.cont.create_task('Title2', 'opendistance', self.chps,
+            window_open=wo + 30, deadline=wo + 40, bearing=2)
+
+

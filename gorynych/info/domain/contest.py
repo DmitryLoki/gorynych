@@ -1,21 +1,18 @@
 '''
 Contest Aggregate.
 '''
-from copy import deepcopy
-import datetime
-from collections import defaultdict
+from collections import defaultdict, Counter
 import simplejson as json
 
 import pytz
 
 from gorynych.info.domain import transport
 from gorynych.common.domain.model import AggregateRoot, ValueObject, DomainIdentifier
-from gorynych.common.domain.types import Address, Country, Phone, Checkpoint, MappingCollection, TransactionalDict, Title, DateRange
+from gorynych.common.domain.types import Address, Country, Phone, MappingCollection, TransactionalDict, Title, DateRange
 from gorynych.common.domain.events import ParagliderRegisteredOnContest
 from gorynych.common.infrastructure import persistence
 from gorynych.info.domain.ids import ContestID, RaceID, PersonID
 from gorynych.common.exceptions import DomainError
-from gorynych.common.domain.services import times_from_checkpoints
 
 ROLES = dict(organizer='organizers', staff='staff', winddummy='winddummies',
     paraglider='paragliders')
@@ -83,6 +80,40 @@ def contest_times_are_good(cont):
     if cont.times.is_empty():
         raise DomainError("Contest times are wrong: %r" % cont.times)
 
+
+def contest_tasks_are_correct(cont):
+    '''
+    Check if contest tasks can exist in given contest.
+    @param cont:
+    @type cont: Contest
+    @raise DomainError
+    '''
+    # Contest has paragliders to fly.
+    if len(cont.tasks) > 0 and len(cont.paragliders) == 0:
+        raise DomainError("No paragliders on contest.")
+
+    # Titles are unique.
+    titles = [t.title for t in cont.tasks.values()]
+    dup = Counter(titles) - Counter(set(titles))
+    if len(dup) > 0:
+        raise DomainError("Task titles are duplicated: %s." % dup.keys())
+
+    # Task times inside contest.
+    for key, task in cont.tasks.iteritems():
+        if not cont.times.overlap(DateRange(task.window_open, task.deadline)):
+            raise DomainError("Task %s is out of contest's time range: %s" %
+                              (key, cont.times))
+
+    # Tasks times don't overlaps.
+    sorted_tasks = sorted(cont.tasks.values(), key=lambda t: t.window_open)
+    for i, t in enumerate(sorted_tasks[1:]):
+        if DateRange(sorted_tasks[i].deadline, t.window_open).is_empty():
+            raise DomainError("Task %s follow immediately after task %s" % (
+                t.id, sorted_tasks[i].id))
+
+    # TODO: check trackers existance for live-tracking tasks.
+
+
 ###################################################################
 
 class Contest(AggregateRoot):
@@ -93,13 +124,12 @@ class Contest(AggregateRoot):
         self.times = DateRange(start_time, end_time)
         self._timezone = ''
         self.address = Address(address)
-        self._participants = dict()
         self.retrieve_id = None
-        self._tasks = dict()
         self.organizers = MappingCollection()
         self.paragliders = MappingCollection()
         self.winddummies = MappingCollection()
         self.staff = MappingCollection()
+        self.tasks = MappingCollection()
 
     @property
     def timezone(self):
@@ -130,61 +160,72 @@ class Contest(AggregateRoot):
     def end_time(self):
         return self.times[1]
 
-    @property
-    def tasks(self):
-        return self._tasks.values()
+    def create_task(self, title, task_type, checkpoints, **kw):
+        '''
+        Factory method which create task and add it to contest.
+        @param title: task title
+        @type title: str or Title
+        @param task_type: task type in lowercase without spaces
+        @type task_type: C{str}
+        @param checkpoints: checkpoints in GeoJSON.
+        @type checkpoints: C{str} or C{dict}
+        @param kw: another useful parameters for task
+        @rtype: NoneType
+        @raise DomainError, ValueError
+        '''
+        # Initialize specifications.
+        four_points = CheckpointTypesSpecification(['to', 'es', 'ss', 'goal'])
+        one_point = CheckpointTypesSpecification(['to'])
+        allowed_goals = GoalTypeSpecification(['Point'])
+        two_times = TimesSpecification(2)
+        four_times = TimesSpecification(4)
+        # Dictionary to simplify task checking.
+        types = defaultdict(dict)
+        types['opendistance']['specifications'] = [
+            (one_point, ValueError("Checkpoint's types are incorrect.")),
+            (two_times, ValueError("Task is empty")),
+            (allowed_goals, ValueError("Goal should be one of %s"
+                                       % allowed_goals.goals))
+        ]
+        types['speedrun']['specifications'] = [
+            (four_points, ValueError("Checkpoint's types are incorrect.")),
+            (four_times, ValueError("Task times are incorrect")),
+            types['opendistance']['specifications'][2]
+        ]
+        types['racetogoal']['specifications'] = types['speedrun'][
+            'specifications']
 
-    def _tasks_are_correct(self):
-        """
-        1) Unique titles.
-        2) Each task must fit contest time bounds.
-        3) No time overlapping between tasks.
-        4) Each task is by itself correct.
-        """
-        tasks = self._tasks.values()
-        titles = [t.title for t in tasks]
-        if len(titles) != len(set(titles)):
-            return False
+        # Prepare input parameters.
+        task_id = RaceID() if not kw.get('id') else RaceID(kw['id'])
+        if task_type == 'opendistance':
+            checkpoints = OpenDistanceTask.read_checkpoints(checkpoints)
+            bearing = OpenDistanceTask.read_bearing(kw.get('bearing'))
+            task = OpenDistanceTask(title, checkpoints, kw['window_open'],
+                kw['deadline'], bearing, task_id)
+        elif task_type == 'speedrun':
+            checkpoints = SpeedRunTask.read_checkpoints(checkpoints)
+            window = DateRange(kw['window_open'], kw['window_close'])
+            speed_section = DateRange(kw['start_time'], kw['deadline'])
+            task = SpeedRunTask(title, checkpoints, window, speed_section,
+                task_id)
+        elif task_type == 'racetogoal':
+            checkpoints = RaceToGoalTask.read_checkpoints(checkpoints)
+            window = DateRange(kw['window_open'], kw['window_close'])
+            speed_section = DateRange(kw['start_time'], kw['deadline'])
+            start_gates_number = int(kw.get('start_gates_number', 1))
+            gate_interval = int(kw.get('start_gates_interval', 0))
+            task = RaceToGoalTask(title, checkpoints, window, speed_section,
+                start_gates_number, gate_interval, task_id)
+        else:
+            raise ValueError("Unknown task type %s" % task_type)
 
-        for task in tasks:
-            if not task.is_task_correct():
-                return False
-            if task.start_time < self.start_time or \
-                    task.deadline > self.end_time:
-                return False
-
-        for i, task in enumerate(tasks):
-            for j, other_task in enumerate(tasks[i + 1:]):
-                if other_task.start_time >= task.start_time \
-                    and other_task.start_time <= task.deadline \
-                    or other_task.deadline >= task.start_time \
-                        and other_task.deadline <= task.deadline:
-                    return False
-        return True
-
-    def add_task(self, task):
-        if not isinstance(task, BaseTask):
-            raise TypeError(
-                'Expected BaseTask instance, got {} instead'.format(type(task)))
-        tasks_before = deepcopy(self._tasks)
-        self._tasks[task.id] = task
-        if not self._tasks_are_correct():
-            self._tasks = tasks_before
-            # that's too vague, could we get concrete error message?
-            raise ValueError('Contest tasks conditions are violated')
-
-    def get_task(self, task_id):
-        return self._tasks[task_id]
-
-    def edit_task(self, task_id, **kwargs):
-        tasks_before = deepcopy(self._tasks)
-        if task_id in self._tasks:
-            for key, value in kwargs.iteritems():
-                if hasattr(self._tasks[task_id], key):
-                    setattr(self._tasks[task_id], key, value)
-        if not self._tasks_are_correct():
-            self._tasks = tasks_before
-            raise ValueError('Contest tasks conditions are violated')
+        # Check created task.
+        for spec, exc in types[task_type]['specifications']:
+            if not spec.is_satisfied_by(task):
+                raise exc
+        with TransactionalDict(self.tasks) as tasks:
+            tasks[task_id] = task
+            self.check_invariants()
 
     def change_times(self, start_time, end_time):
         '''
@@ -214,6 +255,7 @@ class Contest(AggregateRoot):
         contest_numbers_are_unique(self)
         person_only_in_one_role(self)
         contest_times_are_good(self)
+        contest_tasks_are_correct(self)
 
 
 # Meta adding
@@ -342,171 +384,165 @@ class Paraglider(ValueObject):
         self.phone = Phone(phone) if phone else None
 
 
-class BaseTask(ValueObject):
+######################## Task's stuff ########################################
 
+class CheckpointTypesSpecification(ValueObject):
+    '''
+    Check does task checkpoints has all necessary types: to, goal, es etc.
+    '''
+    def __init__(self, types=None):
+        # At least 'to' should exist.
+        self.types = types if types else ['to']
+        self.types.sort()
+
+    def is_satisfied_by(self, task):
+        point_types = []
+        for ch in task.checkpoints['features']:
+            _type = ch['properties'].get('checkpoint_type')
+            if _type in self.types:
+                point_types.append(_type)
+        point_types.sort()
+        return self.types == point_types
+
+
+class GoalTypeSpecification(ValueObject):
+    '''
+    Check goal geometry.
+    '''
+    def __init__(self, allowed_goals=None):
+        # At least Point should be allowed as geometry.
+        self.goals = allowed_goals if allowed_goals else ['Point']
+
+    def is_satisfied_by(self, task):
+        for ch in task.checkpoints['features']:
+            _type = ch['properties'].get('checkpoint_type')
+            if _type == 'goal' and ch['geometry']['type'] in self.goals:
+                return True
+        # Can I return True if no goals set in task? I think no. So let's
+        # return False.
+        return False
+
+
+class TimesSpecification(ValueObject):
+    '''
+    Check task times: window_open, window_close, start_time, deadline.
+    '''
+    def __init__(self, times_amount=2):
+        # All tasks operate by some amount of times.
+        self.times = times_amount
+
+    def is_satisfied_by(self, task):
+        if self.times == 2:
+            return self._two_times_check(task)
+        elif self.times == 4:
+            return self._four_times_check(task)
+        else:
+            raise NotImplementedError("Like Chrome say: Ooops!")
+
+    def _two_times_check(self, task):
+        '''
+        Two times mean that only window_open and deadline are used.
+        @param task:
+        @type task:
+        @rtype: bool
+        '''
+        return not DateRange(task.window_open, task.deadline).is_empty()
+
+    def _four_times_check(self, task):
+        '''
+        Tasks with speedsection.
+        @param task:
+        @type task:
+        @return:
+        @rtype:
+        '''
+        window = DateRange(task.window_open, task.window_close)
+        speedsection = DateRange(task.start_time, task.deadline)
+        return (not window.is_empty()) and (not speedsection.is_empty()) and (
+            task.start_time >= task.window_open)
+
+
+class BaseTask(ValueObject):
     """
     Base class for tasks.
-    Contains an id, title, start time and deadline, and also checkpoint collection.
     """
 
-    def __init__(self, task_id, title, checkpoints):
-        self.id = RaceID(task_id)
-        self.title = Title(title)
-        self._check_checkpoints(checkpoints)
-        st, et = times_from_checkpoints(checkpoints)
-        self._check_timelimits(st, et)
-        self.start_time = st
-        self.deadline = et
-        self._checkpoints = checkpoints
-
-    def _check_timelimits(self, start_time, deadline):
-        for i, t in enumerate([start_time, deadline]):
-            try:
-                datetime.datetime.fromtimestamp(t)
-            except TypeError:
-                raise TypeError(
-                    "Expected int or float for timestamp, got {} instead".format(
-                        type(t)))
-        if start_time >= deadline:
-            raise ValueError(
-                'Incorrect time section specified: first time value should be before the last')
-
-    def _check_checkpoints(self, checkpoints):
-        if not checkpoints:
-            raise ValueError("Race can't be created without checkpoints.")
-        for chp in checkpoints:
-            if not isinstance(chp, Checkpoint):
-                raise TypeError("Wrong checkpoint type: {}".format(type(chp)))
-
-    def is_task_correct(self):
-        try:
-            self._check_timelimits(self.start_time, self.deadline)
-            self._check_checkpoints(self._checkpoints)
-        except (ValueError, TypeError):
-            return False
-        return True
-
-    @property
-    def checkpoints(self):
-        return self._checkpoints
-
-    @checkpoints.setter
-    def checkpoints(self, value):
-        self._check_checkpoints(value)
-        st, et = times_from_checkpoints(value)
-        self._check_timelimits(st, et)
-        self.start_time = st
-        self.deadline = et
-        self._checkpoints = value
-
-    def __eq__(self, other):
-        return self.id == other.id and self.title == other.title \
-            and self.checkpoints == other.checkpoints \
-            and self.start_time == other.start_time \
-            and self.deadline == other.deadline
+    @staticmethod
+    def read_checkpoints(checkpoints):
+        '''
+        Check is passed checkpoints string correct.
+        @param checkpoints: json with checkpoints.
+        @type checkpoints: str
+        @return: checked checkpoints
+        @rtype: dict
+        @raise ValueError
+        '''
+        # TODO: replace it with validation through json schema.
+        if isinstance(checkpoints, str):
+            checkpoints = json.loads(checkpoints)
+        if isinstance(checkpoints, dict) and len(checkpoints) > 1:
+            return checkpoints
+        else:
+            ValueError("Can't read checkpoints %r" % checkpoints)
 
 
 class SpeedRunTask(BaseTask):
-    type = 'speedrun'
+    def __init__(self, title, checkpoints, window, speedsection, id):
+        self.title = Title(title)
+        self.checkpoints = checkpoints
+        self.window_open, self.window_close = window
+        self.start_time, self.deadline = speedsection
+        self.id = id
 
-    def __init__(self, window_open, window_close, *args, **kwargs):
-        BaseTask.__init__(self, *args, **kwargs)
-        self._check_window_bounds(window_open, window_close)
-        self.window_open = window_open
-        self.window_close = window_close
-
-    def is_task_correct(self):
-        if not BaseTask.is_task_correct(self):
-            return False
-        try:
-            self._check_window_bounds(self.window_open, self.window_close)
-        except (ValueError, TypeError):
-            return False
-        return True
-
-    def _check_window_bounds(self, window_open, window_close):
-        self._check_timelimits(window_open, window_close)
-        if window_open < self.start_time or window_close >= self.deadline:
-            raise ValueError(
-                'Window margins ({}, {}) are out of task bounds ({}, {})'.format(
-                    window_open, window_close, self.start_time, self.deadline))
-
-    def __eq__(self, other):
-        return BaseTask.__eq__(self, other) and self.window_open == other.window_open \
-            and self.window_close == other.window_close
+    @staticmethod
+    def read_checkpoints(checkpoints):
+        # TODO: replace it with validation through json schema.
+        checkpoints = BaseTask.read_checkpoints(checkpoints)
+        if len(checkpoints['features']) < 2:
+            raise ValueError("Too small checkpoints: %r " % checkpoints)
+        return checkpoints
 
 
 class RaceToGoalTask(BaseTask):
-    type = 'racetogoal'
 
-    def __init__(self, window_open, window_close, race_gates_number=1,
-            race_gates_interval=None, *args, **kwargs):
-        BaseTask.__init__(self, *args, **kwargs)
-        self._check_window_bounds(window_open, window_close)
-        self.window_open = window_open
-        self.window_close = window_close
+    def __init__(self, title, checkpoints, window, speed_section,
+            gates_number, gate_interval, id):
+        self.title = Title(title)
+        self.checkpoints = checkpoints
+        self.window_open, self.window_close = window
+        self.start_time, self.deadline = speed_section
+        self.gates_number = gates_number
+        self.gates_interval = gate_interval
+        self.id = id
+        if self.gates_number > 1 and not self.gates_interval > 0:
+            raise ValueError("Gates number is set but gates interval is %s"
+                             % self.gates_interval)
 
-        self._check_gates(race_gates_number, race_gates_interval)
-        self.race_gates_number = race_gates_number
-        self.race_gates_interval = race_gates_interval
-
-    def _check_window_bounds(self, window_open, window_close):
-        self._check_timelimits(window_open, window_close)
-        if window_open < self.start_time or window_close >= self.deadline:
-            raise ValueError(
-                'Window margins ({}, {}) are out of task bounds ({}, {})'.format(
-                    window_open, window_close, self.start_time, self.deadline))
-
-    def _check_gates(self, num, interval):
-        if not isinstance(num, int) or num < 0:
-            raise TypeError('Number of gates must be positive integer')
-        if num == 1 and interval is not None:
-            raise ValueError(
-                'Only one gate specified, expecting null interval: got {} instead'.format(
-                    interval))
-        if num != 1 and (
-                    not interval or not isinstance(interval, int) or interval < 0):
-            raise ValueError(
-                'Multiple gates specified, expecting positive integer interval: got {} instead'.format(
-                    interval))
-
-    def is_task_correct(self):
-        if not BaseTask.is_task_correct(self):
-            return False
-        try:
-            self._check_window_bounds(self.window_open, self.window_close)
-            self._check_gates(self.race_gates_number, self.race_gates_interval)
-        except (ValueError, TypeError):
-            return False
-        return True
-
-    def __eq__(self, other):
-        return BaseTask.__eq__(self, other) and self.window_open == other.window_open \
-            and self.window_close == other.window_close \
-            and self.race_gates_number == other.race_gates_number \
-            and self.race_gates_interval == other.race_gates_interval
+    @staticmethod
+    def read_checkpoints(checkpoints):
+        # TODO: replace it with validation through json schema.
+        checkpoints = BaseTask.read_checkpoints(checkpoints)
+        if len(checkpoints['features']) < 2:
+            raise ValueError("Too small checkpoints: %r " % checkpoints)
+        return checkpoints
 
 
 class OpenDistanceTask(BaseTask):
-    type = 'opendistance'
 
-    def __init__(self, bearing, *args, **kwargs):
-        BaseTask.__init__(self, *args, **kwargs)
-        self._check_bearing(bearing)
+    def __init__(self, title, checkpoints, window_open, deadline, bearing,
+            id):
+        self.title = Title(title)
+        self.checkpoints = checkpoints
+        self.window_open = window_open
+        self.deadline = deadline
         self.bearing = bearing
+        self.id = id
 
-    def _check_bearing(self, bearing):
+    @staticmethod
+    def read_bearing(bearing):
+        if bearing is None:
+            return bearing
         if not isinstance(bearing, int) or not 0 <= bearing <= 360:
-            raise ValueError("Bearing should be integer from 0 to 360")
+            raise ValueError("Bearing should be integer from 0 to 360.")
+        return bearing
 
-    def is_task_correct(self):
-        if not BaseTask.is_task_correct(self):
-            return False
-        try:
-            self._check_bearing(self.bearing)
-        except ValueError:
-            return False
-        return True
-
-    def __eq__(self, other):
-        return BaseTask.__eq__(self, other) and self.bearing == other.bearing

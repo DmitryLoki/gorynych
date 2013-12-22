@@ -2,7 +2,6 @@
 Realization of persistence logic.
 '''
 import simplejson as json
-import cPickle
 
 from twisted.internet import defer
 from twisted.python import log
@@ -351,21 +350,40 @@ class PGSQLContestRepository(BasePGSQLRepository):
 
     @defer.inlineCallbacks
     def _append_data_to_contest(self, cont):
-        participants = yield self.pool.runQuery(pe.select('participants',
-                                                'contest'), (cont._id,))
+        participants = yield self.pool.runQuery(
+            pe.select('participants', 'contest'), (cont._id,))
         if participants:
-            cont = self._add_participants(cont, participants)
+            cont = self._add_participants_to_contest(cont, participants)
         retrieve_id = yield self.pool.runQuery(
             pe.select('retrieve_id', 'contest'), (cont._id,))
         if retrieve_id:
             cont.retrieve_id = retrieve_id[0][0]
         defer.returnValue(cont)
 
-    def _add_participants(self, cont, rows):
+    def _add_participants_to_contest(self, cont, rows):
+        '''
+
+        @param cont:
+        @type cont: C{Contest}
+        @param rows: [(id, participant_id, role, glider,
+        contest_number, description, type)]
+        @type rows: C{list}
+        @return:
+        @rtype:
+        '''
+        participants = dict()
         for row in rows:
-            c_id, _id, role, data = row
-            data = cPickle.loads(str(data))
-            cont._participants[_id] = data
+            id, pid, role, glider, cnum, desc, ptype = row
+            if role == 'paraglider':
+                participants[PersonID.fromstring(pid)] = dict(
+                    role=role,
+                    contest_number=cnum,
+                    glider=str(glider))
+            elif role == 'organizator':
+                participants[PersonID.fromstring(pid)] = dict(role=role)
+            elif role == 'transport':
+                participants[TransportID.fromstring(pid)] = dict(role=role)
+        cont._participants = participants
         return cont
 
     @defer.inlineCallbacks
@@ -376,64 +394,56 @@ class PGSQLContestRepository(BasePGSQLRepository):
             _list.insert(0, _id)
             return _list
 
-        def delete_participants(cur, entities):
-            ids = tuple([x[1] for x in entities])
-            cur.execute("DELETE FROM contest_participant WHERE id=%s "
-                        "AND participant_id IN %s", (obj._id, ids))
-
-        def insert_participants(cur, entities):
-            q = ','.join(cur.mogrify("(%s, %s, %s, %s)", (pitem)) for pitem in entities)
-            cur.execute("INSERT INTO contest_participant(id, participant_id, role, data) "
-                        "VALUES " + q)
-
-            # same shit
-
         def save_new(cur):
             '''
             Save just created contest.
             '''
+
             i = cur.execute(pe.insert('contest'), values['contest'])
             _id = cur.fetchone()[0]
 
             if values['participants']:
-                insert_participants(cur, values['participants'])
                 # Callbacks wan't work in for loop, so i insert multiple values
                 # in one query.
                 # Oh yes, executemany also wan't work in asynchronous mode.
+                q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s)",
+                    (insert_id(_id, p))) for p in values['participants'])
+                cur.execute("INSERT into participant values " + q)
             cur.execute("INSERT INTO contest_retrieve_id values (%s, %s)",
                 (_id, obj.retrieve_id))
 
             return _id
 
-        def update(cur, participants):
+        def update(cur, prts):
             cur.execute(pe.update('contest'), values['contest'])
-            if values['participants'] or participants:
+            if values['participants'] or prts:
                 inobj = values['participants']
-                indb = participants
+                indb = prts
                 for idx, p in enumerate(inobj):
                     p.insert(0, obj._id)
                     inobj[idx] = tuple(p)
                 to_insert = set(inobj).difference(set(indb))
                 to_delete = set(indb).difference(set(inobj))
                 if to_delete:
-                    delete_participants(cur, to_delete)
+                    ids = tuple([x[1] for x in to_delete])
+                    cur.execute("DELETE FROM participant WHERE id=%s "
+                                "AND participant_id in %s", (obj._id, ids))
                 if to_insert:
-                    insert_participants(cur, to_insert)
+                    q = ','.join(cur.mogrify("(%s, %s, %s, %s, %s, %s, %s)",
+                        (pitem)) for pitem in to_insert)
+                    cur.execute("INSERT into participant values " + q)
             if obj.retrieve_id:
                 cur.execute(
                     "UPDATE contest_retrieve_id SET retrieve_id=%s where"
                             " id=%s", (obj.retrieve_id, obj._id))
+
             return obj
 
         result = None
         if obj._id:
-            
-            participants = yield self.pool.runQuery(pe.select('participants',
-                                                    'contest'), (obj._id,))
-            # going from binary buffer to string
-            participants = [(c_id, p_id, role, str(data)) for c_id, p_id, role,
-                            data in participants]
-            result = yield self.pool.runInteraction(update, participants)
+            prts = yield self.pool.runQuery(pe.select('participants',
+                'contest'), (obj._id,))
+            result = yield self.pool.runInteraction(update, prts)
         else:
             c__id = yield self.pool.runInteraction(save_new)
             obj._id = c__id
@@ -443,13 +453,17 @@ class PGSQLContestRepository(BasePGSQLRepository):
     def _extract_values_from_contest(self, obj):
         result = dict()
         result['contest'] = (obj.title, obj.start_time, obj.end_time,
-                             obj.timezone,
-                             obj.address.place, obj.address.country,
-                             obj.address.lat, obj.address.lon, str(obj.id))
+        obj.timezone,
+        obj.address.place, obj.address.country,
+        obj.address.lat, obj.address.lon, str(obj.id))
 
         result['participants'] = []
-        for p_id, data in obj._participants.iteritems():
-            result['participants'].append([str(p_id), data['role'], cPickle.dumps(data)])
+        for key in obj._participants:
+            p = obj._participants[key]
+            row = [str(key), p['role'], p.get('glider', ''),
+                p.get('contest_number', ''), p.get('description', ''),
+                key.__class__.__name__.lower()[:-2]]
+            result['participants'].append(row)
 
         return result
 

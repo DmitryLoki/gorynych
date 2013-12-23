@@ -1,8 +1,8 @@
 {
     "type":"object",
     "$schema": "http://json-schema.org/draft-03/schema#",
-    "title": "New contest",
-    "description": "Add new contest",
+    "title": "Change contest",
+    "description": "Change contest parameters",
     "properties":{
         "country": {
             "type":"string",
@@ -54,6 +54,12 @@
             "type":"string",
             "required":true,
             "description": "Contest title",
+            "minLength": 1
+        },
+        "retrieve_id": {
+            "type": "string",
+            "required": false,
+            "description": "Some ID used for retrieve",
             "minLength": 1
         }
     }

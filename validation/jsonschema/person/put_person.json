@@ -1,0 +1,33 @@
+{
+    "type":"object",
+    "$schema": "http://json-schema.org/draft-03/schema#",
+    "title": "Change person",
+    "description": "Change some person characteristics",
+    "properties":{
+        "name": {
+            "type": "string",
+            "required": false,
+            "minLength": 1,
+            "description": "First name, like John"
+        },
+        "surname": {
+            "type": "string",
+            "required": false,
+            "minLength": 1,
+            "description": "Surname (family name), like Doe"
+        },
+        "country": {
+            "type":"string",
+            "required": false,
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "Two-letter country code, like US"
+        },
+        "phone": {
+            "type": "string",
+            "pattern": "^\\+\\d+",
+            "required": false,
+            "description": "User's phone number"
+        }
+    }
+}

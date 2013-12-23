@@ -1,0 +1,26 @@
+{
+    "type":"object",
+    "$schema": "http://json-schema.org/draft-03/schema#",
+    "title": "Change transport",
+    "description": "Change transport characteristics",
+    "properties":{
+        "name": {
+            "type": "string",
+            "required": false,
+            "minLength": 1,
+            "description": "Transport type: bus, car, motocycle"
+        },
+        "title": {
+            "type": "string",
+            "required": false,
+            "minLength": 1,
+            "description": "Transport's name"
+        },
+        "description": {
+            "type": "string",
+            "required": false,
+            "minLength": 1,
+            "description": "Transport's description"
+        }
+    }
+}

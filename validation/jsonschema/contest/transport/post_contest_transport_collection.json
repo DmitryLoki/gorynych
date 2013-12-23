@@ -1,0 +1,14 @@
+{
+    "type":"object",
+    "$schema": "http://json-schema.org/draft-03/schema#",
+    "title": "New contest transport",
+    "description": "Add a previously created transport to a contest",
+    "properties":{
+        "transport_id": {
+            "type": "string",
+            "required": true,
+            "minLength": 1,
+            "description": "Transport ID from /transport resource"
+        }
+    }
+}

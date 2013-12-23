@@ -1,0 +1,14 @@
+{
+    "type":"object",
+    "$schema": "http://json-schema.org/draft-03/schema#",
+    "title": "Track archive",
+    "description": "Add track archive to a race",
+    "properties":{
+        "url": {
+            "type":"string",
+            "format": "url",
+            "required":true,
+            "description": "Url to download the archive"
+        }
+    }
+}

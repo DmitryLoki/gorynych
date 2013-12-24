@@ -64,6 +64,17 @@ class Name(ValueObject):
     def surname(self):
         return self._surname
 
+    @classmethod
+    def from_name(cls, name):
+        assert isinstance(name, (str, unicode)), "Name should be string"
+        names = name.strip().split(' ')
+        if len(names) < 2:
+            raise ValueError("Can't create name from input %s" % name)
+        # Choose only first and last names.
+        firstname = names[0]
+        lastname = names[-1]
+        return cls(firstname, lastname)
+
 
 class Country(ValueObject):
     # TODO: create properties for every country code type.

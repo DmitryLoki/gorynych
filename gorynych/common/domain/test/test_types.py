@@ -74,8 +74,6 @@ class AddressTest(unittest.TestCase):
                             types.Address('  ParIs', 'Fr', (1.08812, 3)))
 
 
-
-
 class CheckpointTest(unittest.TestCase):
     def test_creating(self):
         point1 = Point(42.502, 0.798)

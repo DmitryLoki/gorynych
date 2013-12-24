@@ -1,14 +1,8 @@
 import unittest
 import datetime
 
-from gorynych.info.domain import person
 from gorynych.info.domain.ids import ContestID, PersonID
-
-def create_person(name='John', surname='Doe',
-                  country='UA', email='johndoe@example.com', id=None):
-    factory = person.PersonFactory()
-    pers = factory.create_person(name, surname, country, email, person_id=id)
-    return pers
+from gorynych.info.domain.test.helpers import create_person
 
 
 class PersonFactoryTest(unittest.TestCase):

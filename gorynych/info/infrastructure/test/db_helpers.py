@@ -15,11 +15,11 @@ POOL = adbapi.ConnectionPool('psycopg2', host=OPTS['dbhost'],
 
 
 def initDB(aggregate_name, pool):
-    drop_tables = ';'.join(pe.drop_tables(aggregate_name))
+    drop_tables = ''.join(pe.drop_tables(aggregate_name))
     d = defer.succeed(drop_tables)
     d.addCallback(pool.runOperation)
 
-    create_tables = ';'.join(pe.create_tables(aggregate_name))
+    create_tables = ''.join(pe.create(aggregate_name))
     d.addCallback(lambda _: pool.runOperation(create_tables))
     return d
 

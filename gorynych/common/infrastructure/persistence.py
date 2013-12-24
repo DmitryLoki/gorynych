@@ -52,14 +52,14 @@ def event_store():
 
 sqldir = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'sql/')
 
-def create_tables(fname):
+def create(fname):
     '''
     Find CREATE TABLE commands from file witn name fname.sql.
     @return: list of commands or None.
     '''
     with open(sqldir + fname + '.sql', 'r') as f:
-        tables = re.findall(r'''(CREATE\s+TABLE\s+[-(),.\s\w\\]*);''',
-                            f.read(), re.IGNORECASE)
+        tables = re.findall(r'''CREATE\s+[-(),.\s\w\\=']*?;''',
+            f.read(), re.IGNORECASE)
     return tables
 
 

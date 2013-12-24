@@ -2,22 +2,18 @@
 Realization of persistence logic.
 '''
 import simplejson as json
+import collections
 
 from twisted.internet import defer
 from twisted.python import log
-from zope.interface import implements, implementer
+from zope.interface import implementer
 import psycopg2
 
-from gorynych.info.domain.interfaces import IContestRepository, IPersonRepository, IRaceRepository
-from gorynych.info.domain.contest import ContestFactory
-from gorynych.info.domain.ids import PersonID, TransportID
-from gorynych.info.domain.race import RaceFactory, Paraglider
 from gorynych.common.domain.types import checkpoint_collection_from_geojson, geojson_feature_collection, Name
-from gorynych.info.domain.person import PersonFactory
 from gorynych.common.exceptions import NoAggregate, DatabaseValueError
 from gorynych.common.infrastructure import persistence as pe
-from gorynych.info.domain import interfaces
-from gorynych.info.domain.tracker import TrackerFactory
+from gorynych.info.domain import interfaces, contest, race, person, tracker
+from gorynych.info.domain import ids, transport
 from gorynych.info.domain.transport import TransportFactory
 
 
@@ -27,7 +23,7 @@ def create_participants(paragliders_row):
         result = list()
         for tup in paragliders_row:
             _id, pid, cn, co, gl, ti, n, sn = tup
-            result.append(Paraglider(pid, Name(n, sn), co,
+            result.append(race.Paraglider(pid, Name(n, sn), co,
                 gl, cn, ti))
     return result
 
@@ -97,14 +93,14 @@ class BasePGSQLRepository(object):
         defer.returnValue(result)
 
 
+@implementer(interfaces.IPersonRepository)
 class PGSQLPersonRepository(BasePGSQLRepository):
-    implements(IPersonRepository)
 
     def _restore_aggregate(self, data_row):
         if data_row:
             # regdate is datetime.datetime object
             regdate = data_row[4]
-            factory = PersonFactory()
+            factory = person.PersonFactory()
             result = factory.create_person(
                 data_row[0],
                 data_row[1],
@@ -175,8 +171,8 @@ class PGSQLPersonRepository(BasePGSQLRepository):
                     log.err("Error occured with code %s: %r" % (e.pgcode, e))
 
 
+@implementer(interfaces.IRaceRepository)
 class PGSQLRaceRepository(BasePGSQLRepository):
-    implements(IRaceRepository)
 
     @defer.inlineCallbacks
     def _restore_aggregate(self, race_data):
@@ -200,7 +196,7 @@ class PGSQLRaceRepository(BasePGSQLRepository):
             b = aux.get('bearing')
         else:
             b = None
-        factory = RaceFactory()
+        factory = race.RaceFactory()
         result = factory.create_race(t, rt, tz, ps, chs, race_id=rid,
             transport=trs, bearing=b, timelimits=(slt, elt))
         result._start_time = st
@@ -472,7 +468,7 @@ class PGSQLContestRepository(BasePGSQLRepository):
 class PGSQLTrackerRepository(BasePGSQLRepository):
     @defer.inlineCallbacks
     def _restore_aggregate(self, row):
-        factory = TrackerFactory()
+        factory = tracker.TrackerFactory()
         did, dtype, tid, name, _id = row
         last_point = yield self.pool.runQuery(pe.select('last_point',
             'tracker'), (_id,))

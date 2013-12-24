@@ -12,18 +12,16 @@ from twisted.trial import unittest
 from twisted.internet import defer
 import mock
 
-from gorynych.info.domain.test.helpers import create_contest, \
-    create_checkpoints, create_race, create_tracker, create_transport
-from gorynych.info.infrastructure.persistence import PGSQLTrackerRepository, PGSQLTransportRepository, \
-    PGSQLPersonRepository, PGSQLContestRepository, PGSQLRaceRepository, create_participants
-# TODO: create separate module with test utils
-from gorynych.info.domain.test.test_person import create_person
-from gorynych.common.domain.types import geojson_feature_collection, checkpoint_collection_from_geojson, Name
-from gorynych.info.domain.ids import PersonID, ContestID, RaceID
+from gorynych.info.domain.test.helpers import create_checkpoints, create_race, create_tracker, create_transport
+from gorynych.info.infrastructure import persistence
+from gorynych.info.domain.test import helpers
+from gorynych.info.domain.test.test_contest import create_role
+from gorynych.common.domain.types import geojson_feature_collection, checkpoint_collection_from_geojson, Name, Phone
+from gorynych.info.domain.ids import PersonID, ContestID, RaceID, TrackerID
 from gorynych.info.infrastructure.test import db_helpers
 from gorynych.common.infrastructure import persistence as pe
 from gorynych.common.exceptions import NoAggregate, DatabaseValueError
-from gorynych.info.domain.ids import TrackerID
+from gorynych.info.domain import contest
 
 
 POOL = db_helpers.POOL
@@ -61,7 +59,7 @@ class MockeryTestCase(unittest.TestCase):
 
 
 class TransportRepositoryTest(MockeryTestCase):
-    repo_type = PGSQLTransportRepository
+    repo_type = persistence.PGSQLTransportRepository
     sql_file = 'transport'
 
     test_transport_type = 'motorcycle'
@@ -116,7 +114,7 @@ class TransportRepositoryTest(MockeryTestCase):
 
 
 class TrackerRepositoryTest(MockeryTestCase):
-    repo_type = PGSQLTrackerRepository
+    repo_type = persistence.PGSQLTrackerRepository
     sql_file = 'tracker'
 
     def setUp(self):
@@ -187,13 +185,13 @@ class TrackerRepositoryTest(MockeryTestCase):
 
 
 class PersonRepositoryTest(MockeryTestCase):
-    repo_type = PGSQLPersonRepository
+    repo_type = persistence.PGSQLPersonRepository
     sql_file = 'person'
 
     @defer.inlineCallbacks
     def test_save_new(self):
         email = 'a@a.ru_' + str(randint(1, 10000))
-        pers = create_person(email=email)
+        pers = helpers.create_person(email=email)
         saved_pers = yield self.repo.save(pers)
         self.assertEqual(pers, saved_pers,
             'Something strange happend while saving.')
@@ -242,8 +240,8 @@ class PersonRepositoryTest(MockeryTestCase):
     @defer.inlineCallbacks
     def test_save_duplicate(self):
         email = 'a@a.ru'
-        pers = create_person(email=email)
-        pers2 = create_person(email=email)
+        pers = helpers.create_person(email=email)
+        pers2 = helpers.create_person(email=email)
         saved_pers = yield self.repo.save(pers)
         saved_pers2 = yield self.repo.save(pers)
         self.assertNotEqual(pers.id, pers2.id)
@@ -251,7 +249,7 @@ class PersonRepositoryTest(MockeryTestCase):
 
 
 class ContestRepositoryTest(MockeryTestCase):
-    repo_type = PGSQLContestRepository
+    repo_type = persistence.PGSQLContestRepository
     sql_file = 'contest'
 
     @defer.inlineCallbacks
@@ -320,7 +318,7 @@ class ContestRepositoryTest(MockeryTestCase):
 
     def _prepare_contest(self):
         cid = ContestID()
-        cont = create_contest(1, 5, id=cid)
+        cont = helpers.create_contest(1, 5, id=cid)
         cont._participants = dict()
         pid1 = PersonID()
         cont._participants[pid1] = dict(role='paraglider',
@@ -375,7 +373,7 @@ class ContestRepositoryTest(MockeryTestCase):
 
 
 class RaceRepositoryTest(MockeryTestCase):
-    repo_type = PGSQLRaceRepository
+    repo_type = persistence.PGSQLRaceRepository
     sql_file = 'race'
 
     def setUp(self):
@@ -449,7 +447,8 @@ class RaceRepositoryTest(MockeryTestCase):
 
         pg_row = yield POOL.runQuery(pe.select('paragliders', 'race'),
             (saved_rc._id,))
-        pgs = {p.contest_number: p for p in create_participants(pg_row)}
+        pgs = {p.contest_number: p
+            for p in persistence.create_participants(pg_row)}
         for key in pgs:
             # can't use __eq__ here because after _get_values_from_obj None tracker_id becomes ''
             # and I'm not sure if I'm allowed to change it
@@ -482,7 +481,8 @@ class RaceRepositoryTest(MockeryTestCase):
             checkpoint_collection_from_geojson(chs), rc)
         pg_row = yield POOL.runQuery(pe.select('paragliders', 'race'),
             (saved_rc._id,))
-        pgs = {p.contest_number: p for p in create_participants(pg_row)}
+        pgs = {p.contest_number: p
+            for p in persistence.create_participants(pg_row)}
         for key in pgs:
             # same shit as in test_save
             self.assertEqual(pgs[key].person_id, rc.paragliders[key].person_id)

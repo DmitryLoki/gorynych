@@ -118,7 +118,6 @@ class ApiValidator(object):
             if filenames:
                 for fname in filenames:
                     with open(os.path.join(directory, fname), 'r') as f:
-                        print os.path.join(directory, fname)
                         schema = json.loads(f.read())
                         cleared_fname = fname[: fname.rindex('.')]
                         schemas[cleared_fname] = schema

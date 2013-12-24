@@ -2,7 +2,6 @@ import simplejson as json
 from twisted.python import log
 from zope.interface import implementer
 from twisted.web import resource, server
-from twisted.web.http import stringToDatetime
 
 from gorynych.common.exceptions import AuthenticationError
 

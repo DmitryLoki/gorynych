@@ -82,7 +82,7 @@ class APIResource(resource.Resource):
 
 
     @defer.inlineCallbacks
-    def _render_method(self, request, method_func, request_params={}):
+    def _render_method(self, request, method_func, request_params=None):
         '''
         Other render_METHOD methods delegate their work to this method.
         Most of the work is doing here.

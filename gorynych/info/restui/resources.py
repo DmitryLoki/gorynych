@@ -50,10 +50,10 @@ class ContestResource(APIResource):
         '''
         return dict(title=cont.title,
             id=cont.id,
-            country=cont.country,
+            country=cont.address.country.get_code(),
             start_time=cont.start_time,
             end_time=cont.end_time,
-            coords=cont.hq_coords,
+            coords=cont.address.coordinates,
             retrieve_id=cont.retrieve_id)
 
     def read_GET(self, cont, request_params=None):

@@ -8,7 +8,7 @@ import pytz
 
 from gorynych.info.domain import transport
 from gorynych.common.domain.model import AggregateRoot, ValueObject, DomainIdentifier
-from gorynych.common.domain.types import Address, Country, Phone, MappingCollection, TransactionalDict, Title, DateRange
+from gorynych.common.domain.types import Address, Country, Phone, MappingCollection, TransactionalDict, Title, DateRange, Name
 from gorynych.common.domain.events import ParagliderRegisteredOnContest
 from gorynych.common.infrastructure import persistence
 from gorynych.info.domain.ids import ContestID, RaceID, PersonID
@@ -27,7 +27,8 @@ def _pluralize(role):
 
 class ContestFactory(object):
     def create_contest(self, title, start_time, end_time, contest_place,
-            contest_country, hq_coords, timezone, contest_id=None):
+            contest_country, hq_coords, timezone, contest_id=None,
+            retrieve_id=None):
         address = Address(contest_place, contest_country, hq_coords)
         if end_time < start_time:
             raise ValueError("Start time must be less then end time.")
@@ -37,7 +38,35 @@ class ContestFactory(object):
             raise pytz.exceptions.UnknownTimeZoneError("Wrong timezone.")
         contest = Contest(contest_id, start_time, end_time, address, title)
         contest.timezone = timezone
+        contest.retrieve_id = retrieve_id
         return contest
+
+    def restore_contest(self, cont, participants):
+        '''
+        Restore contest from.
+        @param cont: created contest without participants and tasks.
+        @type cont: L{Contest}
+        @param participants: collection with namedtuples with participants
+        data.
+        @type participants: C{list}
+        '''
+        for p in participants:
+            if p.role == 'paraglider':
+                paraglider = Paraglider(p.id, p.contest_number, p.glider,
+                    p.country, p.name, p.phone)
+                cont.paragliders[paraglider.id] = paraglider
+            if p.role == 'organizer':
+                org = Organizer(p.id, p.email, p.name, p.description)
+                cont.organizers[org.id] = org
+            if p.role == 'winddummy':
+                wind = Winddummy(p.id, p.phone, p.name)
+                cont.winddummies[wind.id] = wind
+            if p.role == 'staff':
+                staff = Staff(p.title, p.type, p.description, p.phone, p.id)
+                cont.staff[staff.id] = staff
+        cont.check_invariants()
+        return cont
+
 
 ######################## Contest invariants #######################
 def contest_numbers_are_unique(obj):
@@ -347,13 +376,12 @@ class Staff(ValueObject):
 
     def __init__(self, title, type, description="", phone=None, id=None):
         if type not in self.types:
-            raise TypeError(
-                'Incorrect type ({}). Avaliable types: {}'.format(
-                              type, self.types))
-        self.title = title
+            raise TypeError('Incorrect type ({}). Avaliable types: {}'.
+                    format(type, self.types))
+        self.id = DomainIdentifier(id)
+        self.title = Title(title)
         self.type = type
         self.phone = Phone(phone) if phone else ''
-        self.id = DomainIdentifier(id) if id else DomainIdentifier()
         self.description = description
 
 
@@ -361,14 +389,14 @@ class Winddummy(ValueObject):
     def __init__(self, person_id, phone, name):
         self.id = PersonID(person_id)
         self.phone = Phone(phone)
-        self.name = name
+        self.name = name if isinstance(name, Name) else Name.from_name(name)
 
 
 class Organizer(ValueObject):
     def __init__(self, person_id, email, name, description=None):
         self.id = PersonID(person_id)
         self.email = email
-        self.name = name
+        self.name = name if isinstance(name, Name) else Name.from_name(name)
         self.description = description if description else ''
 
 
@@ -378,7 +406,7 @@ class Paraglider(ValueObject):
         self.id = PersonID(person_id)
         assert int(contest_number) >= 0, "Contest number must be positive."
         self.contest_number = int(contest_number)
-        self.name = name
+        self.name = name if isinstance(name, Name) else Name.from_name(name)
         self.glider = glider.strip().split(' ')[0].lower()
         self.country = Country(country)
         self.phone = Phone(phone) if phone else None

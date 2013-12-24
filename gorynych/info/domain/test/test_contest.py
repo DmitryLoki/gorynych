@@ -39,8 +39,8 @@ def create_role(rolename, pers=None, **kw):
                 kw.get('glider', 'mantra'), pers.country, pers.name,
                 kw.get('phone'))
         elif rolename.lower() == 'organizer':
-            result = contest.Organizer(pers.id, kw['email'], pers.name,
-                kw.get('description', None))
+            result = contest.Organizer(pers.id, kw.get('email', pers.email),
+                pers.name, kw.get('description', None))
         elif rolename.lower() == 'winddummy':
             result = contest.Winddummy(pers.id, kw['phone'], pers.name)
         else:

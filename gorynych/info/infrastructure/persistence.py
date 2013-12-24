@@ -324,36 +324,38 @@ class PGSQLRaceRepository(BasePGSQLRepository):
         return result
 
 
-class PGSQLContestRepository(BasePGSQLRepository):
-    implements(IContestRepository)
+ContestParticipant = collections.namedtuple('prow',
+    ['id', 'role', 'glider', 'contest_number','description',
+        'type', 'phone', 'name', 'email', 'country', 'title'], verbose=True)
 
-    @defer.inlineCallbacks
+@implementer(interfaces.IContestRepository)
+class PGSQLContestRepository(BasePGSQLRepository):
+
     def _restore_aggregate(self, row):
         '''
 
         @param row: (id, contest_id, title, stime, etime, tz, place,
         country, hq_lat, hq_lon)
         @type row: C{tuple}
-        @return: contest
-        @rtype: C{Contest}
+        @return:
+        @rtype: C{Deferred}
         '''
-        factory = ContestFactory()
-        sid, cid, ti, st, et, tz, pl, co, lat, lon = row
-        cont = factory.create_contest(ti, st, et, pl, co, (lat, lon), tz, cid)
+        factory = contest.ContestFactory()
+        sid, cid, ti, st, et, tz, pl, co, lat, lon, ri = row
+        cont = factory.create_contest(ti, st, et, pl, co, (lat, lon), tz,
+            cid, ri)
         cont._id = sid
-        cont = yield self._append_data_to_contest(cont)
-        defer.returnValue(cont)
+        return self._append_data_to_contest(cont)
 
     @defer.inlineCallbacks
     def _append_data_to_contest(self, cont):
+        # TODO: remove factory code duplicates.
+        factory = contest.ContestFactory()
         participants = yield self.pool.runQuery(
             pe.select('participants', 'contest'), (cont._id,))
         if participants:
-            cont = self._add_participants_to_contest(cont, participants)
-        retrieve_id = yield self.pool.runQuery(
-            pe.select('retrieve_id', 'contest'), (cont._id,))
-        if retrieve_id:
-            cont.retrieve_id = retrieve_id[0][0]
+            rows = [ContestParticipant(*row[1:]) for row in participants]
+            cont = factory.restore_contest(cont, rows)
         defer.returnValue(cont)
 
     def _add_participants_to_contest(self, cont, rows):

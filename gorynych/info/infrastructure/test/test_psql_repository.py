@@ -260,37 +260,41 @@ class ContestRepositoryTest(MockeryTestCase):
         etime = stime + 1
         c__id = yield POOL.runQuery(pe.insert('contest'),
             ('PGContest', stime, etime, tz, 'place', 'cou', 42.1, 42.2,
-            str(c_id)))
+            'android', str(c_id)))
         c__id = c__id[0][0]
         # Add participants to contest
         pg1_id = PersonID()
         pg2_id = PersonID()
         org1_id = PersonID()
-        yield POOL.runOperation(pe.insert('participant', 'contest'),
-            (str(c_id), str(pg1_id), 'paraglider', 'gl1', '15', '', 'person'))
-        yield POOL.runOperation(pe.insert('participant', 'contest'),
-            (str(c_id), str(pg2_id), 'paraglider', 'gl2', '18', '', 'person'))
-        yield POOL.runOperation(pe.insert('participant', 'contest'),
-            (str(c_id), str(org1_id), 'organizator', '', '', 'retrieve',
-            'person'))
+        p1row = (c__id, str(pg1_id), 'paraglider', 'gl1', '15', '', '', '+71',
+            'John Doe', '', 'RU', '')
+        p2row = (c__id, str(pg2_id), 'paraglider', 'gl2', '18', '', '', '',
+            'Vasya Ivanov', '', 'CA', '')
+        o1row = (c__id, str(org1_id), 'organizer', '', '', 'retrieve', '',
+            '+88', 'Daniel Petrenko', 'dan@email.org', '', '')
+        yield POOL.runOperation(pe.insert('participant', 'contest'), p1row)
+        yield POOL.runOperation(pe.insert('participant', 'contest'), p2row)
+        yield POOL.runOperation(pe.insert('participant', 'contest'), o1row)
 
         # DB prepared, start test.
         cont = yield self.repo.get_by_id(c_id)
-        self.assertEqual(cont.title, 'PGContest')
-        self.assertEqual(cont.country, 'CO')
-        self.assertEqual(cont.timezone, tz)
-        self.assertEqual(cont.place, 'Place')
-        self.assertEqual(cont._id, c__id)
-        self.assertTupleEqual(cont.hq_coords, (42.1, 42.2))
-        self.assertEquals((cont.start_time, cont.end_time), (stime, etime))
+        self.assertIsInstance(cont, contest.Contest)
         self.assertIsInstance(cont.id, ContestID)
-        self.assertDictEqual(cont._participants,
-            {pg1_id: {'role': 'paraglider', 'contest_number': '15',
-                'glider': 'gl1'},
-                pg2_id: {
-                    'role': 'paraglider', 'contest_number': '18',
-                    'glider': 'gl2'},
-                org1_id: {'role': 'organizator'}})
+        self.assertEqual(cont.title, 'PGContest')
+        self.assertEqual(cont.address.country.code(), 'CO')
+        self.assertEqual(cont.timezone, tz)
+        self.assertEqual(cont.address.place, 'Place')
+        self.assertEqual(cont._id, c__id)
+        self.assertTupleEqual(cont.address.coordinates, (42.1, 42.2))
+        self.assertEquals((cont.start_time, cont.end_time), (stime, etime))
+        self.assertEqual(cont.retrieve_id, 'android')
+        # Check participants.
+        self.assertEqual(cont.paragliders[pg1_id], contest.Paraglider(
+            pg1_id, 15, 'gl1', 'RU', Name('John', 'Doe'), Phone('+71')))
+        self.assertEqual(cont.paragliders[pg2_id], contest.Paraglider(
+            pg2_id, 18, 'gl2', 'CA', Name('Vasya', 'Ivanov')))
+        self.assertEqual(cont.organizers[org1_id], contest.Organizer(
+            org1_id, 'dan@email.org', Name('Daniel', 'Petrenko'), 'retrieve'))
 
     def _prepare_participants(self, p_rows):
         participants = dict()

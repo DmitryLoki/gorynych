@@ -12,15 +12,13 @@ class ChunkReader(object):
 
     Applies the base point to the deltas and makes 'em absolute.
     """
+
     def __init__(self, raw):
         self.chunk = pathchunk_pb2.PathCunk()
         self.chunk.ParseFromString(raw)
-        self.format = ['lat', 'lon', 'ts', 'alt']
-        self.precision = 6  # number of digits after decimal point for lat and lon
-        # if self.pathChunk.HasField('index'):
-        #     self.index = self.chunk.index
-        # else:
-        #     self.index=None
+        self.format = ['lat', 'lon', 'ts', 'alt', 'h_speed', 'v_speed']
+        # number of digits after decimal point for lat and lon
+        self.precision = 6
 
     def _format(self, *args):
         return dict(zip(self.format, args))
@@ -33,11 +31,13 @@ class ChunkReader(object):
             self.base_lon is not None and \
             self.base_ts is not None, 'Invalid chunk: base point missing'
 
-        if getattr(self.chunk, BasePointProto.ALT):
-            self.base_alt = getattr(self.chunk, BasePointProto.ALT)
-        else:
-            self.base_alt = 0
-        return self.base_lat, self.base_lon, self.base_ts, self.base_alt
+        self.base_alt = getattr(self.chunk, BasePointProto.ALT, 0)
+        self.base_h_speed = getattr(self.chunk, BasePointProto.H_SPEED, 0)
+        self.base_v_speed = getattr(self.chunk, BasePointProto.V_SPEED, 0)
+        # v_speed is 10*m. per sec.
+        self.base_v_speed = round(self.base_v_speed / 10., 1)
+        return self.base_lat, self.base_lon, self.base_ts, self.base_alt, \
+            self.base_h_speed, self.base_v_speed
 
     def unpack(self):
         angle_divisor = getattr(self.chunk, BasePointProto.ANGLE_DIV)
@@ -49,8 +49,8 @@ class ChunkReader(object):
         angle_divisor = float(2 ** angle_divisor)
 
         # base point time
-        lat, lon, ts, alt = self._get_base_point()
-        yield self._format(lat, lon, ts, alt)
+        lat, lon, ts, alt, h_speed, v_speed = self._get_base_point()
+        yield self._format(lat, lon, ts, alt, h_speed, v_speed)
 
         # unpack time!
         for point in self.chunk.point:
@@ -75,10 +75,14 @@ class ChunkReader(object):
                             lon = round(lon, self.precision)
                         elif field == getattr(point, PointProto.ALT):
                             alt = self.base_alt + point.packed[i]
+                        elif field == getattr(point, PointProto.H_SPEED):
+                            h_speed = point.packed[i]
+                        elif field == getattr(point, PointProto.V_SPEED):
+                            v_speed = round(point.packed[i] / 10., 1)
                         i += 1
                 ts += timedelta
 
-            yield self._format(lat, lon, ts, alt)
+            yield self._format(lat, lon, ts, alt, h_speed, v_speed)
 
     def make_response(self):
         conf = pathchunk_pb2.PathCunkConf()

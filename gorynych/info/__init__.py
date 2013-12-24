@@ -33,6 +33,7 @@ def makeService(config, services=None):
     from gorynych.info.infrastructure.persistence import PGSQLContestRepository, PGSQLPersonRepository, PGSQLRaceRepository, PGSQLTrackerRepository, PGSQLTransportRepository
     # Time sinchronization. TODO: find better place for it.
     from gorynych.info.restui.resources import TimeResource
+    from gorynych.info.restui.validation import ApiValidator
 
     if not services:
         services = service.MultiService()
@@ -70,6 +71,8 @@ def makeService(config, services=None):
 
     # REST API init
     api_tree = base_resource.resource_tree()
+    v = ApiValidator(api_tree)
+    v.apply()
     api_resource = base_resource.APIResource(api_tree, app_service)
     api_resource.putChild('time', TimeResource())
     site_factory = server.Site(api_resource)

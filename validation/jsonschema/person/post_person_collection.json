@@ -1,0 +1,33 @@
+{
+    "type":"object",
+    "$schema": "http://json-schema.org/draft-03/schema#",
+    "title": "New person",
+    "description": "Create a new person",
+    "properties":{
+        "name": {
+            "type": "string",
+            "required": true,
+            "minLength": 1,
+            "description": "First name, like John"
+        },
+        "surname": {
+            "type": "string",
+            "required": true,
+            "minLength": 1,
+            "description": "Surname (family name), like Doe"
+        },
+        "country": {
+            "type":"string",
+            "required": true,
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "Two-letter country code, like US"
+        },
+        "email": {
+            "type": "string",
+            "format": "email",
+            "required": true,
+            "description": "User's email"
+        }
+    }
+}

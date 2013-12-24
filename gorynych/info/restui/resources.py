@@ -19,11 +19,6 @@ class ContestResourceCollection(APIResource):
                            GET='get_contests')
     name = 'contest_collection'
 
-    def _get_args(self, args):
-        if args.has_key('hq_coords'):
-            args['hq_coords'] = args['hq_coords'].split(',')
-        return args
-
     def read_POST(self, cont, request_params=None):
         if cont:
             return dict(title=cont.title,

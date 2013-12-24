@@ -1,0 +1,23 @@
+{
+    "type":"object",
+    "$schema": "http://json-schema.org/draft-03/schema#",
+    "title": "New tracker",
+    "description": "Add new tracker",
+    "properties":{
+        "device_id": {
+            "type": "string",
+            "required": true,
+            "minLength": 1
+        },
+        "device_type": {
+            "type": "string",
+            "required": true,
+            "minLength": 1
+        },
+        "name": {
+            "type": "string",
+            "required": false,
+            "minLength": 1
+        }
+    }
+}

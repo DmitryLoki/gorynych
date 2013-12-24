@@ -111,7 +111,6 @@ class App13Parser(App13Tracker):
 
         for point in self.points:
             point['imei'] = self.imei
-            point['h_speed'] = 0
 
         response = self.points
         del self.points
@@ -138,7 +137,6 @@ class SBDParser(App13Tracker):
 
         for point in self.points:
             point['imei'] = msg.imei
-            point['h_speed'] = 0
 
         response = self.points
         del self.points

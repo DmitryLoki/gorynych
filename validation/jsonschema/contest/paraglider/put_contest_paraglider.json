@@ -1,0 +1,20 @@
+{
+    "type":"object",
+    "$schema": "http://json-schema.org/draft-03/schema#",
+    "title": "Change contest paraglider",
+    "description": "Change paraglider's characteristics. Will affect entire contest.",
+    "properties":{
+        "glider": {
+            "type": "string",
+            "required": false,
+            "minLength": 1,
+            "description": "Paraglider's model"
+        },
+        "contest_number": {
+            "type": "string",
+            "required": false,
+            "minLength": 1,
+            "description": "Unique number denoting the pilot in current contest"
+        }
+    }
+}

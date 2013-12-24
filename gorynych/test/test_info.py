@@ -6,7 +6,6 @@ import json
 import time
 import random
 import unittest
-import string
 
 import requests
 # from twisted.trial import unittest
@@ -20,8 +19,8 @@ def create_contest(title='Contest with paragliders'):
     params = dict(title=title, start_time=1,
         end_time=int(time.time()),
         place = 'La France', country='ru',
-        hq_coords='43.3,23.1', timezone='Europe/Paris')
-    r = requests.post(URL + '/contest', data=params)
+        hq_coords=[43.3, 23.1], timezone='Europe/Paris')
+    r = requests.post(URL + '/contest', data=json.dumps(params), headers={'Content-Type': 'application/json'})
     if not r.status_code == 201:
         print r.text
     return r, title
@@ -38,7 +37,7 @@ def create_persons(reg_date=None, email=None, name=None, phone=None, udid=None):
         params.update({'phone': phone})
     if udid:
         params.update({'udid': udid})
-    r = requests.post(URL + '/person', data=params)
+    r = requests.post(URL + '/person', data=json.dumps(params), headers={'Content-Type': 'application/json'})
     return r, email
 
 
@@ -60,7 +59,7 @@ def create_race(contest_id, checkpoints=None, race_type='racetogoal',
     if bearing:
         params['bearing'] = bearing
     return requests.post('/'.join((URL, 'contest', contest_id, 'race')),
-                     data=params)
+                     data=json.dumps(params), headers={'Content-Type': 'application/json'})
 
 def find_contest_with_paraglider():
         contest_list = requests.get(URL + '/contest')
@@ -77,7 +76,8 @@ def register_paraglider(pers_id, cont_id):
     params = dict(person_id=pers_id, glider='gArlem 88',
                   contest_number=str(cn))
     r = requests.post('/'.join((URL, 'contest', cont_id,
-                                'paraglider')), data=params)
+                                'paraglider')), data=json.dumps(params),
+                                 headers={'Content-Type': 'application/json'})
     if not r.status_code == 201:
         raise Exception
     return r, cn
@@ -89,7 +89,7 @@ def create_transport(ttype=None, title=None, description=None):
     if not title:
         title='Some bus.'
     params = dict(type=ttype, title=title, description=description)
-    r = requests.post(URL + '/transport', data=params)
+    r = requests.post(URL + '/transport', data=json.dumps(params), headers={'Content-Type': 'application/json'})
     return r
 
 
@@ -209,7 +209,7 @@ class PersonAPITest(ValidatedTestCase):
     url = URL + '/person/'
 
     # format section
-    
+
     # POST /person
     create_person_format = {
         "id": unicode,
@@ -435,9 +435,9 @@ class ContestRaceTest(ValidatedTestCase):
         "optdistance": unicode,
         "timeoffset": unicode,
         "checkpoints": _checkpoints_format
-        
+
     }
-    
+
     # GET /contest/{contest_id}/race
     get_race_list_format = (list, {
         "start_time": int,
@@ -464,7 +464,7 @@ class ContestRaceTest(ValidatedTestCase):
         "person_id": unicode,
         "glider": unicode
     })
-      
+
     def setUp(self):
         try:
             c_, t_ = create_contest(title='Contest with checkpoints and race')
@@ -515,7 +515,7 @@ class ContestRaceTest(ValidatedTestCase):
                                     "for test: %r" % error)
         if not race_id:
             raise unittest.SkipTest("I need race for test")
-        
+
         # GET /contest/{contest_id}/race
         r = requests.get('/'.join((URL, 'contest', self.c_id, 'race')))
         self.validate(r.json(), self.get_race_list_format)
@@ -551,7 +551,8 @@ class ContestRaceTest(ValidatedTestCase):
 
         # Test POST /contest/{id}/race/{id}/track_archive
         r = requests.post('/'.join((URL, 'contest', self.c_id, 'race', race_id,
-                   'track_archive')), data={'url':'http://airtribune.com/1'})
+                   'track_archive')), data=json.dumps({'url':'http://airtribune.com/1'}),
+                   headers={'Content-Type': 'application/json'})
         self.assertEqual(r.status_code, 201)
         self.assertEqual(r.json()['result'],
             "Archive with url http://airtribune.com/1 added.")
@@ -618,14 +619,14 @@ class TrackerTest(ValidatedTestCase):
         "name": unicode,
         "id": unicode,
     }
-    
+
 
     def test_create(self):
         device_id = str(random.randint(1, 1000))
         params = dict(device_id=device_id,
             device_type='tr203', name='a03')
         # POST /tracker
-        r = requests.post(self.url, data=params)
+        r = requests.post(self.url, data=json.dumps(params), headers={'Content-Type': 'application/json'})
         result = r.json()
         self.validate(result, self.create_tracker_format)
         self.assertEqual(r.status_code, 201)
@@ -667,7 +668,7 @@ class TrackerTest(ValidatedTestCase):
             device_id = str(random.randint(1, 1000))
             params = dict(device_id=device_id,
                 device_type='tr203')
-            r = requests.post(self.url, data=params)
+            r = requests.post(self.url, data=json.dumps(params), headers={'Content-Type': 'application/json'})
             tid = r.json()['id']
         except Exception as e:
             raise unittest.SkipTest("Need person and tracker for test.")
@@ -698,11 +699,11 @@ class TrackerTest(ValidatedTestCase):
         device_id = str(random.randint(1, 1000))
         params = dict(device_id=device_id,
             device_type='tr203')
-        r = requests.post(self.url, data=params)
+        r = requests.post(self.url, data=json.dumps(params), headers={'Content-Type': 'application/json'})
         tid = r.json()['id']
 
         # duplicate
-        r1 = requests.post(self.url, data=params)
+        r1 = requests.post(self.url, data=json.dumps(params), headers={'Content-Type': 'application/json'})
         self.assertEqual(r1.status_code, 201)
         self.assertEqual(r1.json()['id'], tid)
 
@@ -843,8 +844,8 @@ class ContestTransportTest(ValidatedTransportTestCase):
 
     def test_add_transport_to_contest(self):
         r = requests.post('/'.join((self.url, self.c_id, 'transport')),
-            data=dict(transport_id=self.tr_id))
-        print r.json()
+            data=json.dumps(dict(transport_id=self.tr_id)),
+            headers={'Content-Type': 'application/json'})
         self.validate(r.json(), self.add_to_contest_format)
         self.assertEqual(r.status_code, 201)
         self.assertIn(self.tr_id, r.json())
@@ -863,11 +864,12 @@ class ContestTransportTest(ValidatedTransportTestCase):
             i, cn = register_paraglider(p_id, self.c_id)
             # Append transport to contest.
             r = requests.post('/'.join((self.url, self.c_id, 'transport')),
-                data=dict(transport_id=self.tr_id))
+                data=json.dumps(dict(transport_id=self.tr_id)),
+                headers={'Content-Type': 'application/json'})
             # Create tracker and assign it to transport.
             params = dict(device_id=random.randint(1, 1000),
                 device_type='tr203')
-            r = requests.post('/'.join((URL, 'tracker')), data=params)
+            r = requests.post('/'.join((URL, 'tracker')), data=json.dumps(params))
             tid = r.json()['id']
             params = json.dumps(dict(assignee=str(self.tr_id),
                 contest_id='cont'))
@@ -888,111 +890,6 @@ class ContestTransportTest(ValidatedTransportTestCase):
         self.assertEqual(self.tr_id, res[0]['id'])
 
 
-class ValidatedParticipantsTestCase(ValidatedTestCase):
-    """
-    Common testcase class for winddummies, organizers and rescuers.
-    """
-
-    # POST/GET /contest/{id}/winddummies
-    winddummies_format = (list, {
-        'phone': unicode,
-        'name': unicode,
-        'person_id': unicode
-    })
-
-    # POST/GET /contest/{id}/organizers
-    organizers_format = (list, {
-        'person_id': unicode,
-        'email': unicode,
-        'name': unicode,
-        'description': unicode
-    })
-
-    # POST/GET /contest/{id}/rescuers
-    staff_format = (list, {
-        'id': unicode,
-        'type': unicode,
-        'phone': unicode,
-        'description': unicode,
-        'title': unicode
-    })
-
-
-class ContestParticipantsTest(ValidatedParticipantsTestCase):
-    url = URL + '/contest'
-
-    def setUp(self):
-        try:
-            c_, t_ = create_contest(title='Contest with participants')
-        except:
-            raise unittest.SkipTest("I need contest for test")
-        self.c_id = c_.json()['id']
-
-    def tearDown(self):
-        del self.c_id
-
-    def _get_person_id(self):
-        r, email = create_persons()
-        return r.json()['id']
-
-    # winddummies
-
-    def test_get_winddummies(self):
-        r = requests.get('/'.join((URL, 'contest', self.c_id,
-                                   'winddummies')))
-        self.validate(r.json(), self.winddummies_format)
-
-    def test_add_winddummy_to_contest(self):
-        p_id = self._get_person_id()
-        r = requests.post('/'.join((self.url, self.c_id, 'winddummies')),
-                          data=dict(person_id=p_id))
-        self.validate(r.json(), self.winddummies_format)
-        self.assertEqual(r.status_code, 201)
-        self.assertTrue(r.json()[0]['person_id'] == p_id)
-
-    # organizers
-
-    def test_get_organizers(self):
-        r = requests.get('/'.join((URL, 'contest', self.c_id,
-                                   'organizers')))
-        self.validate(r.json(), self.organizers_format)
-
-    def test_add_organizer_to_contest(self):
-        p_id = self._get_person_id()
-        r = requests.post('/'.join((self.url, self.c_id, 'organizers')),
-                          data=dict(person_id=p_id))
-        self.validate(r.json(), self.organizers_format)
-        self.assertEqual(r.status_code, 201)
-        self.assertTrue(r.json()[0]['person_id'] == p_id)
-
-    # staff
-
-    def test_get_staff(self):
-        r = requests.get('/'.join((URL, 'contest', self.c_id,
-                                   'staff')))
-        self.validate(r.json(), self.staff_format)
-
-    def test_add_staff_rescuer_to_contest(self):
-        data = dict(
-            phone='+76542345566',
-            title='RescueRanger',
-            description="Chip-Chip-Chip-Chip 'n Dale!",
-            type='rescuer')
-        r = requests.post('/'.join((self.url, self.c_id, 'staff')),
-                          data=data)
-        self.validate(r.json(), self.staff_format)
-        self.assertEqual(r.status_code, 201)
-
-    def test_add_staff_transport_to_contest(self):
-        data = dict(
-            phone='+76542345566',
-            title='Battlestar Galactica',
-            description="some series I haven't seen yet",
-            type='transport')
-        r = requests.post('/'.join((self.url, self.c_id, 'staff')),
-                          data=data)
-        self.validate(r.json(), self.staff_format)
-        self.assertEqual(r.status_code, 201)
 
 if __name__ == '__main__':
     unittest.main()

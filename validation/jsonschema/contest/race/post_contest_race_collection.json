@@ -1,0 +1,102 @@
+{
+    "type":"object",
+    "$schema": "http://json-schema.org/draft-03/schema#",
+    "title": "New contest race",
+    "description": "Add a race to contest",
+    "properties":{
+        "title": {
+            "type": "string",
+            "required": true,
+            "minLength": 1,
+            "description": "Race title, like Task 1"
+        },
+        "race_type": {
+            "type": "string",
+            "required": true,
+            "minLength": 1,
+            "description": "Race type, like opendistance or speedrun"
+        },
+        "bearing": {
+            "type": "integer",
+            "required": false,
+            "description": "Flight direction: for opendistance races only"
+        },
+        "checkpoints": {
+            "type": "object",
+            "required": true,
+            "description": "Race checkpoints as geojson FeatureCollection",
+            "properties": {
+                "type": { "enum": [ "FeatureCollection" ] },
+                "features": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "type": { "enum": [ "Feature" ] },
+                            "properties": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "required": false,
+                                        "minLength": 1,
+                                        "description": "Checkpoint name"
+                                    },
+                                    "radius": {
+                                        "type": "integer",
+                                        "required": false,
+                                        "description": "Checkpoint radius (meters)"
+                                    },
+                                    "checkpoint_type": {
+                                        "type": "string",
+                                        "required": false,
+                                        "minLength": 1,
+                                        "description": "Checkoint type: es, ss, to, goal, or non-specified (can be ommited)"
+                                    },
+                                    "open_time": {
+                                        "type":"integer",
+                                        "required": false,
+                                        "minimum": 0,
+                                        "maximum": 2147483648,
+                                        "description": "Timestamp format. Time when checkpoint is open"
+                                    },
+                                    "close_time": {
+                                        "type":"integer",
+                                        "required": false,
+                                        "minimum": 0,
+                                        "maximum": 2147483648,
+                                        "description": "Timestamp format. Time when checkpoint is closed"
+                                    },
+                                    "checked_on": {
+                                        "required": false,
+                                        "enum": ["enter", "exit"]
+                                    }
+                                }
+                            },
+                            "geometry": {
+                                "type": "object",
+                                "required": true,
+                                "properties": {
+                                    "type": { "enum": [ "Point" ] },
+                                    "coordinates": {
+                                        "type":"array",
+                                        "required":true,
+                                        "description": "Сoordinates: should be two float numbers",
+                                        "items": {
+                                            "type": "number",
+                                            "not": {
+                                                "type": "integer"
+                                            }
+                                        },
+                                        "minItems": 2,
+                                        "maxItems": 2
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

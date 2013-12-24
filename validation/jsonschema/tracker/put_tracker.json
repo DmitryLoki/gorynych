@@ -1,0 +1,23 @@
+{
+    "type":"object",
+    "$schema": "http://json-schema.org/draft-03/schema#",
+    "title": "Change tracker",
+    "description": "Change tracker's name or assign it to the contest",
+    "properties":{
+        "name": {
+            "type": "string",
+            "required": false,
+            "minLength": 1
+        },
+        "assignee": {
+            "type": "string",
+            "required": false,
+            "minLength": 0
+        },
+        "contest_id": {
+            "type": "string",
+            "required": false,
+            "minLength": 1
+        }
+    }
+}

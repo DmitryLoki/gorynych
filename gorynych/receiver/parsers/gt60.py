@@ -28,7 +28,7 @@ class RedViewGT60(object):
             or @@ (from server) and end with \r\n.
 
     2) A geodata piece.
-            Contains lat, lng, timestamp and all that's useful. Handled in parse_geodata
+            Contains lat, lng, timestamp and all that's useful. Handled in parse_compressed_geodata
             method. Geodata begins from a single $ and ends with #.
 
     ATTENTION: these two kinds of messages are not completely independent from each other.
@@ -65,7 +65,7 @@ class RedViewGT60(object):
             cmd = Command(msg)
             return self.handle_command(cmd)
         elif msg[0] == '$' and msg[-1] == '#':
-            return self.parse_geodata(msg)
+            return self.parse_compressed_geodata(msg)
         else:
             raise ValueError('Unrecognized message type')
 

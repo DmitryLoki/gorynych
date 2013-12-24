@@ -8,7 +8,6 @@ import re
 import json
 
 import pytz
-from zope.interface.interfaces import Interface
 
 
 from gorynych.common.domain.model import AggregateRoot, ValueObject
@@ -348,7 +347,7 @@ class Paraglider(ValueObject):
 
     @property
     def name(self):
-        return self._name.short()
+        return self._name.full()
 
     @property
     def contest_track_id(self):

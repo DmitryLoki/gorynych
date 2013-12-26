@@ -20,17 +20,14 @@ from twisted.web.client import HTTPClientFactory
 HTTPClientFactory.noisy = False
 
 
-class AsynchronousAPIAccessor(object):
-    def __init__(self, url=None, version=None):
-        if not version:
-            version = str(__version__)
-        if not version.startswith('v'):
-            version = 'v' + version
+class APIClient(object):
+    def __init__(self, url=None):
         if not url:
-            url = OPTS['apiurl']
-            if url.endswith('/'):
-                url = url[:-1]
-        self.url = '/'.join((url, version))
+            url = 'http://localhost:{}'.format(OPTS['info']['web_port'])
+        self.url = url
+
+
+class AsynchronousAPIAccessor(APIClient):
 
     def _return_page(self, url):
         d = getPage(url)
@@ -44,20 +41,10 @@ class AsynchronousAPIAccessor(object):
 
 
 # TODO: do all of this in async way.
-class APIAccessor(object):
+class APIAccessor(APIClient):
     '''
     Implement asynchronous methods for convinient access to JSON api.
     '''
-    def __init__(self, url=None, version=None):
-        if not version:
-            version = str(__version__)
-        if not version.startswith('v'):
-            version = 'v' + version
-        if not url:
-            url = OPTS['apiurl']
-            if url.endswith('/'):
-                url = url[:-1]
-        self.url = '/'.join((url, version))
 
     def get_track_archive(self, race_id):
         url = '/'.join((self.url, 'race', race_id, 'track_archive'))

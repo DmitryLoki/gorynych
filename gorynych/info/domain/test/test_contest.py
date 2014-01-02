@@ -5,6 +5,7 @@ import time
 from copy import deepcopy
 
 from gorynych.common.domain import events
+from gorynych.common.exceptions import DomainError
 from gorynych.info.domain.test.helpers import create_contest
 from gorynych.info.domain import contest, person, race
 from gorynych.common.domain.types import Address, Name, Country
@@ -251,3 +252,22 @@ class ContestServiceTest(unittest.TestCase):
         self.assertEquals(pgl.keys()[0], pid)
         self.assertEquals(pgl[pid]['glider'], 'noglider')
         self.assertEquals(pgl[pid]['contest_number'], 21)
+
+    def test_add_winddummy(self, patched):
+        event_store = mock.Mock()
+        patched.return_value = event_store
+
+        pid = PersonID()
+        cont = self.cont.add_winddummy(pid)
+        wdms = cont.winddummies
+        self.assertEquals(wdms, [pid])
+
+    def test_get_winddummy(self, patched):
+        event_store = mock.Mock()
+        patched.return_value = event_store
+
+        pid = PersonID()
+        cont = self.cont.add_winddummy(pid)
+        self.assertEquals(cont.get_winddummy(pid), pid)
+        pid2 = PersonID()
+        self.assertRaises(DomainError, cont.get_winddummy, pid2)

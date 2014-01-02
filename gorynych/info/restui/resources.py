@@ -474,6 +474,32 @@ class ContestTransportCollection(APIResource):
             return cont.transport
 
 
+class ContestWinddummyResource(APIResource):
+    """
+    /contest/{id}/winddummy/{id}
+    """
+    service_command = dict(GET='get_winddummy')
+
+    def read_GET(self, response, p=None):
+        return response
+        
+
+class ContestWinddummyCollection(APIResource):
+    """
+    /contest/{id}/winddummy
+    """
+    service_command = dict(POST='add_winddummy_to_contest',
+        GET='get_contest')
+
+    def read_GET(self, t, p=None):
+        if t:
+            return self.read_POST(t)
+
+    def read_POST(self, cont, p=None):
+        if cont:
+            return cont.winddummies
+
+
 class RaceTransportCollection(APIResource):
     '''
     /race/{id}/transport

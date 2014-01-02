@@ -157,6 +157,14 @@ class Contest(AggregateRoot):
         return result
 
     @property
+    def winddummies(self):
+        result = list()
+        for key in self._participants.keys():
+            if self._participants[key]['role'] == 'winddummy':
+                result.append(key)
+        return result
+
+    @property
     def country(self):
         return self.address.country
 
@@ -224,6 +232,27 @@ class Contest(AggregateRoot):
         if self._participants.has_key(str(transport_id)) and (
                 self._participants[transport_id]['role'] == 'transport'):
             del self._participants[transport_id]
+
+    def add_winddummy(self, person_id):
+        # add_transport copypaste
+        if not isinstance(person_id, PersonID):
+            person_id = PersonID.fromstring(person_id)
+        if not person_id in self._participants:
+            self._participants[person_id] = dict(role='winddummy', tracker_id='')
+            return self
+        if person_id in self._participants and (
+                self._participants[person_id]['role'] == 'winddummy'):
+            return self
+        raise DomainError("Received id already in contest and it's not "
+                          "a winddummy: %s" % person_id)
+
+    def get_winddummy(self, person_id):
+        if not isinstance(person_id, PersonID):
+            person_id = PersonID.fromstring(person_id)
+        if person_id not in self._participants or \
+                self._participants[person_id]['role'] != 'winddummy':
+            raise DomainError("Non-existent winddummy: {}".format(person_id))
+        return person_id
 
     def _invariants_are_correct(self):
         """

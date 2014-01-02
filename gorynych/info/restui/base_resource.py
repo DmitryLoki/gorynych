@@ -235,6 +235,7 @@ class APIResource(resource.Resource):
                     person='person_id',
                     race='race_id',
                     paraglider='person_id',
+                    winddummy='person_id',
                     group='group_id',
                     tracker='tracker_id',
                     transport='transport_id')

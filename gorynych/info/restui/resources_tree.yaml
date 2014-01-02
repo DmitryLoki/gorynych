@@ -55,6 +55,13 @@ contest:
         transport:
           leaf: ContestTransportCollection
           package: *gorynych
+        winddummy:
+          leaf: ContestWinddummyCollection
+          package: *gorynych
+          tree:
+            *person_index:
+              leaf: ContestWinddummyResource
+              package: *gorynych
         race:
           leaf: ContestRaceResourceCollection
           package: *gorynych

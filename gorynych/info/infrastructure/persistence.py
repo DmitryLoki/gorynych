@@ -383,6 +383,8 @@ class PGSQLContestRepository(BasePGSQLRepository):
                 participants[PersonID.fromstring(pid)] = dict(role=role)
             elif role == 'transport':
                 participants[TransportID.fromstring(pid)] = dict(role=role)
+            elif role == 'winddummy':
+                participants[PersonID.fromstring(pid)] = dict(role=role)
         cont._participants = participants
         return cont
 

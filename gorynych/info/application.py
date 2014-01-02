@@ -7,7 +7,7 @@ import cPickle
 from twisted.internet import defer, task
 from twisted.python import log
 
-from gorynych.info.domain import contest, person, race, tracker, transport, interfaces
+from gorynych.info.domain import contest, person, race, tracker, transport, interfaces, ids
 from gorynych.common.infrastructure import persistence
 from gorynych.common.domain.events import ContestRaceCreated
 from gorynych.common.domain.services import SinglePollerService
@@ -129,6 +129,24 @@ class ApplicationService(BaseApplicationService):
         d.addCallback(lambda cont: cont.add_transport(params['transport_id']))
         d.addCallback(
             persistence.get_repository(interfaces.IContestRepository).save)
+        return d
+
+    def add_winddummy_to_contest(self, params):
+        print params
+        d = self.get_contest(params)
+        d.addCallback(lambda cont: cont.add_winddummy(params['person_id']))
+        d.addCallback(
+            persistence.get_repository(interfaces.IContestRepository).save)
+        return d
+
+    def get_winddummy(self, params):
+        c_id = ids.ContestID.fromstring(params['contest_id'])
+        d = self.get_contest(params)
+        d.addCallback(lambda cont: cont.get_winddummy(params['person_id']))
+        d.addCallback(lambda person_id: self._get_aggregate(person_id,
+                                                            interfaces.IPersonRepository))
+        d.addCallback(lambda pers: dict(person_id=pers.id,
+                                        tracker=pers.trackers.get(c_id, '')))
         return d
 
     def get_contest_transport(self, params):

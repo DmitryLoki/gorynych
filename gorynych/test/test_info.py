@@ -394,6 +394,59 @@ class ParaglidersTest(ValidatedTestCase):
         self.assertEqual(result['glider'], 'marlboro')
 
 
+class WinddummyTest(ValidatedTestCase):
+    # POST /contest/{contest_id}/winddummy
+    post_winddummy_format = (list, unicode)
+
+    # GET /contest/{contest_id}/winddummy
+    get_winddummy_list_format = (list, unicode)
+
+    # GET /contest/{contest_id}/winddummy/{person_id}
+    get_winddummy_format = {
+        "person_id": unicode,
+        "tracker": unicode
+    }
+
+    def _sample(self):
+        try:
+            cont_id = create_contest()[0].json()['id']
+            pers_id = create_persons()[0].json()['id']
+        except Exception:
+            raise unittest.SkipTest("Contest and persons hasn't been created"
+                                    ".")
+        return cont_id, pers_id
+
+    def test_add_winddummy(self):
+        cont_id, pers_id = self._sample()
+        params = dict(person_id=pers_id)
+        r = requests.post('/'.join((URL, 'contest', cont_id,
+                                    'winddummy')), data=params)
+        self.assertEqual(r.status_code, 201)
+        result = r.json()
+        self.validate(result, self.post_winddummy_format)
+        self.assertEqual(len(result), 1)
+        self.assertIn(pers_id, result)
+
+        r = requests.get('/'.join((URL, 'contest', cont_id, 'winddummy')))
+        self.assertEqual(r.status_code, 200)
+        print result
+        self.validate(result, self.get_winddummy_list_format)
+        self.assertEqual(len(result), 1)
+        self.assertIn(pers_id, result)
+
+    def test_get_winddummy(self):
+        cont_id, pers_id = self._sample()
+        params = dict(person_id=pers_id)
+        requests.post('/'.join((URL, 'contest', cont_id,
+                                'winddummy')), data=params)
+        r = requests.get('/'.join((URL, 'contest', cont_id, 'winddummy', pers_id)))
+        self.assertEqual(r.status_code, 200)
+        result = r.json()
+        self.validate(result, self.get_winddummy_format)
+        self.assertEqual(result['person_id'], pers_id)
+        self.assertEqual(result['tracker'], '')
+
+
 class ContestRaceTest(ValidatedTestCase):
     # for internal use
     _checkpoints_format = {

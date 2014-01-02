@@ -445,6 +445,7 @@ class TransportResource(APIResource):
         result['title'] = t.title
         result['description'] = t.description
         result['type'] = t.type
+        result['phone'] = t.phone
         return result
 
     def read_PUT(self, t, p=None):

@@ -544,9 +544,10 @@ class PGSQLTransportRepository(BasePGSQLRepository):
 
     def _restore_aggregate(self, rows):
         factory = TransportFactory()
-        _id, _tid, _title, _ttype, _desc = rows
+        _id, _tid, _title, _ttype, _desc, _phone = rows
         result = factory.create_transport( _ttype, _title, _desc, tr_id=_tid)
         result._id = _id
+        result._phone = _phone
         return result
 
     def _save_new(self, obj):
@@ -565,7 +566,8 @@ class PGSQLTransportRepository(BasePGSQLRepository):
         @return:
         @rtype: tuple
         '''
-        a = (obj.title, obj.type, obj.description, str(obj.id))
+        a = (obj.title, obj.type, obj.description, obj.phone, str(obj.id))
+        print a
         return a
 
     def _get_existed(self, obj, e):

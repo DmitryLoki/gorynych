@@ -7,6 +7,9 @@ from gorynych.receiver.parsers.app13.constants import HEADER, MAGIC_BYTE, FrameI
 from gorynych.receiver.parsers.app13.parser import Frame
 from gorynych.receiver.parsers.app13.session import PathMakerSession
 
+import logging
+logging.basicConfig(filename='pmtracker_detailed.log', level=logging.INFO)
+
 
 class TR203ReceivingProtocol(basic.LineOnlyReceiver):
     '''
@@ -85,6 +88,7 @@ class FrameReceivingProtocol(protocol.Protocol):
         raise NotImplementedError
 
     def dataReceived(self, data):
+        logging.info(data)
         self._buffer += data
         cursor = 0
         while True:
@@ -124,10 +128,14 @@ class PathMakerProtocol(FrameReceivingProtocol):
         # log'n'check
         result = self.factory.service.check_message(frame.serialize(), proto='TCP',
                                                     device_type=self.device_type)
-        resp = self.factory.service.parser.get_response(frame)
-        if resp:
-            self.transport.write(resp)
-        parsed = self.factory.service.parser.parse(frame)
+        try:  # catch any parser's exception
+            resp = self.factory.service.parser.get_response(frame)
+            if resp:
+                self.transport.write(resp)
+            parsed = self.factory.service.parser.parse(frame)
+        except Exception as e:
+            logging.warning(e.message)
+            return
         if frame.id == FrameId.MOBILEID:
             self.session.init(parsed)
         else:

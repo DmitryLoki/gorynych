@@ -88,7 +88,7 @@ class FrameReceivingProtocol(protocol.Protocol):
         raise NotImplementedError
 
     def dataReceived(self, data):
-        logging.info(data)
+        logging.info(data.encode('string_escape'))
         self._buffer += data
         cursor = 0
         while True:

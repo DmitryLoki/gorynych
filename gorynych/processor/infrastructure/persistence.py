@@ -71,10 +71,11 @@ class TrackRepository(object):
         data = yield self.pool.runQuery(pe.select('track'), (str(id),))
         if not data:
             raise NoAggregate("%s %s" % ('Track', id))
-        tid = track.TrackID.fromstring(data[0][0])
+        track_id, _id = data[0]
+        tid = track.TrackID.fromstring(track_id)
         event_list = yield pe.event_store().load_events(tid)
         result = track.Track(tid, event_list)
-        result._id = data[0][1]
+        result._id = long(_id)
         defer.returnValue(result)
 
     def save(self, obj):

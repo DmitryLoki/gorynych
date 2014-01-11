@@ -233,18 +233,6 @@ class OnlineTrashService(SinglePollerService):
             return
         return self.handle_track_data(data)
 
-    @defer.inlineCallbacks
-    def _get_race_by_tracker(self, device_id, now):
-        result = self.devices.get(device_id)
-        if result and now - result[2] < 300:
-            defer.returnValue((result[0], result[1]))
-        row = yield self.pool.runQuery(pe.select('current_race_by_tracker',
-            'race'),(device_id, now))
-        if not row:
-            defer.returnValue(None)
-        self.devices[device_id] = (row[0][0], row[0][1], int(time.time()))
-        defer.returnValue(row[0])
-
     def handle_track_data(self, data):
         now = int(time.time())
         d = self._get_race_by_tracker(data['imei'], now)
@@ -252,11 +240,25 @@ class OnlineTrashService(SinglePollerService):
         d.addCallback(lambda tr: tr.append_data(data))
         return d
 
-    def _get_track(self, rid, device_id):
-        if not rid:
+    @defer.inlineCallbacks
+    def _get_race_by_tracker(self, device_id, now):
+        result = self.devices.get(device_id)
+        if result and now - result[2] < 300:
+            defer.returnValue((result[0], result[1]))
+        row = yield self.pool.runQuery(pe.select('current_race_by_tracker',
+            'race'),(device_id, now))
+        # row can be (race.race_id, paraglider.contest_number).
+        if not row:
+            defer.returnValue(None)
+        race_id, contest_number = row[0]
+        self.devices[device_id] = (race_id, contest_number, int(time.time()))
+        defer.returnValue(row[0])
+
+    def _get_track(self, row, device_id):
+        if not row:
             # Null-object.
             return A()
-        rid, cnumber = rid
+        rid, cnumber = row
         if not cnumber:
             return A()
         if self.tracks.has_key(rid) and self.tracks[rid].has_key(device_id):
@@ -264,7 +266,7 @@ class OnlineTrashService(SinglePollerService):
             return self.tracks[rid][device_id]
         else:
             d = self.pool.runQuery(pe.select('track_n_label', 'track'),
-                (rid, cnumber))
+                ('_'.join((rid, 'online')), cnumber))
             d.addCallback(self._restore_or_create_track, rid, device_id, cnumber)
             return d
 

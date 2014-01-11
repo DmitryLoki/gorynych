@@ -155,7 +155,7 @@ class FileParserAdapter(object):
             track['timestamp'])
         return track, []
 
-    def correct(self, obj):
+    def postprocess(self, obj):
         return [events.TrackEnded(obj.id, dict(state='landed',
                                         distance=int(obj.points[-1]['distance'])),
             occured_on=obj.points[-1]['timestamp'])]
@@ -476,11 +476,28 @@ class ParagliderSkyEarth(object):
 
     def _state_work(self, data):
         result = []
-        if self._state == 'landed' or self._state == 'finished':
+        if not self._in_air or self._state == 'finished':
             return []
 
-        if not self._in_air:
+        if self._in_air:
+            if self._bf:
+                if data['g_speed'] < self.t_speed:
+                    result.append(self._slowed_down(data))
+            else:
+                # Пилот уже медленный, но ещё в воздухе.
+                if data['g_speed'] > self.t_speed:
+                    result.append(self._speed_exceed(data))
+
+                elif self._bs and data['timestamp'] - self._bs > 60 and (
+                    self._alt_diff(data, 5)):
+                    # Landed
+                    result.append(self._track_landed(data))
+                elif not self._bs and data['g_speed'] < self.t_speed:
+                    result.append(self._slowed_down(data))
+        else:
             # Ещё не в воздухе
+            # Эта ветвь временно не используется пока для aftertask треков
+            # сделан костыль с in_air = True.
             if self._bf:
                 # Пилот уже летит быстрее пороговой скорости.
                 in_air_by_speed = data['g_speed'] > self.t_speed and (
@@ -493,19 +510,6 @@ class ParagliderSkyEarth(object):
                 if data['g_speed'] > self.t_speed:
                     # Был медленный, стал быстрый.
                     result.append(self._speed_exceed(data))
-        else:
-            if self._bf:
-                if data['g_speed'] < self.t_speed:
-                    result.append(self._slowed_down(data))
-            else:
-                # Пилот уже медленный, но ещё в воздухе.
-                if data['g_speed'] > self.t_speed:
-                    result.append(self._speed_exceed(data))
-
-                elif data['timestamp'] - self._bs > 60 and (
-                    self._alt_diff(data, 5)):
-                    # Landed
-                    result.append(self._track_landed(data))
         return result
 
     def _speed_exceed(self, data):
@@ -530,11 +534,20 @@ class ParagliderSkyEarth(object):
             occured_on=data['timestamp'])
 
     def _alt_diff(self, data, dif):
+        '''
+        Check if altitude difference less then dif.
+        @param data:
+        @type data:
+        @param dif:
+        @type dif:
+        @return:
+        @rtype:
+        '''
         ts = data['timestamp']
         idxs = np.where(self.trackstate._buffer['timestamp'] < ts - 50)
         if len(idxs) == 0:
             return False
-        a1 = self.trackstate._buffer['alt'][idxs[-1]]
+        a1 = self.trackstate._buffer['alt'][idxs[0][-1]]
         return abs(a1 - data['alt']) < dif
 
 
@@ -575,15 +588,16 @@ class OnlineTrashAdapter(object):
         data['g_speed'] = data['g_speed'] / 3.6
         return data, []
 
-    def correct(self, trck):
+    def postprocess(self, trck):
         '''
-
+        Define track status.
         @param trck:
         @type trck: gorynych.processor.domain.track.Track
         @return:
-        @rtype:
+        @rtype: C{list}
         '''
-        return []
+        return ParagliderSkyEarth(trck._state).state_work(trck.points)
+
 
 class Point(object):
     def __init__(self, lat, lon, radius=0):

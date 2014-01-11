@@ -123,10 +123,9 @@ class TrackState(ValueObject):
 
     def apply_TrackLanded(self, ev):
         self.in_air = False
+        self.in_air_changed = ev.occured_on
         if not self.state == 'finished':
-            self.state = 'landed'
             self.last_distance = int(ev.payload)
-            self.statechanged_at = ev.occured_on
 
     def get_state(self):
         result = dict()
@@ -192,8 +191,11 @@ class Track(AggregateRoot):
         points, ev_list = self.task.process(points, self._state, self.id)
         self.apply(ev_list)
         self.points = services.create_uniq_hstack(self.points, points)
+        # TODO: do it correctly.
+        self._state._buffer = services.create_uniq_hstack(
+            self._state._buffer, self.points)[-100:]
         # Look for state after processing and do all correctness.
-        evlist = self.type.correct(self)
+        evlist = self.type.postprocess(self)
         self.apply(evlist)
         self.changes = services.clean_events(self.changes)
 

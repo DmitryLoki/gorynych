@@ -544,7 +544,7 @@ class ParagliderSkyEarth(object):
         @rtype:
         '''
         ts = data['timestamp']
-        idxs = np.where(self.trackstate._buffer['timestamp'] < ts - 50)
+        idxs = np.where(self.trackstate._buffer['timestamp'] < ts - 120)
         if len(idxs) == 0:
             return False
         a1 = self.trackstate._buffer['alt'][idxs[0][-1]]

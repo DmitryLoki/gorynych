@@ -144,7 +144,7 @@ class TestParagliderSkyEarth(unittest.TestCase):
             'track')
         trackstate = track.TrackState(tid, [tc])
         self.pse = services.ParagliderSkyEarth(trackstate)
-        self.d = np.empty(5, dtype=track.DTYPE)
+        self.d = np.zeros(5, dtype=track.DTYPE)
 
     def tearDown(self):
         del self.pse
@@ -203,9 +203,6 @@ class TestParagliderSkyEarth(unittest.TestCase):
         self.assertTrue(self.pse._in_air)
         self.assertIsNone(self.pse._bs)
         self.assertEqual(self.pse._bf, t1 + 67)
-        print res
-        print "cleaning"
-        print services.clean_events(res)
 
 
     def test_landed_when_started(self):
@@ -219,8 +216,15 @@ class TestParagliderSkyEarth(unittest.TestCase):
         self.assertFalse(self.pse._in_air)
         self.assertEqual(self.pse._bs, t1)
         self.assertIsNone(self.pse._bf)
-        print res
-        print "cleaning"
-        print services.clean_events(res)
 
+    def test_lagged_sloweddown(self):
+        t1 = int(time.time())
+        self.d['timestamp'] = [1389461576, 1389461648, 1389461708, 1389461718, 1389461766]
+        self.d['alt'] = [1935, 1829, 1775, 1775, 1773]
+        self.d['g_speed'] = [8.6111, 9.7222, 9.4444, 7.77778, 9.7222]
+        self.pse.trackstate._buffer = self.d
+        res = self.pse.state_work(self.d)
+        self.assertIsInstance(res, list)
+        self.assertTrue(self.pse._in_air)
+        print res
 

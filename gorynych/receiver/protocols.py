@@ -8,7 +8,9 @@ from gorynych.receiver.parsers.app13.parser import Frame
 from gorynych.receiver.parsers.app13.session import PathMakerSession
 
 import logging
-logging.basicConfig(filename='pmtracker_detailed.log', level=logging.INFO)
+logging.basicConfig(filename='pmtracker_detailed.log',
+                    format='%(levelname)s: %(asctime)s %(message)s',
+                    level=logging.INFO)
 
 
 class TR203ReceivingProtocol(basic.LineOnlyReceiver):
@@ -88,13 +90,15 @@ class FrameReceivingProtocol(protocol.Protocol):
         raise NotImplementedError
 
     def dataReceived(self, data):
-        logging.info(data.encode('string_escape'))
+        logging.info("DATA_RECEIVED: " + data.encode('string_escape'))
         self._buffer += data
         cursor = 0
         while True:
             if len(self._buffer) < HEADER.size:
+                logging.info("BUFFER_LESS_THEN_HEADER: " + self._buffer.encode('string_escape'))
                 break
             if cursor >= len(self._buffer):
+                logging.info("CURSOR_MORE_THEN_BUFFER: " + self._buffer.encode('string_escape'))
                 break
             try:
                 magic, frame_id, payload_len = HEADER.unpack_from(self._buffer, cursor)
@@ -105,11 +109,13 @@ class FrameReceivingProtocol(protocol.Protocol):
                 self.reset()
                 raise ValueError('Magic byte mismatch')
             frame_len = payload_len + HEADER.size
-            if len(self._buffer) < frame_len:  # keep accumulating
+            if len(self._buffer[cursor:]) < frame_len:  # keep accumulating
+                logging.info("BUFFER_LESS_THEN_FRAMELEN: " + self._buffer.encode('string_escape'))
                 break
             msg = self._buffer[cursor + HEADER.size: cursor + frame_len]
             cursor += frame_len
             frame = Frame(frame_id, msg)
+            logging.info("FRAME_RECEIVED_CALLED: " + msg.encode('string_escape'))
             self.frameReceived(frame)
         self._buffer = self._buffer[cursor:]
 
@@ -135,6 +141,7 @@ class PathMakerProtocol(FrameReceivingProtocol):
             parsed = self.factory.service.parser.parse(frame)
         except Exception as e:
             logging.warning(e.message)
+            logging.warning(frame.serialize().encode('string_escape'))
             return
         if frame.id == FrameId.MOBILEID:
             self.session.init(parsed)

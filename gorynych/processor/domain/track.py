@@ -55,8 +55,8 @@ class TrackState(ValueObject):
         self._state = 'not started'
         self.statechanged_at = None
         self.started = False
-        self.in_air = True # TODO: change it when time will come.
-        self.in_air_changed = None
+        self.in_air = False
+        self.in_air_changed = None # TODO: check necessity.
         # XXX: for aftertask tracks.
         self.es_taken = None
         self.start_time = None

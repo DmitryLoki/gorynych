@@ -476,7 +476,7 @@ class ParagliderSkyEarth(object):
 
     def _state_work(self, data):
         result = []
-        if not self._in_air or self._state == 'finished':
+        if self._state == 'landed' or self._state == 'finished':
             return []
 
         if self._in_air:
@@ -496,8 +496,6 @@ class ParagliderSkyEarth(object):
                     result.append(self._slowed_down(data))
         else:
             # Ещё не в воздухе
-            # Эта ветвь временно не используется пока для aftertask треков
-            # сделан костыль с in_air = True.
             if self._bf:
                 # Пилот уже летит быстрее пороговой скорости.
                 in_air_by_speed = data['g_speed'] > self.t_speed and (
@@ -544,10 +542,10 @@ class ParagliderSkyEarth(object):
         @rtype:
         '''
         ts = data['timestamp']
-        idxs = np.where(self.trackstate._buffer['timestamp'] < ts - 120)
+        idxs = np.where(self.trackstate._buffer['timestamp'] < ts - 60)[0]
         if len(idxs) == 0:
             return False
-        a1 = self.trackstate._buffer['alt'][idxs[0][-1]]
+        a1 = self.trackstate._buffer['alt'][idxs[-1]]
         return abs(a1 - data['alt']) < dif
 
 
@@ -794,7 +792,4 @@ class JavaScriptShortWay(object):
 
     def isBetween(self, a, x, b):
         return (a <= x <= b) or (b <= x <= a)
-
-
-
 

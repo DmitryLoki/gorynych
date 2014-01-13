@@ -153,7 +153,7 @@ class TestParagliderSkyEarth(unittest.TestCase):
     def test_init(self):
         self.assertIsNone(self.pse._bs)
         self.assertIsNone(self.pse._bf)
-        self.assertTrue(self.pse._in_air)
+        self.assertFalse(self.pse._in_air)
         self.assertEqual(self.pse._state, 'not started')
 
     def test_speed_exceeded(self):
@@ -168,6 +168,7 @@ class TestParagliderSkyEarth(unittest.TestCase):
         self.assertEqual(res[0].occured_on, t1 + 6)
 
     def test_slowed_down(self):
+        self.pse._in_air = True
         t1 = int(time.time())
         self.d['timestamp'] = [t1, t1 + 6, t1 + 20, t1 + 40, t1 + 67]
         self.d['g_speed'] = [20, 20, 15, 10, 9]
@@ -182,17 +183,19 @@ class TestParagliderSkyEarth(unittest.TestCase):
 
     def test_landed(self):
         t1 = int(time.time())
+        self.pse._in_air = True
         self.d['timestamp'] = [t1, t1 + 6, t1 + 20, t1 + 40, t1 + 67]
         self.d['alt'] = [100, 101, 103, 99, 100]
-        self.d['g_speed'] = [9, 10, 9, 5, 3]
+        self.d['g_speed'] = [19, 9, 9, 5, 3]
         self.pse.trackstate._buffer = self.d
         res = self.pse.state_work(self.d)
         self.assertIsInstance(res, list)
-        self.assertEqual(self.pse._bs, t1)
+        self.assertEqual(self.pse._bs, t1 + 6)
         self.assertIsNone(self.pse._bf)
         self.assertFalse(self.pse._in_air)
 
     def test_sloweddown_when_accelerated(self):
+        self.pse._in_air = True
         t1 = int(time.time())
         self.d['timestamp'] = [t1, t1 + 6, t1 + 20, t1 + 40, t1 + 67]
         self.d['alt'] = [100, 101, 103, 99, 100]
@@ -204,11 +207,11 @@ class TestParagliderSkyEarth(unittest.TestCase):
         self.assertIsNone(self.pse._bs)
         self.assertEqual(self.pse._bf, t1 + 67)
 
-
-    def test_landed_when_started(self):
+    def test_landed_when_accelerated(self):
+        self.pse._in_air = True
         t1 = int(time.time())
         self.d['timestamp'] = [t1, t1 + 6, t1 + 20, t1 + 61, t1 + 67]
-        self.d['alt'] = [100, 101, 103, 99, 100]
+        self.d['alt'] = [100, 101, 103, 99, 150]
         self.d['g_speed'] = [9, 1, 9, 5, 15]
         self.pse.trackstate._buffer = self.d
         res = self.pse.state_work(self.d)
@@ -217,14 +220,36 @@ class TestParagliderSkyEarth(unittest.TestCase):
         self.assertEqual(self.pse._bs, t1)
         self.assertIsNone(self.pse._bf)
 
-    def test_lagged_sloweddown(self):
-        t1 = int(time.time())
-        self.d['timestamp'] = [1389461576, 1389461648, 1389461708, 1389461718, 1389461766]
+    def test_flyed_lagged_sloweddown(self):
+        self.d['timestamp'] = [1389461576, 1389461648, 1389461708, 1389461718,
+            1389461766]
         self.d['alt'] = [1935, 1829, 1775, 1775, 1773]
         self.d['g_speed'] = [8.6111, 9.7222, 9.4444, 7.77778, 9.7222]
+        self.pse._in_air = True
         self.pse.trackstate._buffer = self.d
         res = self.pse.state_work(self.d)
         self.assertIsInstance(res, list)
         self.assertTrue(self.pse._in_air)
-        print res
+
+    def test_become_in_air(self):
+        t1 = int(time.time())
+        self.d['timestamp'] = [t1, t1 + 6, t1 + 20, t1 + 40, t1 + 67]
+        self.d['alt'] = [100, 101, 103, 99, 100]
+        self.d['g_speed'] = [9, 11, 19, 15, 15]
+        self.pse.trackstate._buffer = self.d
+        res = self.pse.state_work(self.d)
+        self.assertIsInstance(res, list)
+        self.assertIsNone(self.pse._bs)
+        self.assertEqual(self.pse._bf, t1 + 6)
+        self.assertTrue(self.pse._in_air)
+        self.assertEqual(len(res), 2)
+
+    def test_track_still_not_in_air(self):
+        t1 = int(time.time())
+        self.d['timestamp'] = [t1, t1 + 6, t1 + 20, t1 + 40, t1 + 67]
+        self.d['alt'] = [100, 101, 103, 99, 100]
+        self.d['g_speed'] = [9, 11, 19, 5, 15]
+        self.pse.trackstate._buffer = self.d
+        res = self.pse.state_work(self.d)
+        self.assertFalse(self.pse._in_air)
 

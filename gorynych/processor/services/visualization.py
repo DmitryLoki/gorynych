@@ -238,6 +238,12 @@ class TrackVisualizationService(Service):
                     result[cont_number]['finish_time'] = int(state_ts)
 
                 if len(state) > 0:
+                    # XXX: workaround
+                    if result[cont_number].get('state') == 'finished':
+                        continue
+                    if result[cont_number].get('state') == 'es_taken' and \
+                            not state[0] == 'finished':
+                        continue
                     result[cont_number]['state'] = state[0]
             except:
                 continue

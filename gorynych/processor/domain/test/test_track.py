@@ -18,8 +18,8 @@ def sorted_events_list(ev_list):
     assert isinstance(ev_list, list), "I'm waiting for a list."
     result = defaultdict(list)
     for ev in ev_list:
-        name, ts, payload = (ev.name, datetime.fromtimestamp(ev.occured_on),
-            ev.payload)
+        name, ts, payload = (
+            ev.name, datetime.fromtimestamp(ev.occured_on), ev.payload)
         result[ts].append(':'.join((name, str(payload))))
     k = []
     for key in sorted(result.keys()):
@@ -28,12 +28,10 @@ def sorted_events_list(ev_list):
 
 
 class TestTrack(unittest.TestCase):
-
     def setUp(self):
         tid = track.TrackID()
         e1 = events.TrackCreated(tid,
-                                 dict(track_type='competition_aftertask',
-                                     race_task=test_race))
+            dict(track_type='competition_aftertask', race_task=test_race))
         self.track = track.Track(tid, [e1])
 
     def tearDown(self):
@@ -52,26 +50,22 @@ class TestTrack(unittest.TestCase):
         for ch in sorted_events_list(self.track.changes):
             print ch
         print 'trackpoints amount:', len(self.track.points)
-        print 'first point time', datetime.fromtimestamp(self.track.points[0][
-            'timestamp'])
+        print 'first point time', datetime.fromtimestamp(
+            self.track.points[0]['timestamp'])
         self._check_events(self.track.changes, finished=False,
-                           checkpoints_taken=3, amount=7)
-        self._check_track_state(self.track._state, ended=True,
-                                last_checkpoint=3, state='landed', last_distance=38837)
+            checkpoints_taken=3, amount=7)
+        self._check_track_state(self.track._state, ended=True, last_checkpoint=3,
+            state='started', last_distance=38837)
 
     def test_parse_finished(self):
         self.track.append_data('pwc13.task3.finished.79.igc')
         self.track.process_data()
         for ch in sorted_events_list(self.track.changes):
             print ch
-        self._check_events(self.track.changes,
-                           finish_time=1374243311,
-                           finished=True, checkpoints_taken=6, amount=12,
-                            last_distance=210)
-        self._check_track_state(self.track._state,
-                                finish_time=1374243311,
-                                last_checkpoint=6,
-                                ended=True, last_distance=210)
+        self._check_events(self.track.changes, finish_time=1374243311, finished=True, checkpoints_taken=6, amount=12,
+            last_distance=210)
+        self._check_track_state(self.track._state, finish_time=1374243311,
+            last_checkpoint=6, ended=True, last_distance=210)
         # 4 checkpoint taken at 16:45
         # es (5 checkpoint) taken at 17:20
         # track started at 12:40
@@ -104,33 +98,33 @@ class TestTrack(unittest.TestCase):
 
     def test_parse_1d_error(self):
         self.track.append_data('cond.1d.3243.17.igc')
-        self.track.process_data()
+        try:
+            self.track.process_data()
+        except Exception as e:
+            pass
+        self.assertTrue(e.message.startswith('Nothing to process'))
+        self.assertIsInstance(e, ValueError)
         for ch in self.track.changes:
             print ch.name, datetime.fromtimestamp(ch.occured_on)
-        print len(self.track.points)
 
 
 class FAI_12thTest(unittest.TestCase):
-
     def setUp(self):
         tid = track.TrackID()
         e1 = events.TrackCreated(tid,
-            dict(track_type='competition_aftertask',
-                race_task=th_fai_1_task))
+            dict(track_type='competition_aftertask', race_task=th_fai_1_task))
         self.track = track.Track(tid, [e1])
 
     def tearDown(self):
         del self.track
 
     def test_12thfai_littame(self):
-        from gorynych.processor.infrastructure.persistence import find_aftertasks_snapshots
         self.track.append_data('0033.igc')
         self.track.process_data()
         for ch in sorted_events_list(self.track.changes):
             print ch
-        self._check_track_state(self.track._state, ended=True,
-                                state='finished', last_checkpoint=6,
-                                finish_time=1346939844, last_distance=199)
+        self._check_track_state(self.track._state, ended=True, state='finished', last_checkpoint=6,
+            finish_time=1346939844, last_distance=199)
 
     def _check_track_state(self, tstate, **kw):
         '''

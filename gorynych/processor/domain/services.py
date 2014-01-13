@@ -1,5 +1,4 @@
 # coding=utf-8
-from datetime import datetime
 
 __author__ = 'Boris Tsema'
 
@@ -141,6 +140,9 @@ class FileParserAdapter(object):
         return parsed_track
 
     def process(self, data, trck):
+        if len(data) == 0:
+            raise ValueError("Nothing to process: track length is zero. May "
+                             "be this track from another race.")
         stime = trck.task.start_time
         etime = trck.task.end_time
         corrector = OfflineCorrectorService()
@@ -593,8 +595,6 @@ class ParagliderSkyEarth(object):
         Check if altitude difference less then dif.
         @param data:
         @type data:
-        @param dif:
-        @type dif:
         @return:
         @rtype:
         '''

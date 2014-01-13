@@ -151,18 +151,7 @@ class TrackRepository(object):
         @return:
         @rtype: L{gorynych.processor.domain.track.Track}
         '''
-        # Очередной костыль, появившийся в результате того, что snapshot'ы
-        # делают не то, что задумывалось а состояния берутся не из событий.
-        # Здесь мы тупо считаем состояния из aftertask треков т.к. они
-        # сохраняются лишь раз. Если мы будем делать так же для лайвтреков,
-        # то новые снапшоты будут писаться при каждом состоянии что приводит
-        # к неправильным результатам. Для сохранения в таблицу
-        # track_snapshot нужных времён и состояний попытаемся их выцепить из
-        # событий, появившихся в треке за время обработки им точек.
-        if obj._state.track_type == 'competition_aftertask':
-            snaps = find_aftertasks_snapshots(obj)
-        else:
-            snaps = get_states_from_events(obj)
+        snaps = get_states_from_events(obj)
         for snap in snaps:
             try:
                 yield self.pool.runOperation(INSERT_SNAPSHOT,

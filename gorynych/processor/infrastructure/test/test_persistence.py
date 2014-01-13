@@ -1,11 +1,15 @@
-from gorynych.info.infrastructure.test.test_psql_repository import MockeryTestCase
-from gorynych.processor.infrastructure.persistence import TrackRepository
-from gorynych.processor.domain.track import Track, TrackID, DTYPE, track_types
-from gorynych.info.infrastructure.test import db_helpers
+import time
 
 from twisted.internet import defer
+from twisted.trial import unittest
 import numpy as np
-import time
+
+from gorynych.info.infrastructure.test.test_psql_repository import MockeryTestCase
+from gorynych.processor.infrastructure import persistence
+from gorynych.processor.domain import track
+from gorynych.info.infrastructure.test import db_helpers
+from gorynych.common.domain import events
+
 
 POOL = db_helpers.POOL
 
@@ -22,7 +26,7 @@ DATA_QUERY = """
 
 
 class TrackRepositoryTestCase(MockeryTestCase):
-    repo_type = TrackRepository
+    repo_type = persistence.TrackRepository
     sql_file = 'track'
     data = [{
             'timestamp': int(time.time()),
@@ -44,13 +48,13 @@ class TrackRepositoryTestCase(MockeryTestCase):
             }]
 
     def _sample(self):
-        t = Track(TrackID(), [])
-        t._type = track_types('online')
-        t.processed = np.array([], dtype=DTYPE)
+        t = track.Track(track.TrackID(), [])
+        t._type = track.track_types('online')
+        t.processed = np.array([], dtype=track.DTYPE)
         return t
 
     def _get_points(self, data):
-        points = np.empty(len(data), dtype=DTYPE)
+        points = np.empty(len(data), dtype=track.DTYPE)
         for i, item in enumerate(data):
             for key in item.keys():
                 points[i][key] = item[key]
@@ -120,8 +124,72 @@ class TrackRepositoryTestCase(MockeryTestCase):
         retrieved_data = yield POOL.runQuery(DATA_QUERY, (str(track.id),))
         self.assertEquals(len(retrieved_data), 2)
         # now insert some duplicate points
-        track.points = np.array([], dtype=DTYPE)
+        track.points = np.array([], dtype=track.DTYPE)
         yield self.repo.save(track)
         retrieved_data = yield POOL.runQuery(DATA_QUERY, (str(track.id),))
         self.assertEquals(len(retrieved_data), 2)
         self._compare_points(retrieved_data, self.data)
+
+
+class TestGetStatesFromEvents(unittest.TestCase):
+    def setUp(self):
+        self.track = track.Track(track.TrackID(), [])
+
+    def tearDown(self):
+        del self.track
+
+    def test_empty_events(self):
+        res = persistence.get_states_from_events(self.track)
+        self.assertIsInstance(res, dict)
+        self.assertEqual(len(res), 0)
+
+    def test_some_events(self):
+        t = int(time.time())
+        ev1 = events.TrackStarted(track.TrackID(), None, 'track', t)
+        ev2 = events.TrackFinished(track.TrackID(), None, 'track', t + 1)
+        self.track.apply(ev1)
+        self.track.apply(ev2)
+        res = persistence.get_states_from_events(self.track)
+        self.assertIsInstance(res, dict)
+        self.assertEqual(len(res), 2)
+        for key, val in res.iteritems():
+            if 'started' in val:
+                self.assertEqual(key, t)
+            elif 'finished' in val:
+                self.assertEqual(key, t + 1)
+            else:
+                self.fail("Only started or finished state expected.")
+
+    def test_duplicated_events(self):
+        t = int(time.time())
+        ev1 = events.TrackStarted(track.TrackID(), None, 'track', t)
+        ev2 = events.TrackStarted(track.TrackID(), None, 'track', t + 1)
+        ev3 = events.TrackStarted(track.TrackID(), None, 'track', t + 1)
+        self.track.apply(ev1)
+        self.track.apply(ev2)
+        self.track.apply(ev3)
+        res = persistence.get_states_from_events(self.track)
+        self.assertIsInstance(res, dict)
+        self.assertEqual(len(res), 2)
+        self.assertEqual(len(res[t+1]), 1)
+
+    def test_two_events_in_one_time(self):
+        t = int(time.time())
+        ev1 = events.TrackFinishTimeReceived(track.TrackID(), t, 'track', t)
+        ev2 = events.TrackLanded(track.TrackID(), t, 'track', t)
+        self.track.apply(ev1)
+        self.track.apply(ev2)
+        res = persistence.get_states_from_events(self.track)
+        self.assertIsInstance(res, dict)
+        self.assertEqual(len(res), 1)
+        self.assertEqual(len(res[t]), 2)
+        self.assertSetEqual(res[t], set(['in_air_false', 'es_taken']))
+
+    def test_unwanted_event(self):
+        t = int(time.time())
+        ev1 = events.TrackSlowedDown(track.TrackID())
+        self.track.apply(ev1)
+        res = persistence.get_states_from_events(self.track)
+        self.assertIsInstance(res, dict)
+        self.assertEqual(len(res), 0)
+

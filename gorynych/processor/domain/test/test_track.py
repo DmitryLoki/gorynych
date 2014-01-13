@@ -95,7 +95,7 @@ class TestTrack(unittest.TestCase):
         print len(self.track.points)
 
     def test_12thfai_littame(self):
-        from gorynych.processor.infrastructure.persistence import find_snapshots
+        from gorynych.processor.infrastructure.persistence import find_aftertasks_snapshots
         self.track.append_data('0033.igc')
         self.track.process_data()
         for ch in self.track.changes:
@@ -103,4 +103,4 @@ class TestTrack(unittest.TestCase):
         print len(self.track.points)
         self._check_track_state(self.track._state, ended=True,
                                 state='finished', last_checkpoint=6, finish_time=1346939844)
-        print find_snapshots(self.track)
+        print find_aftertasks_snapshots(self.track)

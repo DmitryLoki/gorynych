@@ -34,7 +34,7 @@ INSERT_SNAPSHOT = """
     """
 
 
-def find_snapshots(data):
+def find_aftertasks_snapshots(data):
     '''
     @param data:
     @type data: L{gorynych.processor.domain.track.Track}
@@ -56,6 +56,31 @@ def find_snapshots(data):
         result[int(state.finish_time)].add('es_taken')
     if state.start_time:
         result[int(state.start_time)].add('started')
+    return result
+
+
+def get_states_from_events(obj):
+    '''
+    Read states in track and create corresponding snapshots.
+    @param obj:
+    @type obj: L{gorynych.processor.domain.track.Track}
+    @return: dict with timestamp as a key and state set as a value.
+    @rtype: C{dict}
+    @rtype: C{dict}
+    '''
+    result = defaultdict(set)
+    lookedup_events = ['TrackStarted', 'TrackFinished',
+        'TrackFinishTimeReceived', 'TrackLanded', 'TrackInAir']
+    map_event = dict(TrackStarted='started',
+                    TrackFinished='finished',
+                    TrackFinishTimeReceived='es_taken',
+                    TrackLanded='in_air_false',
+                    TrackInAir='in_air_true')
+    if len(obj.changes) == 0:
+        return result
+    for ev in obj.changes:
+        if ev.name in lookedup_events:
+            result[ev.occured_on].add(map_event[ev.name])
     return result
 
 
@@ -119,7 +144,25 @@ class TrackRepository(object):
 
     @defer.inlineCallbacks
     def _save_snapshots(self, obj):
-        snaps = find_snapshots(obj)
+        '''
+
+        @param obj: track object
+        @type obj: L{gorynych.processor.domain.track.Track}
+        @return:
+        @rtype: L{gorynych.processor.domain.track.Track}
+        '''
+        # Очередной костыль, появившийся в результате того, что snapshot'ы
+        # делают не то, что задумывалось а состояния берутся не из событий.
+        # Здесь мы тупо считаем состояния из aftertask треков т.к. они
+        # сохраняются лишь раз. Если мы будем делать так же для лайвтреков,
+        # то новые снапшоты будут писаться при каждом состоянии что приводит
+        # к неправильным результатам. Для сохранения в таблицу
+        # track_snapshot нужных времён и состояний попытаемся их выцепить из
+        # событий, появившихся в треке за время обработки им точек.
+        if obj._state.track_type == 'competition_aftertask':
+            snaps = find_aftertasks_snapshots(obj)
+        else:
+            snaps = get_states_from_events(obj)
         for snap in snaps:
             try:
                 yield self.pool.runOperation(INSERT_SNAPSHOT,

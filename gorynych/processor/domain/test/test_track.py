@@ -1,5 +1,6 @@
 import simplejson as json
 from datetime import datetime
+from collections import defaultdict
 
 from twisted.trial import unittest
 from gorynych.processor.domain import track
@@ -11,6 +12,19 @@ test_race = json.loads(
 
 th_fai_1_task = json.loads(
     '{"contest_title":"12th  FAI European Paragliding Championship","country":"France","place":"Saint andre les alpes","timeoffset":"+0200","race_title":"Task 1 - 103 km","race_type":"racetogoal","start_time":"1346924700","end_time":"1346949000","bearing":"None","checkpoints":{"type": "FeatureCollection", "features": [{"geometry": {"type": "Point", "coordinates": [43.9785, 6.48]}, "type": "Feature", "properties": {"close_time": 1346930100, "radius": 1, "name": "D01", "checkpoint_type": "to", "open_time": 1346924700}}, {"geometry": {"type": "Point", "coordinates": [43.9388333333, 6.4078333333]}, "type": "Feature", "properties": {"close_time": 1346949000, "radius": 5000, "name": "B40", "checkpoint_type": "ss", "open_time": 1346928300}}, {"geometry": {"type": "Point", "coordinates": [44.4063333333, 6.2163333333]}, "type": "Feature", "properties": {"close_time": null, "radius": 20000, "name": "B13", "checkpoint_type": "ordinal", "open_time": null}}, {"geometry": {"type": "Point", "coordinates": [43.7578333333, 6.6238333333]}, "type": "Feature", "properties": {"close_time": null, "radius": 20000, "name": "B15", "checkpoint_type": "ordinal", "open_time": null}}, {"geometry": {"type": "Point", "coordinates": [43.9878333333, 6.3643333333]}, "type": "Feature", "properties": {"close_time": null, "radius": 1000, "name": "B42", "checkpoint_type": "ordinal", "open_time": null}}, {"geometry": {"type": "Point", "coordinates": [43.9658333333, 6.5578333333]}, "type": "Feature", "properties": {"close_time": 1346949000, "radius": 1000, "name": "B37", "checkpoint_type": "es", "open_time": 1346928300}}, {"geometry": {"type": "Point", "coordinates": [43.9586666667, 6.5105]}, "type": "Feature", "properties": {"close_time": 1346949000, "radius": 200, "name": "A01", "checkpoint_type": "goal", "open_time": 1346928300}}]}}')
+
+
+def sorted_events_list(ev_list):
+    assert isinstance(ev_list, list), "I'm waiting for a list."
+    result = defaultdict(list)
+    for ev in ev_list:
+        name, ts, payload = (ev.name, datetime.fromtimestamp(ev.occured_on),
+            ev.payload)
+        result[ts].append(':'.join((name, str(payload))))
+    k = []
+    for key in sorted(result.keys()):
+        k.append((str(key), result[key]))
+    return k
 
 
 class TestTrack(unittest.TestCase):
@@ -34,29 +48,30 @@ class TestTrack(unittest.TestCase):
     def test_parse_unfinished(self):
         self.track.append_data('1.2.609.609.igc')
         self.track.process_data()
-        for ch in self.track.changes:
-            print ch.name, datetime.fromtimestamp(ch.occured_on), ch.occured_on
-        print len(self.track.points)
+        print self.track.points['g_speed'][170:190]
+        for ch in sorted_events_list(self.track.changes):
+            print ch
+        print 'trackpoints amount:', len(self.track.points)
+        print 'first point time', datetime.fromtimestamp(self.track.points[0][
+            'timestamp'])
         self._check_events(self.track.changes, finished=False,
-                           checkpoints_taken=3, amount=5)
+                           checkpoints_taken=3, amount=7)
         self._check_track_state(self.track._state, ended=True,
                                 last_checkpoint=3, state='landed', last_distance=38837)
 
     def test_parse_finished(self):
         self.track.append_data('pwc13.task3.finished.79.igc')
         self.track.process_data()
-        for ch in self.track.changes:
-            print ch.name, ch.payload, datetime.fromtimestamp(ch
-                                                              .occured_on), ch.occured_on
-        print len(self.track.points)
-        print 'distance:', self.track.points[-1]['distance']
+        for ch in sorted_events_list(self.track.changes):
+            print ch
         self._check_events(self.track.changes,
-                           finish_time=1374243310,
-                           finished=True, checkpoints_taken=6, amount=9)
+                           finish_time=1374243311,
+                           finished=True, checkpoints_taken=6, amount=12,
+                            last_distance=210)
         self._check_track_state(self.track._state,
-                                finish_time=1374243310,
+                                finish_time=1374243311,
                                 last_checkpoint=6,
-                                ended=True)
+                                ended=True, last_distance=210)
         # 4 checkpoint taken at 16:45
         # es (5 checkpoint) taken at 17:20
         # track started at 12:40
@@ -94,13 +109,39 @@ class TestTrack(unittest.TestCase):
             print ch.name, datetime.fromtimestamp(ch.occured_on)
         print len(self.track.points)
 
+
+class FAI_12thTest(unittest.TestCase):
+
+    def setUp(self):
+        tid = track.TrackID()
+        e1 = events.TrackCreated(tid,
+            dict(track_type='competition_aftertask',
+                race_task=th_fai_1_task))
+        self.track = track.Track(tid, [e1])
+
+    def tearDown(self):
+        del self.track
+
     def test_12thfai_littame(self):
         from gorynych.processor.infrastructure.persistence import find_aftertasks_snapshots
         self.track.append_data('0033.igc')
         self.track.process_data()
-        for ch in self.track.changes:
-            print ch.name, datetime.fromtimestamp(ch.occured_on)
-        print len(self.track.points)
+        for ch in sorted_events_list(self.track.changes):
+            print ch
         self._check_track_state(self.track._state, ended=True,
-                                state='finished', last_checkpoint=6, finish_time=1346939844)
-        print find_aftertasks_snapshots(self.track)
+                                state='finished', last_checkpoint=6,
+                                finish_time=1346939844, last_distance=199)
+
+    def _check_track_state(self, tstate, **kw):
+        '''
+
+        @param tstate:
+        @type tstate: L{gorynych.processor.domain.track.TrackState}
+        '''
+        self.assertEqual(tstate.last_checkpoint, kw.get('last_checkpoint', 0))
+        self.assertEqual(tstate.ended, kw.get('ended'))
+        self.assertEqual(tstate.finish_time, kw.get('finish_time'))
+        self.assertEqual(tstate.last_distance, kw.get('last_distance', 0))
+        self.assertEqual(tstate.started, kw.get('started', True))
+        self.assertEqual(tstate.state, kw.get('state', 'finished'))
+

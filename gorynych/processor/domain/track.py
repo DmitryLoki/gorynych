@@ -188,15 +188,19 @@ class Track(AggregateRoot):
         #evs = services.ParagliderSkyEarth(self._state).state_work(points)
         #self.apply(evs)
         # Task process points and emit new events if occur.
-        points, ev_list = self.task.process(points, self._state, self.id)
-        self.apply(ev_list)
+        points, processed_evs = self.task.process(points, self._state, self.id)
         self.points = services.create_uniq_hstack(self.points, points)
-        # TODO: do it correctly.
+        # TODO: do it correctly. Introduce correct snapshotting.
         self._state._buffer = services.create_uniq_hstack(
-            self._state._buffer, self.points)[-100:]
+            self._state._buffer, self.points)
         # Look for state after processing and do all correctness.
-        evlist = self.type.postprocess(self)
-        self.apply(evlist)
+        postprocessed_evs = self.type.postprocess(self)
+        # Apply events from task processing. We don't do it before
+        # postprocessing because of independence of those events.
+        # Order matters! processed_evs first!
+        # TODO: rewrite this stinky moment.
+        self.apply(processed_evs)
+        self.apply(postprocessed_evs)
         self.changes = services.clean_events(self.changes)
 
     @property

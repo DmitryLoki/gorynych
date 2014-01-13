@@ -1,4 +1,6 @@
 # coding=utf-8
+from datetime import datetime
+
 __author__ = 'Boris Tsema'
 
 from calendar import timegm
@@ -156,9 +158,60 @@ class FileParserAdapter(object):
         return track, []
 
     def postprocess(self, obj):
-        return [events.TrackEnded(obj.id, dict(state='landed',
-                                        distance=int(obj.points[-1]['distance'])),
-            occured_on=obj.points[-1]['timestamp'])]
+        evs = ParagliderSkyEarth(obj._state).state_work(obj.points)
+        end_event = events.TrackEnded(obj.id, dict(state='',
+            distance=int(obj.points[-1]['distance'])),
+            occured_on=obj.points[-1]['timestamp'])
+        evs.append(end_event)
+        return evs
+
+
+@implementer(interfaces.ITrackType)
+class OnlineTrashAdapter(object):
+    type = 'online'
+    store_second = 60
+    def __init__(self, dtype):
+        self.dtype = dtype
+
+    def read(self, data):
+        result = np.empty(1, self.dtype)
+        result['timestamp'] = data['ts']
+        result['lat'] = data['lat']
+        result['lon'] = data['lon']
+        result['alt'] = data['alt']
+        result['g_speed'] = data['h_speed']
+        return result
+
+    def process(self, data, trck):
+        '''
+        На выходе получили самые ранние пришедшие точки (те, которые раньше
+        чем за store_second.
+        @param data: 1-length array
+        @type data: np.ndarray
+        @type trck: gorynych.processor.domain.track.Track
+        @return: массив, единичной или больше длины.
+        @rtype: np.ndarray
+        '''
+        if len(data) == 0:
+            return None, []
+        if len(trck.processed)>0:
+            first_v_speed = trck.processed[-1]['v_speed']
+        else:
+            first_v_speed = 1.0
+        data['v_speed'] = vspeed_calculator(data['alt'],
+            data['timestamp'], to_begin=first_v_speed)
+        data['g_speed'] = data['g_speed'] / 3.6
+        return data, []
+
+    def postprocess(self, trck):
+        '''
+        Define track status.
+        @param trck:
+        @type trck: gorynych.processor.domain.track.Track
+        @return:
+        @rtype: C{list}
+        '''
+        return ParagliderSkyEarth(trck._state).state_work(trck.points)
 
 
 class ParaglidingTrackCorrector(object):
@@ -489,7 +542,7 @@ class ParagliderSkyEarth(object):
                     result.append(self._speed_exceed(data))
 
                 elif self._bs and data['timestamp'] - self._bs > 60 and (
-                    self._alt_diff(data, 5)):
+                    self._alt_diff(data) <= 5):
                     # Landed
                     result.append(self._track_landed(data))
                 elif not self._bs and data['g_speed'] < self.t_speed:
@@ -505,9 +558,13 @@ class ParagliderSkyEarth(object):
                 elif data['g_speed'] < self.t_speed:
                     result.append(self._slowed_down(data))
             else:
+                # Пилот замедлился и летит ниже пороговой скорости.
                 if data['g_speed'] > self.t_speed:
                     # Был медленный, стал быстрый.
                     result.append(self._speed_exceed(data))
+            if self._alt_diff(data) > 30:
+                # Перепад высот за минуту больше 30 метров.
+                result.append(self._track_in_air(data))
         return result
 
     def _speed_exceed(self, data):
@@ -531,7 +588,7 @@ class ParagliderSkyEarth(object):
         return events.TrackLanded(self._id, payload=data['distance'],
             occured_on=data['timestamp'])
 
-    def _alt_diff(self, data, dif):
+    def _alt_diff(self, data):
         '''
         Check if altitude difference less then dif.
         @param data:
@@ -546,55 +603,7 @@ class ParagliderSkyEarth(object):
         if len(idxs) == 0:
             return False
         a1 = self.trackstate._buffer['alt'][idxs[-1]]
-        return abs(a1 - data['alt']) < dif
-
-
-@implementer(interfaces.ITrackType)
-class OnlineTrashAdapter(object):
-    type = 'online'
-    store_second = 60
-    def __init__(self, dtype):
-        self.dtype = dtype
-
-    def read(self, data):
-        result = np.empty(1, self.dtype)
-        result['timestamp'] = data['ts']
-        result['lat'] = data['lat']
-        result['lon'] = data['lon']
-        result['alt'] = data['alt']
-        result['g_speed'] = data['h_speed']
-        return result
-
-    def process(self, data, trck):
-        '''
-        На выходе получили самые ранние пришедшие точки (те, которые раньше
-        чем за store_second.
-        @param data: 1-length array
-        @type data: np.ndarray
-        @type trck: gorynych.processor.domain.track.Track
-        @return: массив, единичной или больше длины.
-        @rtype: np.ndarray
-        '''
-        if len(data) == 0:
-            return None, []
-        if len(trck.processed)>0:
-            first_v_speed = trck.processed[-1]['v_speed']
-        else:
-            first_v_speed = 1.0
-        data['v_speed'] = vspeed_calculator(data['alt'],
-            data['timestamp'], to_begin=first_v_speed)
-        data['g_speed'] = data['g_speed'] / 3.6
-        return data, []
-
-    def postprocess(self, trck):
-        '''
-        Define track status.
-        @param trck:
-        @type trck: gorynych.processor.domain.track.Track
-        @return:
-        @rtype: C{list}
-        '''
-        return ParagliderSkyEarth(trck._state).state_work(trck.points)
+        return abs(a1 - data['alt'])
 
 
 class Point(object):

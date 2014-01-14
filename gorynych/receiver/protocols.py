@@ -119,6 +119,14 @@ class FrameReceivingProtocol(protocol.Protocol):
             self.frameReceived(frame)
         self._buffer = self._buffer[cursor:]
 
+    def connectionLost(self, reason):
+        logging.info('CONNECTION_LOST')
+        self.connectionLost(reason)
+
+    def connectionMade(self):
+        logging.info('CONNECTION_MADE')
+        self.connectionMade()
+
 
 class PathMakerProtocol(FrameReceivingProtocol):
     """

@@ -78,6 +78,10 @@ person:
     *person_index:
       leaf: PersonResource
       package: *gorynych
+      tree:
+        current_contest:
+          leaf: CurrentPersonContestResource
+          package: *gorynych
 
 tracker:
   leaf: TrackerResourceCollection

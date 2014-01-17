@@ -29,6 +29,11 @@ class Person(AggregateRoot):
         self._contests = dict()
         # data_type:value
         self._person_data = dict()
+        self._current_contest = None
+
+    @property
+    def current_contest(self):
+        return self._current_contest
 
     @property
     def country(self):

@@ -238,6 +238,18 @@ class PersonResource(APIResource):
             return self.__read(pers)
 
 
+class CurrentPersonContestResource(APIResource):
+    '''
+    /person/{id}/current_contest resource
+    '''
+    service_command = dict(GET='get_current_contest')
+    name = 'person'
+
+    def read_GET(self, cont_id, request_params=None):
+        return dict(contest_id=cont_id)
+
+
+
 class RaceParagliderResourceCollection(APIResource):
     '''
     Resource /contest/{id}/race/{id}/paraglider,

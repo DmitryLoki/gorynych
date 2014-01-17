@@ -2,6 +2,7 @@
 Realization of persistence logic.
 '''
 import simplejson as json
+import time
 
 from twisted.internet import defer
 from twisted.python import log
@@ -112,7 +113,16 @@ class PGSQLPersonRepository(BasePGSQLRepository):
                 data_row[3],
                 data_row[5])
             result._id = data_row[6]
+            result._current_contest = self.get_current_contest(result.id)
             return result
+
+    @defer.inlineCallbacks
+    def get_current_contest(self, person_id):
+        row = yield self.pool.runQuery(pe.select('current_contest', 'person'),
+                                       (str(person_id), time.time()))
+        if row:
+            defer.returnValue(row[0][0])
+        defer.returnValue(None)
 
     @defer.inlineCallbacks
     def save(self, pers):

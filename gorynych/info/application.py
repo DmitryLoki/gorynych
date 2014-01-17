@@ -203,6 +203,12 @@ class ApplicationService(BaseApplicationService):
         return self._change_aggregate(params, interfaces.IPersonRepository,
                                       person.change_person)
 
+    def get_current_contest(self, params):
+        d = self._get_aggregate(params['person_id'],
+                                   interfaces.IPersonRepository)
+        d.addCallback(lambda pers: pers.current_contest)
+        return d
+
     ############## Race Service part ################
     def get_race(self, params):
         return self._get_aggregate(params['race_id'], interfaces.IRaceRepository)

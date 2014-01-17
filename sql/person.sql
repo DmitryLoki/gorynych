@@ -62,3 +62,15 @@ UPDATE PERSON_DATA SET
 WHERE
   ID=%s AND
   DATA_TYPE=%s;
+
+-- Select current_contest
+SELECT
+    C.contest_id
+FROM
+    CONTEST C,
+    PARTICIPANT P
+WHERE
+    C.id=P.id AND
+    P.participant_id=%s AND
+    %s BETWEEN C.start_time and C.end_time
+LIMIT 1;

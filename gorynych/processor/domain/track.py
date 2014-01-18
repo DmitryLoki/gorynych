@@ -124,6 +124,7 @@ class TrackState(ValueObject):
     def apply_TrackLanded(self, ev):
         self.in_air = False
         self.in_air_changed = ev.occured_on
+        self.ended = True
         if not self.state == 'finished':
             self.last_distance = int(ev.payload)
 

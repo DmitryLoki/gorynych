@@ -13,7 +13,7 @@ from gorynych.processor.domain import TrackArchive, track
 from gorynych.common.application import EventPollingService
 from gorynych.common.domain.services import APIAccessor, SinglePollerService
 
-API = APIAccessor()
+API = APIAccessor('http://api.airtribune.com/v0.2')
 
 class A:
     def process_data(self, data):
@@ -287,8 +287,8 @@ class OnlineTrashService(SinglePollerService):
         log.msg("Restore or create track for race %s and device %s" %
                 (rid, device_id))
         if row:
-            log.msg("Restore track", row[1])
-            result = yield self.repo.get_by_id(row[1][1])
+            log.msg("Restore track", row)
+            result = yield self.repo.get_by_id(row[0][1])
         else:
             log.msg("Create new track")
             race_task = API.get_race_task(str(rid))

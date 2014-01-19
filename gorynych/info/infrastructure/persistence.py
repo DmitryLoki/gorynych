@@ -118,11 +118,17 @@ class PGSQLPersonRepository(BasePGSQLRepository):
 
     @defer.inlineCallbacks
     def get_current_contest(self, person_id):
-        row = yield self.pool.runQuery(pe.select('current_contest', 'person'),
-                                       (str(person_id), time.time()))
-        if row:
-            defer.returnValue(row[0][0])
-        defer.returnValue(None)
+        now = time.time()
+        current_contests = yield self.pool.runQuery(pe.select('current_contests', 'person'),
+                                                    (str(person_id), now))
+        if current_contests:
+            defer.returnValue([x[0] for x in current_contests])
+        else:
+            next_contest = yield self.pool.runQuery(pe.select('next_contest', 'person'),
+                                                    (str(person_id), now))
+            if next_contest:
+                defer.returnValue([x[0] for x in next_contest])
+        defer.returnValue([])
 
     @defer.inlineCallbacks
     def save(self, pers):
@@ -340,6 +346,21 @@ class PGSQLRaceRepository(BasePGSQLRepository):
 
 class PGSQLContestRepository(BasePGSQLRepository):
     implements(IContestRepository)
+
+    @defer.inlineCallbacks
+    def get_by_id(self, id):
+        cont = yield BasePGSQLRepository.get_by_id(self, id)
+        if cont:
+            if cont.race_ids:
+                race_ids = tuple([str(rid) for rid in cont.race_ids])
+                crace = yield self.pool.runQuery(pe.select('current_race', 'contest'),
+                                                 (str(cont.id), race_ids, time.time()))
+                if crace:
+                    crace = crace[0][0]
+                else:
+                    crace = None
+                cont._current_race = crace
+        defer.returnValue(cont)
 
     @defer.inlineCallbacks
     def _restore_aggregate(self, row):

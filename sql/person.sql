@@ -63,7 +63,7 @@ WHERE
   ID=%s AND
   DATA_TYPE=%s;
 
--- Select current_contest
+-- Select current_contests
 SELECT
     C.contest_id
 FROM
@@ -72,5 +72,26 @@ FROM
 WHERE
     C.id=P.id AND
     P.participant_id=%s AND
-    %s BETWEEN C.start_time and C.end_time
-LIMIT 1;
+    %s BETWEEN C.start_time and C.end_time;
+
+
+-- Select next_contest
+WITH
+    future_contests
+AS
+    (SELECT
+        C.contest_id,
+        C.start_time
+    FROM
+        CONTEST C,
+        PARTICIPANT P
+    WHERE
+        C.id=P.id AND
+        P.participant_id=%s AND
+        C.start_time > %s)
+SELECT
+    contest_id
+FROM
+    future_contests
+WHERE
+    start_time = (SELECT MIN(start_time) from future_contests);

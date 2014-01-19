@@ -29,7 +29,7 @@ class Person(AggregateRoot):
         self._contests = dict()
         # data_type:value
         self._person_data = dict()
-        self._current_contest = None
+        self._current_contest = []
 
     @property
     def current_contest(self):

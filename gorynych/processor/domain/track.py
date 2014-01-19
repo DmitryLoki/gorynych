@@ -55,8 +55,8 @@ class TrackState(ValueObject):
         self._state = 'not started'
         self.statechanged_at = None
         self.started = False
-        self.in_air = True # TODO: change it when time will come.
-        self.in_air_changed = None
+        self.in_air = False
+        self.in_air_changed = None # TODO: check necessity.
         # XXX: for aftertask tracks.
         self.es_taken = None
         self.start_time = None
@@ -123,10 +123,10 @@ class TrackState(ValueObject):
 
     def apply_TrackLanded(self, ev):
         self.in_air = False
+        self.in_air_changed = ev.occured_on
+        self.ended = True
         if not self.state == 'finished':
-            self.state = 'landed'
             self.last_distance = int(ev.payload)
-            self.statechanged_at = ev.occured_on
 
     def get_state(self):
         result = dict()
@@ -189,12 +189,19 @@ class Track(AggregateRoot):
         #evs = services.ParagliderSkyEarth(self._state).state_work(points)
         #self.apply(evs)
         # Task process points and emit new events if occur.
-        points, ev_list = self.task.process(points, self._state, self.id)
-        self.apply(ev_list)
+        points, processed_evs = self.task.process(points, self._state, self.id)
         self.points = services.create_uniq_hstack(self.points, points)
+        # TODO: do it correctly. Introduce correct snapshotting.
+        self._state._buffer = services.create_uniq_hstack(
+            self._state._buffer, self.points)
         # Look for state after processing and do all correctness.
-        evlist = self.type.correct(self)
-        self.apply(evlist)
+        postprocessed_evs = self.type.postprocess(self)
+        # Apply events from task processing. We don't do it before
+        # postprocessing because of independence of those events.
+        # Order matters! processed_evs first!
+        # TODO: rewrite this stinky moment.
+        self.apply(processed_evs)
+        self.apply(postprocessed_evs)
         self.changes = services.clean_events(self.changes)
 
     @property

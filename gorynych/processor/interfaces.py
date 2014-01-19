@@ -35,7 +35,7 @@ class ITrackType(Interface):
         @rtype: C{numpy.ndarray}, C{list}
         '''
 
-    def correct(obj):
+    def postprocess(obj):
         '''
         I do postprocessing work - correct points or create track events.
         @param obj: track which I process.

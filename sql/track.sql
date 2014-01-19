@@ -89,4 +89,5 @@ FROM
 WHERE
   tracks_group.track_id = track.id AND
   tracks_group.group_id = %s AND
-  TRACKS_GROUP.TRACK_LABEL = %s;
+  TRACKS_GROUP.TRACK_LABEL = %s AND
+  track_type.id=track.track_type;

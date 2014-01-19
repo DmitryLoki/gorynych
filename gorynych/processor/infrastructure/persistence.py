@@ -34,7 +34,7 @@ INSERT_SNAPSHOT = """
     """
 
 
-def find_snapshots(data):
+def find_aftertasks_snapshots(data):
     '''
     @param data:
     @type data: L{gorynych.processor.domain.track.Track}
@@ -59,6 +59,31 @@ def find_snapshots(data):
     return result
 
 
+def get_states_from_events(obj):
+    '''
+    Read states in track and create corresponding snapshots.
+    @param obj:
+    @type obj: L{gorynych.processor.domain.track.Track}
+    @return: dict with timestamp as a key and state set as a value.
+    @rtype: C{dict}
+    @rtype: C{dict}
+    '''
+    result = defaultdict(set)
+    lookedup_events = ['TrackStarted', 'TrackFinished',
+        'TrackFinishTimeReceived', 'TrackLanded', 'TrackInAir']
+    map_event = dict(TrackStarted='started',
+                    TrackFinished='finished',
+                    TrackFinishTimeReceived='es_taken',
+                    TrackLanded='in_air_false',
+                    TrackInAir='in_air_true')
+    if len(obj.changes) == 0:
+        return result
+    for ev in obj.changes:
+        if ev.name in lookedup_events:
+            result[ev.occured_on].add(map_event[ev.name])
+    return result
+
+
 class TrackRepository(object):
 
     duplicate_key_ts = r'Key.*\((\d*)\,.*already exists'
@@ -71,10 +96,11 @@ class TrackRepository(object):
         data = yield self.pool.runQuery(pe.select('track'), (str(id),))
         if not data:
             raise NoAggregate("%s %s" % ('Track', id))
-        tid = track.TrackID.fromstring(data[0][0])
+        track_id, _id = data[0]
+        tid = track.TrackID.fromstring(track_id)
         event_list = yield pe.event_store().load_events(tid)
         result = track.Track(tid, event_list)
-        result._id = data[0][1]
+        result._id = long(_id)
         defer.returnValue(result)
 
     def save(self, obj):
@@ -118,7 +144,14 @@ class TrackRepository(object):
 
     @defer.inlineCallbacks
     def _save_snapshots(self, obj):
-        snaps = find_snapshots(obj)
+        '''
+
+        @param obj: track object
+        @type obj: L{gorynych.processor.domain.track.Track}
+        @return:
+        @rtype: L{gorynych.processor.domain.track.Track}
+        '''
+        snaps = get_states_from_events(obj)
         for snap in snaps:
             try:
                 yield self.pool.runOperation(INSERT_SNAPSHOT,

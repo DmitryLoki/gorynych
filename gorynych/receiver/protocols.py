@@ -101,7 +101,7 @@ class FrameReceivingProtocol(protocol.Protocol):
                 self.reset()
                 raise ValueError('Magic byte mismatch')
             frame_len = payload_len + HEADER.size
-            if len(self._buffer) < frame_len:  # keep accumulating
+            if len(self._buffer[cursor:]) < frame_len:  # keep accumulating
                 break
             msg = self._buffer[cursor + HEADER.size: cursor + frame_len]
             cursor += frame_len

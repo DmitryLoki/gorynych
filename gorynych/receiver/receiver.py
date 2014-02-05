@@ -1,53 +1,16 @@
 '''
-Thinkless copy/paste.
-I hope it works.
+A service which receive GPS data, parse them and write into system.
 '''
 
 __author__ = 'Boris Tsema'
 import time
 import cPickle
-import collections
 
 from twisted.internet import defer
 from twisted.application.service import Service
 from twisted.python import log
 
 from gorynych.common.infrastructure.messaging import RabbitMQObject
-
-
-###################### Different receivers ################################
-
-class FileReceiver:
-    '''This class just write a message to file.'''
-    # XXX: do smth clever with interfaces. It's not good to have a class with
-    # just __init__ and one method.
-
-    running = 1
-
-    def __init__(self, filename):
-        self.filename = filename
-
-    def write(self, data):
-        # XXX: this is a blocking operation. It's bad in Twisted. Rework.
-        fd = open(self.filename, 'a')
-        fd.write(''.join((str(data), '\r\n')))
-        fd.close()
-
-
-class CheckReceiver:
-    running = 1
-
-    def __init__(self, filename):
-        self.filename = filename
-        # imei: time
-        self.messages = collections.defaultdict(dict)
-        self.coords = collections.defaultdict(dict)
-
-    def write(self, data):
-        '''data is a dict with parsed data.'''
-        self.messages[data['imei']] = int(time.time())
-        self.coords[data['imei']] = (data['lat'], data['lon'], data['alt'],
-        data['h_speed'])
 
 
 class ReceiverRabbitQueue(RabbitMQObject):

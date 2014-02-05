@@ -407,14 +407,6 @@ class StaffMemberTest(unittest.TestCase):
         self.assertRaises(AttributeError, setattr, sm, 'title', 'Hero')
 
 
-class TaskAddingTest(unittest.TestCase):
-    def setUp(self):
-        self.cont = create_contest(time.time(), time.time() + 3600)
-
-    def tearDown(self):
-        del self.cont
-
-
 class OrganizerTest(unittest.TestCase):
     def setUp(self):
         self.p = create_person()

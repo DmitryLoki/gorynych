@@ -50,20 +50,30 @@ class ContestFactory(object):
         data.
         @type participants: C{list}
         '''
+        if not participants:
+            participants = []
+        if not tasks:
+            tasks = []
         for p in participants:
             if p.role == 'paraglider':
-                paraglider = Paraglider(p.id, p.contest_number, p.glider,
+                paraglider = Paraglider(p.pid, p.contest_number, p.glider,
                     p.country, p.name, p.phone)
                 cont.paragliders[paraglider.id] = paraglider
             if p.role == 'organizer':
-                org = Organizer(p.id, p.email, p.name, p.description)
+                org = Organizer(p.pid, p.email, p.name, p.description)
                 cont.organizers[org.id] = org
             if p.role == 'winddummy':
-                wind = Winddummy(p.id, p.phone, p.name)
+                wind = Winddummy(p.pid, p.phone, p.name)
                 cont.winddummies[wind.id] = wind
             if p.role == 'staff':
-                staff = Staff(p.title, p.type, p.description, p.phone, p.id)
+                staff = Staff(p.title, p.type, p.description, p.phone, p.pid)
                 cont.staff[staff.id] = staff
+        for t in tasks:
+            cont.create_task(t.title, t.type, t.checkpoints, id=t.task_id,
+                bearing=t.bearing, window_open=t.window_open, window_close=t
+                .window_close, deadline=t.deadline,
+                start_time=t.start_time, start_gates_interval=t.gates_interval,
+                start_gates_number=t.gates_number)
         cont.check_invariants()
         return cont
 

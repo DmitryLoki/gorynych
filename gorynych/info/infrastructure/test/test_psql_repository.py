@@ -4,6 +4,7 @@ Test PostgreSQL implementation of IPersonRepository.
 
 __author__ = 'Boris Tsema'
 from datetime import datetime
+from collections import deque
 import time
 from random import randint
 import psycopg2
@@ -25,6 +26,71 @@ from gorynych.info.domain import contest
 
 
 POOL = db_helpers.POOL
+
+class ContestReadingTest(unittest.TestCase):
+    def setUp(self):
+        cont = helpers.create_contest(100, 200)
+        persons = []
+        for i in xrange(12):
+            persons.append(helpers.create_person(email=str(i)))
+        for i in xrange(3):
+            _, role = create_role('paraglider', persons[i], cnum=i)
+            cont.paragliders[role.id] = role
+        for i in xrange(3):
+            _, role = create_role('organizer', persons[i + 3])
+            cont.organizers[role.id] = role
+        for i in xrange(3):
+            _, role = create_role('winddummy', persons[i + 6], phone=Phone(
+                '+112'))
+            cont.winddummies[role.id] = role
+        staff = contest.Staff('Title', 'ambulance', 'yellow car',
+            Phone('+03'))
+        cont.staff[staff.id] = staff
+        self.cont = cont
+        self.rep = persistence.PGSQLContestRepository(mock.Mock())
+        self.participant_row = pe.named_row(persistence
+                                .PGSQLContestRepository.participants_columns)
+
+    def test_read_organizers(self):
+        orgs = self.rep._read_participants(self.cont.organizers)
+        self.assertIsInstance(orgs, list)
+        self.assertEqual(len(orgs), 3)
+        row = self.participant_row(*orgs[2])
+        self.assertEqual(row.role, 'organizer')
+        self.assertEqual(row.name, 'John Doe')
+        self.assertEqual((row.glider, row.contest_number, row.description,
+                                    row.type, row.phone), ('', '', '', '', ''))
+
+    def test_read_paragliders(self):
+        pars = self.rep._read_participants(self.cont.paragliders)
+        self.assertIsInstance(pars, list)
+        self.assertEqual(len(pars), 3)
+        row = self.participant_row(*pars[0])
+        self.assertEqual(row.role, 'paraglider')
+        self.assertEqual(row.country, 'UA')
+        self.assertIsInstance(row.contest_number, str)
+        self.assertEqual(row.glider, 'mantra')
+        self.assertEqual(row.name, 'John Doe')
+
+    def test_read_staff(self):
+        staff = self.rep._read_participants(self.cont.staff)
+        self.assertIsInstance(staff, list)
+        self.assertIsInstance(staff[0], deque)
+        self.assertEqual(len(staff), 1)
+        row = self.participant_row(*staff[0])
+        self.assertEqual(row.role, 'staff')
+        self.assertEqual(row.description, 'yellow car')
+        self.assertEqual(row.title, 'Title')
+        self.assertEqual(row.phone, '+03')
+
+    def test_read_winddummy(self):
+        wnds = self.rep._read_participants(self.cont.winddummies)
+        self.assertIsInstance(wnds, list)
+        self.assertEqual(len(wnds), 3)
+        row = self.participant_row(*wnds[0])
+        self.assertEqual(row.role, 'winddummy')
+        self.assertEqual(row.phone, '+112')
+        self.assertEqual(row.name, 'John Doe')
 
 
 class MockeryTestCase(unittest.TestCase):
@@ -257,7 +323,7 @@ class ContestRepositoryTest(MockeryTestCase):
         c_id = ContestID()
         tz = 'Europe/Amsterdam'
         stime = int(time.time())
-        etime = stime + 1
+        etime = stime + 1000
         c__id = yield POOL.runQuery(pe.insert('contest'),
             ('PGContest', stime, etime, tz, 'place', 'cou', 42.1, 42.2,
             'android', str(c_id)))
@@ -275,6 +341,20 @@ class ContestRepositoryTest(MockeryTestCase):
         yield POOL.runOperation(pe.insert('participant', 'contest'), p1row)
         yield POOL.runOperation(pe.insert('participant', 'contest'), p2row)
         yield POOL.runOperation(pe.insert('participant', 'contest'), o1row)
+
+        # Add tasks to contest.
+        od_id = RaceID()
+        sr_id = RaceID()
+        rt_id = RaceID()
+        chs = geojson_feature_collection(create_checkpoints())
+        odrow = (c__id, str(od_id), 'opendistance', 'ODTask', stime + 5,
+                stime + 10, None, None, chs, 0, 0, 0)
+        srrow = (c__id, str(sr_id), 'speedrun', 'SRTask', stime + 15,
+                stime + 30, stime + 20, stime + 20, chs, 0, 0, 0)
+        rtrow = (c__id, str(rt_id), 'opendistance', 'RTGTask', stime + 35,
+                stime + 50, stime + 40, stime + 40, chs, 0, 1, 0)
+        for i in [odrow, srrow, rtrow]:
+            yield POOL.runOperation(pe.insert('task', 'contest'), i)
 
         # DB prepared, start test.
         cont = yield self.repo.get_by_id(c_id)

@@ -9,6 +9,7 @@ For retreiving repository instance client use interface class as id.
 from io import BytesIO
 import os
 import re
+import collections
 
 from gorynych.eventstore.interfaces import IEventStore
 
@@ -49,6 +50,26 @@ def event_store():
 
 
 # SQL staff
+
+def named_row(columns, typename='NamedRow', verbose=False):
+    '''
+    Create named tuple for easy work with database rows.
+    For example if database table has columns id, name, surname when
+    select * from tblname return row, columns can be accessed like this:
+    >>> row = pool.runQuery('select * from tblname')
+    >>> id, name, surname = row
+    >>> new_row = named_row(['id', 'name', 'surname'])(*row)
+    >>> (id, name, surname) == (new_row.id, new_row.name, new_row.surname)
+    True
+    @param columns: column names
+    @type columns: C{list}
+    @return: named tuple with columns names as object's field
+    @rtype: function
+    '''
+    assert isinstance(columns, list), "I'm waiting for list of columns."
+    assert len(columns) > 0, "I'm waiting for non-zero list."
+    return collections.namedtuple(typename, columns, verbose=verbose)
+
 
 sqldir = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'sql/')
 

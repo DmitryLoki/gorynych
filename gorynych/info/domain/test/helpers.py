@@ -16,7 +16,7 @@ def create_contest(start_time, end_time, id=None,
                    place='Yrupinsk', country='rU', coords=(45.23, -23.22),
                    timezone='Europe/Moscow'):
     factory = contest.ContestFactory()
-    cont = factory.create_contest(title, start_time, end_time, place,
+    cont = factory.create(title, start_time, end_time, place,
         country, coords, timezone, id)
     return cont
 

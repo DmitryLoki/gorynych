@@ -26,10 +26,10 @@ def _pluralize(role):
 
 
 class ContestFactory(object):
-    def create_contest(self, title, start_time, end_time, contest_place,
-            contest_country, hq_coords, timezone, contest_id=None,
+    def create(self, title, start_time, end_time, contest_place,
+            contest_country, hq_lat, hq_lon, timezone, contest_id=None,
             retrieve_id=None):
-        address = Address(contest_place, contest_country, hq_coords)
+        address = Address(contest_place, contest_country, (hq_lat, hq_lon))
         if end_time < start_time:
             raise ValueError("Start time must be less then end time.")
         if not contest_id:
@@ -41,7 +41,7 @@ class ContestFactory(object):
         contest.retrieve_id = retrieve_id
         return contest
 
-    def restore_contest(self, cont, participants):
+    def restore(self, cont, participants=None, tasks=None):
         '''
         Restore contest from.
         @param cont: created contest without participants and tasks.

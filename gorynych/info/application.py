@@ -63,7 +63,7 @@ class ApplicationService(BaseApplicationService):
         '''
         id = contest.ContestID()
         contest_factory = contest.ContestFactory()
-        cont = contest_factory.create_contest(params['title'],
+        cont = contest_factory.create(params['title'],
                                               params['start_time'],
                                               params['end_time'],
                                               params['place'],

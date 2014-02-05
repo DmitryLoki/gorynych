@@ -9,13 +9,10 @@ import cPickle
 from twisted.internet import defer
 from twisted.application.service import Service
 from twisted.python import log
+from zope.interface import implementer
 
 from gorynych.common.infrastructure.messaging import RabbitMQObject
-
-
-class ReceiverRabbitQueue(RabbitMQObject):
-    def serialize(self, data):
-        return cPickle.dumps(data, protocol=2)
+from gorynych.receiver.interfaces import IWrite
 
 
 class ReceiverService(Service):
@@ -76,6 +73,9 @@ class ReceiverService(Service):
         failure.trap(EOFError)
 
 
+# Audit log is a pattern when all data are written somewhere in received
+# unchanged form.
+
 class AuditLog:
     '''Base class for audit logging classes.'''
 
@@ -129,4 +129,11 @@ class DumbAuditLog(AuditLog):
     def _write_log(self, log_message):
         pass
 
+
+# Writers which send data further.
+
+@implementer(IWrite)
+class ReceiverRabbitQueue(RabbitMQObject):
+    def serialize(self, data):
+        return cPickle.dumps(data, protocol=2)
 

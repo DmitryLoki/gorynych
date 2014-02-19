@@ -21,12 +21,12 @@ def get_contest_number(track):
     if track.endswith('.igc'):
         words = track.split('.')
         if len(words) > 2:
-            return words[-2]
+            return int(words[-2])
         if len(words) == 2:
-            return str(int(words[0]))
+            return int(words[0])
     elif track.endswith('.kml'):
         words = track.split('.')
-        return words[-2]
+        return int(words[-2])
 
     pass
 

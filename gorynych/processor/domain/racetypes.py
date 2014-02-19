@@ -20,8 +20,8 @@ class RaceToGoal(object):
 
     def __init__(self, task, checkpoints):
         self.checkpoints = checkpoints
-        self.start_time = int(task['start_time'])
-        self.end_time = int(task['end_time'])
+        self.start_time = int(task['properties']['start_time'])
+        self.end_time = int(task['properties']['deadline'])
 
     def process(self, points, trackstate, _id):
         '''
@@ -93,8 +93,8 @@ class SpeedRun(object):
 
     def __init__(self, task, checkpoints):
         self.checkpoints = checkpoints
-        self.start_time = int(task['start_time'])
-        self.end_time = int(task['end_time'])
+        self.start_time = int(task['properties']['start_time'])
+        self.end_time = int(task['properties']['deadline'])
 
     def process(self, points, trackstate, _id):
         '''
@@ -167,13 +167,13 @@ class OpenDistance(object):
     def __init__(self, task, checkpoints):
         self.checkpoints = checkpoints
         self.task = task
-        _bearing = task.get('bearing')
+        _bearing = task['properties'].get('bearing')
         if not _bearing or _bearing == "None":
             self.bearing = None
         else:
             self.bearing = int(_bearing)
-        self.start_time = int(task['start_time'])
-        self.end_time = int(task['end_time'])
+        self.start_time = int(task['properties']['window_open'])
+        self.end_time = int(task['properties']['deadline'])
 
     def process(self, points, trackstate, _id):
         '''
@@ -347,9 +347,9 @@ class RaceTypesFactory(object):
         '''
         assert isinstance(rtask, dict), "Race task must be dict."
         try:
-            race = self.races[rtask['race_type']]
+            race = self.races[rtask['type']]
         except KeyError:
-            raise ValueError("No such race type %s" % rtask.get('race_type'))
+            raise ValueError("No such race type %s" % rtask.get('type'))
         checkpoints = checkpoint_collection_from_geojson(rtask['checkpoints'])
         points, _ = services.JavaScriptShortWay().calculate(checkpoints)
         race_checkpoints = []
@@ -366,7 +366,7 @@ class RaceTypesFactory(object):
                         CylinderCheckpointAdapter)
                 race_checkpoints.append(cp)
         race_checkpoints = getattr(self, '_distances_for_' + rtask[
-            'race_type'])(race_checkpoints)
+            'type'])(race_checkpoints)
         return race(rtask, race_checkpoints)
 
     def _distances_for_racetogoal(self, race_checkpoints):

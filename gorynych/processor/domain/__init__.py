@@ -11,6 +11,10 @@ from gorynych.common.domain.model import ValueObject
 from gorynych import OPTS, __version__
 from twisted.python import log
 
+from gorynych.common.domain.services import APIAccessor
+
+API = APIAccessor()
+
 
 def get_contest_number(track):
     track = track.split('/')[-1]
@@ -31,10 +35,11 @@ class TrackArchive(ValueObject):
     '''
     Download and unpack archive with race tracks.
     '''
-    def __init__(self, race_id, archive_url, download_dir=None):
+    def __init__(self, race_id, contest_id, archive_url, download_dir=None):
         if not download_dir:
             download_dir = OPTS['workdir']
-        self.race_id = str(race_id)
+        self.race_id = race_id
+        self.contest_id = contest_id
         self.archive_url = str(archive_url)
         if not self.archive_url.endswith('zip'):
             raise ValueError("I'm waiting for zip-file link but got %s" %
@@ -96,14 +101,11 @@ class TrackArchive(ValueObject):
         @rtype: C{dict}
         '''
         # TODO: something wrong here...
-        url = '/'.join((OPTS['apiurl'],'v' + str(__version__), 'race', self.race_id,
-                        'paragliders'))
-        r = requests.get(url)
-        res = r.json()
+        res = API.get_contest_paragliders(self.contest_id)
         result = dict()
         for i, item in enumerate(res):
             cn = item['contest_number']
-            pid = item['person_id']
+            pid = item['id']
             result[cn] = pid
         return result
 
@@ -135,7 +137,8 @@ class TrackArchive(ValueObject):
             if paragliders.has_key(contest_number):
                 tracks.append(dict(person_id=paragliders[contest_number],
                                    trackfile=item,
-                                   contest_number=contest_number))
+                                   contest_number=contest_number,
+                                   contest_id=self.contest_id))
                 del paragliders[contest_number]
             else:
                 extra_tracks.append(item)

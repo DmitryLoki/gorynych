@@ -13,7 +13,7 @@ from gorynych.processor.domain import TrackArchive, track
 from gorynych.common.application import EventPollingService
 from gorynych.common.domain.services import APIAccessor, SinglePollerService
 
-API = APIAccessor('http://api.airtribune.com/v0.2')
+API = APIAccessor()
 
 class A:
     def process_data(self, data):
@@ -38,17 +38,18 @@ class ProcessorService(EventPollingService):
         Download and process track archive.
         '''
         race_id = ev.aggregate_id
-        url = ev.payload
+        url = ev.payload['url']
+        contest_id = ev.payload['contest_id']
         log.msg("URL received ", url)
-        res = yield defer.maybeDeferred(API.get_track_archive, str(race_id))
+        res = yield defer.maybeDeferred(API.get_track_archive, contest_id, str(race_id))
         if res and res['status'] == 'no archive':
-            ta = TrackArchive(str(race_id), url)
-            log.msg("Start unpacking archive %s for race %s" % (url, race_id))
+            ta = TrackArchive(str(race_id), str(contest_id), url)
+            log.msg("Start unpacking archive %s for race %s of contest %s" % (url, race_id, contest_id))
             archinfo = yield threads.deferToThread(ta.process_archive)
-            yield self._inform_about_paragliders(archinfo, race_id)
+            yield self._inform_about_paragliders(archinfo, race_id, contest_id)
         yield self.event_dispatched(ev.id)
 
-    def _inform_about_paragliders(self, archinfo, race_id):
+    def _inform_about_paragliders(self, archinfo, race_id, contest_id):
         '''
         Inform system about finded paragliders, then inform system about
         succesfull archive unpacking.
@@ -75,6 +76,7 @@ class ProcessorService(EventPollingService):
         race_id = ev.aggregate_id
         track_id = ev.payload['track_id']
         cn = ev.payload.get('contest_number')
+        contest_id = ev.payload.get('contest_id')
         group_id = str(race_id)
         if ev.payload['track_type'] == 'online':
             group_id = group_id + '_online'
@@ -88,7 +90,7 @@ class ProcessorService(EventPollingService):
                     (track_id, group_id, e))
         if ev.payload['track_type'] == 'online':
             defer.returnValue('')
-        res = yield defer.maybeDeferred(API.get_track_archive, str(race_id))
+        res = yield defer.maybeDeferred(API.get_track_archive, contest_id, str(race_id))
         if res:
             processed = len(res['progress']['parsed_tracks']) + len(
                 res['progress']['unparsed_tracks'])
@@ -117,10 +119,11 @@ class TrackService(EventPollingService):
         trackfile = ev.payload['trackfile']
         person_id = ev.payload['person_id']
         contest_number = ev.payload['contest_number']
+        contest_id = ev.payload['contest_id']
         log.msg("Got trackfile for paraglider %s" % person_id)
         race_id = ev.aggregate_id
         try:
-            race_task = API.get_race_task(str(race_id))
+            race_task = API.get_race_task(contest_id, str(race_id))
         except Exception as e:
             log.msg("Error in API call: %r" % e)
             race_task = None
@@ -160,7 +163,7 @@ class TrackService(EventPollingService):
         #d = self.event_store.persist(tc)
         #d.addCallback(lambda _:self.execute_ProcessData(track_id, trackfile))
         d.addCallback(lambda _:log.msg("Track %s processed and saved." % contest_number))
-        d.addCallback(lambda _:self.append_track_to_race_and_person(race_id,
+        d.addCallback(lambda _:self.append_track_to_race_and_person(contest_id, race_id,
             track_id, track_type, contest_number, person_id))
         d.addCallback(lambda _:log.msg("track %s events appended" % contest_number))
         d.addErrback(no_altitude_failure)
@@ -185,7 +188,7 @@ class TrackService(EventPollingService):
             self.aggregates[_id] = t
         defer.returnValue(self.aggregates[_id])
 
-    def append_track_to_race_and_person(self, race_id, track_id, track_type,
+    def append_track_to_race_and_person(self, contest_id, race_id, track_id, track_type,
             contest_number, person_id):
         '''
         When track is ready to be shown send messages for Race and Person to
@@ -193,7 +196,7 @@ class TrackService(EventPollingService):
         '''
         rgt = events.RaceGotTrack(race_id, aggregate_type='race')
         rgt.payload = dict(contest_number=contest_number,
-            track_type=track_type, track_id=str(track_id))
+            track_type=track_type, track_id=str(track_id), contest_id=contest_id)
         ptc = events.PersonGotTrack(person_id, str(track_id),
             aggregate_type='person')
         log.msg("Append events for track %s" % track_id)

@@ -13,7 +13,7 @@ class ArchiveURLReceived(DomainEvent):
     @param id: Race id
     @param url: url with track archive.
     '''
-    serializer = serializers.StringSerializer()
+    serializer = serializers.JSONSerializer()
 
 
 class TrackArchiveUnpacked(DomainEvent):

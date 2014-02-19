@@ -46,18 +46,20 @@ class APIAccessor(APIClient):
     Implement asynchronous methods for convinient access to JSON api.
     '''
 
-    def get_track_archive(self, race_id):
-        url = '/'.join((self.url, 'race', race_id, 'track_archive'))
+    def get_track_archive(self, contest_id, race_id):
+        url = '/'.join((self.url,'contest', contest_id, 'race', race_id, 'track_archive'))
         return self._return_page(url)
 
-    def get_race_task(self, race_id):
-        url = '/'.join((self.url, 'race', race_id))
+    def get_race_task(self, contest_id, race_id):
+        url = '/'.join((self.url, 'contest', contest_id, 'race', race_id))
+        return self._return_page(url)
+
+    def get_contest_paragliders(self, contest_id):
+        url = '/'.join((self.url, 'contest', contest_id, 'paraglider'))
         return self._return_page(url)
 
     def _return_page(self, url):
         r = requests.get(url)
-        if not r.status_code == 200:
-            return None
         try:
             result = r.json()
         except Exception as e:

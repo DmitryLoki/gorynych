@@ -37,6 +37,8 @@ class FrameId(object):
     PATHCHUNK_CONF = 4
     RPC_CALL = 5
     RPC_RESPONSE = 6
-    RPC_MESSAGE = 7
-    DEBUG_FRAME = 100
-    MAGIC_RESERVE = 0xBA
+    CURRENT_STATE = 7
+    DEBUG = 8
+    TRACK_INFO = 9
+    FRAME_CONF = 10
+    MAGIC_RESERVE=0xBA

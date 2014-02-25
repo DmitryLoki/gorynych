@@ -60,10 +60,26 @@ class App13ProtobuffMobileProtocol(protocol.Protocol):
     """
     device_type = 'app13'
 
-    def dataReceived(self, data):
+    def __init__(self, *args, **kwargs):
+        self.frames_recieved = 0
+
+    def confirm(self, data):
+        # legacy confirmation
         resp_list = self.factory.service.parser.get_response(data)
         for response in resp_list:
             self.transport.write(response)
+
+        # new-style confirmation
+        frames = self.factory.service.parser._split_to_frames(data)
+        for frame in frames:
+            self.frames_recieved += 1
+            conf = FrameConf()
+            conf.frames_recieved = self.frames_recieved
+            f = Frame(FrameId.FRAME_CONF, conf.SerializeToString())
+            self.transport.write(f.serialize())
+
+    def dataReceived(self, data):
+        self.confirm(data)
         self.factory.service.handle_message(
             data, proto='TCP', device_type=self.device_type)
 
@@ -120,19 +136,25 @@ class PathMakerProtocol(FrameReceivingProtocol):
     def reset(self):
         self.session = PathMakerSession()  # let's start new session
         self._buffer = ''
-        self.frames_received = 0
+        self.frames_recieved = 0
 
-    def confirm(self):
-        self.frames_received += 1
+    def confirm(self, frame):
+        # legacy confirmation
+        response = self.factory.service.parser.get_response(frame)
+        self.transport.write(response)
+
+        # new-style confirmation
+        self.frames_recieved += 1
         conf = FrameConf()
-        conf.frames_received = self.frames_received
-        self.transport.write(conf.SerializeToString())
+        conf.frames_recieved = self.frames_recieved
+        f = Frame(FrameId.FRAME_CONF, conf.SerializeToString())
+        self.transport.write(f.serialize())
 
     def frameReceived(self, frame):
         # log'n'check
         result = self.factory.service.check_message(frame.serialize(), proto='TCP',
                                                     device_type=self.device_type)
-        self.confirm()
+        self.confirm(frame)
         parsed = self.factory.service.parser.parse(frame)
         if frame.id == FrameId.MOBILEID:
             self.session.init(parsed)

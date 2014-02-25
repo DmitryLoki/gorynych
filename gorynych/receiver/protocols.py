@@ -6,6 +6,8 @@ from twisted.protocols import basic
 from gorynych.receiver.parsers.app13.constants import HEADER, MAGIC_BYTE, FrameId
 from gorynych.receiver.parsers.app13.parser import Frame
 from gorynych.receiver.parsers.app13.session import PathMakerSession
+from gorynych.receiver.parsers.app13.pbformat.frameconf_pb2 import FrameConf
+from gorynych.receiver.parsers.sbd import unpack_sbd
 
 
 class TR203ReceivingProtocol(basic.LineOnlyReceiver):
@@ -73,7 +75,6 @@ class FrameReceivingProtocol(protocol.Protocol):
     """
 
     def __init__(self, *args, **kwargs):
-        self._buffer = ''
         self.reset()
 
     def reset(self):
@@ -119,14 +120,19 @@ class PathMakerProtocol(FrameReceivingProtocol):
     def reset(self):
         self.session = PathMakerSession()  # let's start new session
         self._buffer = ''
+        self.frames_received = 0
+
+    def confirm(self):
+        self.frames_received += 1
+        conf = FrameConf()
+        conf.frames_received = self.frames_received
+        self.transport.write(conf.SerializeToString())
 
     def frameReceived(self, frame):
         # log'n'check
         result = self.factory.service.check_message(frame.serialize(), proto='TCP',
                                                     device_type=self.device_type)
-        resp = self.factory.service.parser.get_response(frame)
-        if resp:
-            self.transport.write(resp)
+        self.confirm()
         parsed = self.factory.service.parser.parse(frame)
         if frame.id == FrameId.MOBILEID:
             self.session.init(parsed)
@@ -138,8 +144,6 @@ class PathMakerProtocol(FrameReceivingProtocol):
             else:
                 self.reset()
                 raise ValueError('Bad session: {}'.format(self.session.params))
-
-from gorynych.receiver.parsers.sbd import unpack_sbd
 
 
 class PathMakerSBDProtocol(FrameReceivingProtocol):

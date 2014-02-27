@@ -20,29 +20,25 @@ class TR203ReceivingProtocol(basic.LineOnlyReceiver):
     def lineReceived(self, line):
         if line.startswith('OK\r\n'):
             line = line[4:]
-        self.factory.service.handle_message(line + '!', proto='TCP',
-                                            device_type='tr203')
+        self.factory.service.handle_message(line + '!', proto='TCP')
 
 
 class UDPTR203Protocol(protocol.DatagramProtocol):
     '''
     UDP-receiving protocol for tr203.
     '''
-    device_type = 'tr203'
 
     def __init__(self, service):
          self.service = service
 
     def datagramReceived(self, datagram, sender):
-        self.service.handle_message(datagram, proto='UDP',
-                                            device_type=self.device_type)
+        self.service.handle_message(datagram, proto='UDP')
 
 
 class UDPTeltonikaGH3000Protocol(protocol.DatagramProtocol):
     '''
     UDP receiving protocol for Teltonika GH3000.
     '''
-    device_type = 'telt_gh3000'
 
     def __init__(self, service):
          self.service = service
@@ -50,15 +46,13 @@ class UDPTeltonikaGH3000Protocol(protocol.DatagramProtocol):
     def datagramReceived(self, datagram, sender):
         response = self.service.parser.get_response(datagram)
         self.transport.write(response, sender)
-        self.service.handle_message(datagram, proto='UDP', client=sender,
-                                            device_type=self.device_type)
+        self.service.handle_message(datagram, proto='UDP', client=sender)
 
 
 class App13ProtobuffMobileProtocol(protocol.Protocol):
     """
     New mobile application protocol, is also used by a satellite modem.
     """
-    device_type = 'app13'
 
     def __init__(self, *args, **kwargs):
         self.frames_recieved = 0
@@ -81,7 +75,7 @@ class App13ProtobuffMobileProtocol(protocol.Protocol):
     def dataReceived(self, data):
         self.confirm(data)
         self.factory.service.handle_message(
-            data, proto='TCP', device_type=self.device_type)
+            data, proto='TCP')
 
 
 class FrameReceivingProtocol(protocol.Protocol):
@@ -131,7 +125,6 @@ class PathMakerProtocol(FrameReceivingProtocol):
     """
     Hybrid tracker protocol.
     """
-    device_type = 'pmtracker'
 
     def reset(self):
         self.session = PathMakerSession()  # let's start new session
@@ -152,8 +145,7 @@ class PathMakerProtocol(FrameReceivingProtocol):
 
     def frameReceived(self, frame):
         # log'n'check
-        result = self.factory.service.check_message(frame.serialize(), proto='TCP',
-                                                    device_type=self.device_type)
+        result = self.factory.service.check_message(frame.serialize(), proto='TCP')
         self.confirm(frame)
         parsed = self.factory.service.parser.parse(frame)
         if frame.id == FrameId.MOBILEID:
@@ -174,7 +166,6 @@ class PathMakerSBDProtocol(FrameReceivingProtocol):
     There're a few differences - no confirmation sent, no session,
     each SBD package contaits imei.
     """
-    device_type = 'pmtracker_sbd'
 
     def dataReceived(self, data):
         # override dataReceived to handle SBD and single-frame case
@@ -190,8 +181,7 @@ class PathMakerSBDProtocol(FrameReceivingProtocol):
             FrameReceivingProtocol.dataReceived(self, msg['data'])
 
     def frameReceived(self, frame):
-        result = self.factory.service.check_message(frame.serialize(), proto='TCP',
-                                                    device_type=self.device_type)
+        result = self.factory.service.check_message(frame.serialize(), proto='TCP')
         parsed = self.factory.service.parser.parse(frame)
         for item in parsed:
             item['imei'] = self.imei
@@ -199,11 +189,10 @@ class PathMakerSBDProtocol(FrameReceivingProtocol):
 
 
 class RedViewGT60Protocol(protocol.Protocol):
-    device_type = 'gt60'
 
     def dataReceived(self, data):
         self.factory.service.handle_message(
-            data, proto='TCP', device_type=self.device_type)
+            data, proto='TCP')
 
 
 tr203_tcp_protocol = TR203ReceivingProtocol

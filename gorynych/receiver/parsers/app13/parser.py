@@ -4,7 +4,7 @@ from gorynych.receiver.parsers.app13.constants import HEADER, MAGIC_BYTE
 from gorynych.receiver.parsers import IParseMessage
 from zope.interface import implementer
 
-from pbformat import MobileId_pb2
+from pbformat import MobileId_pb2, trackevent_pb2, trackinfo_pb2
 from constants import FrameId
 from chunk_reader import ChunkReader
 
@@ -22,7 +22,12 @@ class App13Parser(object):
         self.handlers = {
             FrameId.MOBILEID: self._imei_handler,
             FrameId.PATHCHUNK: self._path_handler,
+            FrameId.TRACK_INFO: self._track_event_handler,
             # to be filled
+        }
+        self.track_events = {
+            0: 'TRACK_STARTED',
+            1: 'TRACK_ENDED'
         }
 
     def _split_to_frames(self, raw):
@@ -56,6 +61,17 @@ class App13Parser(object):
         reader = ChunkReader(msg)
         for point in reader.unpack():
             self.points.append(point)
+
+    def _track_event_handler(self, msg):
+        e = trackevent_pb2.TrackEvent()
+        e.ParseFromString(msg)
+        if e.event not in self.track_events:
+            raise TypeError('Unknown event: {} of {}'.format(e.event, self.track_events))
+        self.points.append({
+            'ts': e.timestamp,
+            'event': self.track_events[e.event],
+            'track_id': e.id
+        })
 
     def _parse_frame(self, frame_id, frame_msg):
         if frame_id not in self.handlers:
@@ -105,7 +121,12 @@ class PathMakerParser(object):
             FrameId.MOBILEID: self._imei_handler,
             FrameId.PATHCHUNK: self._path_handler,
             FrameId.PATHCHUNK_ZIPPED: self._compressed_path_handler,
+            FrameId.TRACK_INFO: self._track_event_handler,
             # to be filled
+        }
+        self.track_events = {
+            0: 'TRACK_STARTED',
+            1: 'TRACK_ENDED'
         }
 
     def _imei_handler(self, msg):
@@ -118,6 +139,17 @@ class PathMakerParser(object):
     def _path_handler(self, msg):
         reader = ChunkReader(msg)
         return [point for point in reader.unpack()]
+
+    def _track_event_handler(self, msg):
+        e = trackevent_pb2.TrackEvent()
+        e.ParseFromString(msg)
+        if e.event not in self.track_events:
+            raise TypeError('Unknown event: {} of {}'.format(e.event, self.track_events))
+        return {
+            'ts': e.timestamp,
+            'event': self.track_events[e.event],
+            'track_id': e.id
+        }
 
     def _compressed_path_handler(self, msg):
         return self._path_handler(zlib.decompress(msg))

@@ -56,18 +56,18 @@ class ReceiverRabbitQueue(RabbitMQObject):
 
 
 class ReceiverService(Service):
-    def __init__(self, sender, audit_log, parser):
+    def __init__(self, sender, audit_log, parser, device_type):
         self.sender = sender
         self.sender.connect()
         self.audit_log = audit_log
         self.parser = parser
+        self.device_type = device_type
 
     def check_message(self, msg, **kw):
         '''
         Checks message correctness. If correct, logs it, else logs the error.
         '''
         receiving_time = time.time()
-        device_type = kw.get('device_type', 'tr203')
         d = defer.succeed(msg)
         d.addCallback(self.parser.check_message_correctness)
         d.addCallbacks(self.audit_log.log_msg,
@@ -75,11 +75,11 @@ class ReceiverService(Service):
             callbackArgs=[],
             callbackKeywords={'time': receiving_time,
                 'proto': kw.get('proto', 'Unknown'),
-                'device': kw.get('device_type', 'Unknown')},
+                'device': self.device_type},
             errbackArgs=[],
             errbackKeywords={'data': msg, 'time': receiving_time,
                 'proto': kw.get('proto', 'Unknown'),
-                'device': kw.get('device_type', 'Unknown')})
+                'device': self.device_type})
         if not self.sender.ready:
             log.msg("Received but not sent: %s" % msg)
         d.addErrback(self._handle_error)
@@ -92,8 +92,10 @@ class ReceiverService(Service):
             for item in message:
                 # item=item magic is required by lambda to grab item correctly
                 # otherwise item is always message[-1]. Do not modify!
+                item['device_type'] = self.device_type
                 d.addCallback(lambda _, item=item: self.sender.write(item))
         else:
+            message['device_type'] = self.device_type
             d.addCallback(lambda _: self.sender.write(message))
 
         d.callback('go!')

@@ -48,7 +48,7 @@ def makeService(config):
     parser = getattr(parsers, config['tracker'])()
     sender.setName('RabbitMQReceiverService')
     sender.setServiceParent(sc)
-    receiver_service = ReceiverService(sender, audit_log, parser)
+    receiver_service = ReceiverService(sender, audit_log, parser, config['tracker'])
     receiver_service.setName('ReceiverService')
     receiver_service.setServiceParent(sc)
 

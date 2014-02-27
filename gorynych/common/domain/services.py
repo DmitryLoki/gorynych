@@ -23,8 +23,8 @@ HTTPClientFactory.noisy = False
 class APIClient(object):
     def __init__(self, url=None):
         if not url:
-            url = 'http://localhost:{}'.format(OPTS['info']['web_port'])
-        self.url = url
+            url = OPTS['apiurl']
+        self.url = url.strip('/')
 
 
 class AsynchronousAPIAccessor(APIClient):

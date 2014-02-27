@@ -20,7 +20,7 @@ class RaceToGoal(object):
 
     def __init__(self, task, checkpoints):
         self.checkpoints = checkpoints
-        self.start_time = int(task['properties']['start_time'])
+        self.start_time = int(task['properties']['window_open'])
         self.end_time = int(task['properties']['deadline'])
 
     def process(self, points, trackstate, _id):
@@ -93,7 +93,7 @@ class SpeedRun(object):
 
     def __init__(self, task, checkpoints):
         self.checkpoints = checkpoints
-        self.start_time = int(task['properties']['start_time'])
+        self.start_time = int(task['properties']['window_open'])
         self.end_time = int(task['properties']['deadline'])
 
     def process(self, points, trackstate, _id):

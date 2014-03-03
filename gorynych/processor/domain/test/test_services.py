@@ -221,15 +221,15 @@ class TestParagliderSkyEarth(unittest.TestCase):
         self.assertIsNone(self.pse._bf)
 
     def test_flyed_lagged_sloweddown(self):
-        self.d['timestamp'] = [1389461576, 1389461648, 1389461708, 1389461718,
-            1389461766]
+        self.d['timestamp'] = [1, 72, 132, 142, 190]
         self.d['alt'] = [1935, 1829, 1775, 1775, 1773]
         self.d['g_speed'] = [8.6111, 9.7222, 9.4444, 7.77778, 9.7222]
         self.pse._in_air = True
         self.pse.trackstate._buffer = self.d
         res = self.pse.state_work(self.d)
         self.assertIsInstance(res, list)
-        self.assertTrue(self.pse._in_air)
+        self.assertFalse(self.pse._in_air) # In livetracking it should be
+        # true for bad trackers.
 
     def test_become_in_air(self):
         t1 = int(time.time())
@@ -252,4 +252,15 @@ class TestParagliderSkyEarth(unittest.TestCase):
         self.pse.trackstate._buffer = self.d
         res = self.pse.state_work(self.d)
         self.assertFalse(self.pse._in_air)
+
+    def test_sloweddown_but_still_in_air(self):
+        self.pse._in_air = True
+        t1 = int(time.time())
+        self.d['timestamp'] = [t1, t1 + 6, t1 + 20, t1 + 40, t1 + 67]
+        self.d['alt'] = [100, 101, 123, 99, 100]
+        self.d['g_speed'] = [9, 1, 9, 5, 5]
+        self.pse.trackstate._buffer = self.d
+        res = self.pse.state_work(self.d)
+        self.assertIsInstance(res, list)
+        self.assertTrue(self.pse._in_air)
 

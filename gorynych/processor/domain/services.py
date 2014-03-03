@@ -592,18 +592,21 @@ class ParagliderSkyEarth(object):
 
     def _alt_diff(self, data):
         '''
-        Check if altitude difference less then dif.
-        @param data:
-        @type data:
+        Return altitude difference for last minute.
+        @param data: track data with dtype=Track.dtype.
+        @type data: C{np.ndarray}
         @return:
         @rtype:
         '''
         ts = data['timestamp']
-        idxs = np.where(self.trackstate._buffer['timestamp'] < ts - 60)[0]
-        if len(idxs) == 0:
+        start = np.where(self.trackstate._buffer['timestamp'] >= ts - 60)[0]
+        end = np.where(self.trackstate._buffer['timestamp'] == ts)[0]
+        if len(start) == 0 or len(end) == 0:
             return False
-        a1 = self.trackstate._buffer['alt'][idxs[-1]]
-        return abs(a1 - data['alt'])
+        start = start[0] # Left index in time interval.
+        end = end[0] + 1 # Right index in time interval.
+        alts = self.trackstate._buffer['alt'][start:end]
+        return abs(np.max(alts) - np.min(alts))
 
 
 class Point(object):

@@ -50,6 +50,8 @@ class IRaceType(Interface):
     I am a type of race task like Open Distance or Race to Goal.
     '''
 
+    checkpoints = Attribute("List with checkpoints.")
+
     type = Attribute("A C{str} with name race name in lowercase and without "
                      "any delimiters.")
 

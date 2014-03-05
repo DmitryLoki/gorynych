@@ -33,14 +33,18 @@ def create_checkpoint_adapter(lat=40.1, lon=40.2, error_margin=50,
 
 test_race = {
     "contest_title": "Some contest",
+    "properties": {
+        "window_open": 1374223800,
+        "window_close": 1374238200,
+        "start_time": 1374226800,
+        "deadline": 1374249600,
+        "bearing": None
+    },
     "country": "Some country",
     "place": "Some place",
     "timeoffset": "+0300",
     "race_title": "Some task",
-    "race_type": "racetogoal",
-    "start_time": 1374223800,
-    "end_time": 1374249600,
-    "bearing": None,
+    "type": "racetogoal",
     "checkpoints": {
         "type": "FeatureCollection",
         "features": [
@@ -468,7 +472,7 @@ class TestSpeedRun(RaceTestCase):
     def setUp(self):
         self.factory = RaceTypesFactory()
         self.test_race = test_race.copy()
-        self.test_race['race_type'] = 'speedrun'
+        self.test_race['type'] = 'speedrun'
         self.complete_track = make_pilot_points(self.test_race)
         self.rt = self.factory.create('online', self.test_race)
         self.track_id = track.TrackID()
@@ -625,7 +629,7 @@ class TestOpenDistance(RaceTestCase):
     def setUp(self):
         self.factory = RaceTypesFactory()
         self.test_race = test_race.copy()
-        self.test_race['race_type'] = 'opendistance'
+        self.test_race['type'] = 'opendistance'
         self.complete_track = make_pilot_points(self.test_race)
         self.rt = self.factory.create('online', self.test_race)
         self.track_id = track.TrackID()
@@ -691,7 +695,7 @@ class TestOpenDistance(RaceTestCase):
         malformed_track = self.complete_track[1:]
         pts, evlist = self.rt.process(malformed_track, self.ts, self.track_id)
         self._check_format(evlist, pts)
-        self._check_distance(pts, [157215, 471597, 785880, 1099995, 1413894, 785396])
+        self._check_distance(pts, [157215, 471597, 785880, 1099995, 1413894, 785395])
         self.assertEqual(len(evlist), 6)
         chp_taken = [ev for ev in evlist if
                      isinstance(ev, events.TrackCheckpointTaken)]
@@ -728,7 +732,7 @@ class TestOpenDistance(RaceTestCase):
         self.assertEqual(len(evlist), 0)
 
     def test_successful_track_with_bearing(self):
-        self.test_race['bearing'] = 20
+        self.test_race['properties']['bearing'] = 20
         self.rt = self.factory.create('online', self.test_race)
         pts, evlist = self.rt.process(
             self.complete_track, self.ts, self.track_id)

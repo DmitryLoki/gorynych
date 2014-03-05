@@ -119,6 +119,12 @@ class CheckpointTest(unittest.TestCase):
                                ch_type='TO', times=(2, 3), radius=2)
         self.assertNotEqual(ch1, ch3)
 
+    def test_lat_lon(self):
+        ch1 = types.Checkpoint(name='A01', geometry=Point(53, 1),
+            ch_type='TO', times=(2, None), radius=2)
+        self.assertEqual(ch1.lat, 1)
+        self.assertEqual(ch1.lon, 53)
+
     def test_checkpoint_from_geojson(self):
         point = {'geometry': {'type': 'Point', 'coordinates': [0.0, 1.0]},
                  'type': 'Feature',

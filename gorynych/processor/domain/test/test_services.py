@@ -2,7 +2,6 @@ import unittest
 import time
 
 import numpy as np
-import mock
 from shapely.geometry import Point
 
 from gorynych.processor.domain import services, track
@@ -16,7 +15,7 @@ class TestOfflineCorrectorService(unittest.TestCase):
         self.oc = services.OfflineCorrectorService()
         shape = 15
         ar = np.empty(shape, dtype=self.dtype)
-        ar['id'] = np.arange(10, shape+10)
+        ar['id'] = np.ones(shape)
         ar['timestamp'] = np.arange(10, shape+10)
         ar['lon'] = np.ones(shape)
         self.ar = ar
@@ -24,7 +23,22 @@ class TestOfflineCorrectorService(unittest.TestCase):
     def tearDown(self):
         del self.ar
 
-    def test_clean_timestamp(self):
+    def test_clean_timestamp_cut_track(self):
+        result = self.oc._clean_timestamps(self.ar, 11, 20)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertTupleEqual((result.ndim, result.shape), (1, (10,)))
+
+    def test_clean_timestamp_remove_duplicates(self):
+        self.ar['timestamp'][4] = self.ar['timestamp'][3]
+        result = self.oc._clean_timestamps(self.ar, 11, 20)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertTupleEqual((result.ndim, result.shape), (1, (9,)))
+        expected = range(11, 21)
+        del expected[3]
+        self.assertListEqual(list(result['timestamp']), expected)
+
+    def test_clean_timestamp_remove_reverse_points(self):
+        self.ar['timestamp'][6] = self.ar['timestamp'][5] - 1
         result = self.oc._clean_timestamps(self.ar, 11, 20)
         self.assertIsInstance(result, np.ndarray)
         self.assertTupleEqual((result.ndim, result.shape), (1, (9,)))
@@ -73,28 +87,6 @@ class TestParaglidingTrackCorrector(unittest.TestCase):
         co = services.ParaglidingTrackCorrector()
         res = co.correct_data(ar)
         self.assertEqual(res.shape[0], self.shape)
-
-
-class TestOnlineTrashAdapter(unittest.TestCase):
-    def setUp(self):
-        self.ta = services.OnlineTrashAdapter(1)
-        self.dtype = [('timestamp', 'i4'), ('lat', 'f4')]
-        self.ts = mock.Mock()
-        _buffer = np.ones(10, self.dtype)
-        self.ts._buffer = _buffer
-
-    def tearDown(self):
-        del self.ts
-        del self.ta
-
-    def test_delete(self):
-        now = int(time.time())
-        data = np.ones(1, self.dtype)
-        data['timestamp'] = now
-        self.ts._buffer['timestamp'] = np.ones(10) * now - np.arange(60, 70)
-        points, evs = self.ta.process(data, 1, 2, self.ts)
-        self.assertEqual(len(points), 9)
-        self.assertEqual(len(self.ts._buffer), 2)
 
 
 class TestOptDistCalculator(unittest.TestCase):

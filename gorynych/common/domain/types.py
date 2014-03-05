@@ -118,11 +118,13 @@ class Checkpoint(ValueObject):
 
     @property
     def lat(self):
-        return self.__geo_interface__['geometry']['coordinates'][0]
+        # XXX: remove lat/lon properties from Checkpoint.
+        return self.__geo_interface__['geometry']['coordinates'][1]
 
     @property
     def lon(self):
-        return self.__geo_interface__['geometry']['coordinates'][1]
+        # XXX: it's wrong interface.
+        return self.__geo_interface__['geometry']['coordinates'][0]
 
     def distance_to(self, point):
         '''

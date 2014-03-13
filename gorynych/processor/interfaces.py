@@ -19,17 +19,13 @@ class ITrackType(Interface):
         @rtype: C{numpy.ndarray}
         '''
 
-    def process(data, start_time, end_time, trackstate):
+    def process(data, track):
         '''
         I read passed data and calculate something is necessary.
-        @param data: passed data
-        @type data:
-        @param start_time:
-        @type start_time:
-        @param end_time:
-        @type end_time:
-        @param trackstate: state of track which I process.
-        @type trackstate: L{gorynych.processor.domain.track.TrackState}
+        @param data: parsed data
+        @type data: C{numpy.ndarray}
+        @param track: track which I process.
+        @type track: L{gorynych.processor.domain.track.Track}
         @return: array with dtype L{gorynych.processor.domain.track.DTYPE}
         and list with occured events.
         @rtype: C{numpy.ndarray}, C{list}

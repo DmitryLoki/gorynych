@@ -3,10 +3,12 @@ import time
 
 import numpy as np
 from shapely.geometry import Point
+from zope.interface.verify import verifyObject
 
 from gorynych.processor.domain import services, track
 from gorynych.common.domain.types import Checkpoint
 from gorynych.common.domain import events
+from gorynych.processor.interfaces import ITrackType
 
 
 class TestOfflineCorrectorService(unittest.TestCase):
@@ -256,3 +258,10 @@ class TestParagliderSkyEarth(unittest.TestCase):
         self.assertIsInstance(res, list)
         self.assertTrue(self.pse._in_air)
 
+
+class PrivateTrackAdapterTest(unittest.TestCase):
+    def setUp(self):
+        self.pta = services.PrivateTrackAdapter(track.DTYPE)
+
+    def test_interface(self):
+        verifyObject(ITrackType, self.pta)

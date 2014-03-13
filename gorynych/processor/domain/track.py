@@ -22,7 +22,8 @@ EARTH_RADIUS = 6371000
 
 def track_types(ttype):
     types = dict(competition_aftertask=services.FileParserAdapter(DTYPE),
-        online=services.OnlineTrashAdapter(DTYPE))
+                online=services.OnlineTrashAdapter(DTYPE),
+                private=services.PrivateTrackAdapter(DTYPE))
     return types.get(ttype)
 
 

@@ -195,14 +195,14 @@ class OnlineTrashService(SinglePollerService):
     receive messages with track data from rabbitmq queue.
     '''
 
-    def __init__(self, pool, repo, connection, **kw):
+    def __init__(self, pool, track_repository, connection, **kw):
         poll_interval = kw.get('interval', 0.0)
         SinglePollerService.__init__(self, connection, poll_interval, queue_name='rdp')
         self.pool = pool
         self.did_aid = {}
-        self.repo = repo
-        # {race_id:{track_id:Track}}
-        self.tracks = defaultdict(dict)
+        self.repo = track_repository
+        # {device_id:Track}
+        self.tracks = dict()
         self.processor = task.LoopingCall(self.process)
         # TODO: remove this from constructor.
         self.processor.start(60, False)
@@ -214,6 +214,8 @@ class OnlineTrashService(SinglePollerService):
         if not data.has_key('ts'):
             # ts key MUST be in a data.
             return
+        if 'event' in data:
+            return self.handle_event(data)
         if data['lat'] < 0.1 and data['lon'] < 0.1:
             return
         return self.handle_track_data(data)
@@ -310,4 +312,68 @@ class OnlineTrashService(SinglePollerService):
                 except Exception as e:
                     log.err("%r" % e)
         return
+
+    def handle_event(self, data):
+        '''
+        React on data with event.
+        @param data: {ts, event, [track_id], imei}
+        @type data: C{dict}
+        @return:
+        @rtype:
+        '''
+        if data['event'] == 'TRACK_STARTED':
+            return self._handle_track_started(data)
+        elif data['event'] == 'TRACK_ENDED':
+            return self._handle_track_ended(data)
+
+    @defer.inlineCallbacks
+    def _handle_track_started(self, data):
+        device_id, track_id, ts = data['imei'], data['track_id'], data['ts']
+        track_id = track.TrackID.fromstring(track_id)
+        track_contest = yield defer.maybeDeferred(API.get_device_contest,
+            device_id)
+        if track_contest is None:
+            tr = yield defer.maybeDeferred(API.get_track_owner, device_id)\
+                .addCallback(self._create_private_track, track_id, ts)
+            yield self._handle_track_ended(data)
+            self.tracks[device_id] = tr
+            defer.returnValue(None)
+
+    def _create_private_track(self, owner, track_id, ts):
+        if owner is None:
+            return
+        payload = dict(track_type='private',
+                        race_task=dict(type='undefined',
+                                        start_time=int(ts)))
+        tc = events.TrackCreated(track_id, payload=payload, occured_on=ts)
+        trs = events.TrackStarted(track_id)
+        pgt = events.PersonGotTrack(owner, track_id, occured_on=ts)
+        return track.Track(track_id, [tc, trs, pgt])
+
+    def _handle_track_ended(self, data):
+        '''
+        Check if track ended and delete it from self.tracks. If track isn't
+        ended then end it and delete.
+        @param data: message from queue.
+        @type data: C{dict}
+        @return: None
+        @rtype: C{defer.Deferred}
+        '''
+        device_id, track_id, ts = data['imei'], data['track_id'], data['ts']
+        if not device_id in self.tracks:
+            return
+        d = defer.Deferred()
+        old_track = self.tracks[device_id]
+        if not old_track._state.ended:
+            old_track.apply(events.TrackEnded(old_track.id,
+                payload={ }, occured_on=ts))
+            d.addCallback(self.repo.save)
+
+        def delete_track_from_memory(*args):
+            del self.tracks[device_id]
+            return
+
+        d.addCallback(delete_track_from_memory)
+        d.callback(old_track)
+        return d
 

@@ -202,6 +202,7 @@ class PersonGotTrack(DomainEvent):
     @param payload: TrackID
     '''
     serializer = serializers.StringSerializer()
+    aggregate_type = 'person'
 
 
 class ParagliderRegisteredOnContest(DomainEvent):
@@ -213,6 +214,7 @@ class ParagliderRegisteredOnContest(DomainEvent):
     @param payload: ContestID
     '''
     serializer = serializers.DomainIdentifierSerializer('ContestID')
+    aggregate_type = 'person'
 
 
 class TrackerAssigned(DomainEvent):
@@ -226,6 +228,7 @@ class TrackerAssigned(DomainEvent):
     @param payload: (tracker_id, contest_id).
     '''
     serializer = serializers.TupleOf(serializers.StringSerializer())
+    aggregate_type = 'person'
 
 
 class TrackerUnAssigned(DomainEvent):
@@ -236,6 +239,7 @@ class TrackerUnAssigned(DomainEvent):
     @param payload: (tracker_id, contest_id)
     '''
     serializer = serializers.TupleOf(serializers.StringSerializer())
+    aggregate_type = 'person'
 
 ######### Contest events #################################
 

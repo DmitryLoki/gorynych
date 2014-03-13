@@ -744,5 +744,27 @@ class TestOpenDistance(RaceTestCase):
         self.assertEqual(len(chp_taken), 6)
         self._check_taken_checkpoints(chp_taken)
 
+
+class UndefinedTaskTest(unittest.TestCase):
+    def test_creation(self):
+        rtype = 'private'
+        rtask = dict(start_time=1, type='undefined')
+        r = RaceTypesFactory().create(rtype, rtask)
+        self.assertIsInstance(r, racetypes.UndefinedTask)
+        self.assertEqual(r.start_time, 1)
+
+    def test_object(self):
+        r = racetypes.UndefinedTask(1)
+        verifyObject(IRaceType, r)
+        self.assertEqual(r.start_time, 1)
+        self.assertListEqual(r.checkpoints, [])
+        self.assertEqual(r.type, 'undefined')
+
+    def test_process(self):
+        r = racetypes.UndefinedTask(1)
+        result = r.process('hello', 1, 1)
+        self.assertTupleEqual(('hello', []), result)
+
+
 if __name__ == '__main__':
     unittest.main()

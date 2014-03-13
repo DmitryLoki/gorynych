@@ -223,7 +223,8 @@ class OnlineTrashService(SinglePollerService):
     def handle_track_data(self, data):
         d = defer.Deferred()
         tracker_id = '-'.join((data['device_type'], data['imei']))
-        if data['device_type'] in ['tr203']:
+        if data['device_type'] in ['tr203', 'telt_gh3000', 'gt60',
+            'pmtracker', 'pmtracker_sbd']:
             d.addCallback(lambda _: self._get_race_by_tracker(tracker_id))
         d.addCallback(self._get_track, tracker_id)
         d.addCallback(lambda tr: tr.append_data(data))

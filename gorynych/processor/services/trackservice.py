@@ -170,24 +170,6 @@ class TrackService(EventPollingService):
         d.addCallback(lambda _:self.event_dispatched(ev.id))
         return d
 
-    def execute_ProcessData(self, track_id, data):
-        return self.update(track_id, 'process_data', data)
-
-    @defer.inlineCallbacks
-    def update(self, aggregate_id, method, *args, **kwargs):
-        aggr = yield defer.maybeDeferred(self._get_aggregate, aggregate_id)
-        getattr(aggr, method)(*args, **kwargs)
-        # Persist points, state and events if any.
-        yield self.persist(aggr)
-
-    @defer.inlineCallbacks
-    def _get_aggregate(self, _id):
-        if not self.aggregates.get(_id):
-            elist = yield self.event_store.load_events(_id)
-            t = track.Track(_id, events=elist)
-            self.aggregates[_id] = t
-        defer.returnValue(self.aggregates[_id])
-
     def append_track_to_race_and_person(self, contest_id, race_id, track_id, track_type,
             contest_number, person_id):
         '''

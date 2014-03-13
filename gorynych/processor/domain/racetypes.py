@@ -237,6 +237,22 @@ class OpenDistance(object):
         return points, eventlist
 
 
+@implementer(IRaceType)
+class UndefinedTask(object):
+    checkpoints = []
+    type = 'undefined'
+
+    def __init__(self, start_time):
+        self.start_time = int(start_time)
+        self.end_time = 0
+
+    def process(self, points, trackstate, _id):
+        '''
+        Do nothing.
+        '''
+        return points, []
+
+
 def taken_on_enter(self, lat, lon, on_time):
     '''
     Is point (lat, lon) inside the circle?
@@ -347,6 +363,8 @@ class RaceTypesFactory(object):
         '''
         assert isinstance(rtask, dict), "Race task must be dict."
         try:
+            if rtask['type'] == 'undefined':
+                return UndefinedTask(rtask['start_time'])
             race = self.races[rtask['type']]
         except KeyError:
             raise ValueError("No such race type %s" % rtask.get('type'))

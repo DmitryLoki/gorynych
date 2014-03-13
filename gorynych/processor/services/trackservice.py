@@ -221,44 +221,47 @@ class OnlineTrashService(SinglePollerService):
         return self.handle_track_data(data)
 
     def handle_track_data(self, data):
-        now = int(time.time())
-        d = self._get_race_by_tracker(data['imei'], now)
+        d = defer.Deferred()
+        if data['device_type'] in ['tr203']:
+            d.addCallback(lambda _: self._get_race_by_tracker(data['imei']))
         d.addCallback(self._get_track, data['imei'])
         d.addCallback(lambda tr: tr.append_data(data))
         return d
 
     @defer.inlineCallbacks
-    def _get_race_by_tracker(self, device_id, now):
+    def _get_race_by_tracker(self, device_id):
+        now = int(time.time())
         result = self.devices.get(device_id)
         if result and now - result[2] < 300:
             defer.returnValue((result[0], result[1]))
-        row = yield self.pool.runQuery(pe.select('current_race_by_tracker',
-            'race'),(device_id, now))
-        # row can be (race.race_id, paraglider.contest_number).
-        if not row:
-            defer.returnValue(None)
-        race_id, contest_number = row[0]
-        self.devices[device_id] = (race_id, contest_number, int(time.time()))
-        defer.returnValue(row[0])
+        race_id, cont_num = yield defer.maybeDeferred(
+            API.get_current_race_by_tracker, device_id)
+        self.devices[device_id] = (race_id, cont_num, now)
+        defer.returnValue((race_id, cont_num))
 
+    @defer.inlineCallbacks
     def _get_track(self, row, device_id):
         if not row:
             # Null-object.
-            return A()
+            defer.returnValue(A())
         rid, cnumber = row
         if not cnumber:
-            return A()
-        if self.tracks.has_key(rid) and self.tracks[rid].has_key(device_id):
-            # Race and track are in memory. Return Track for work.
-            return self.tracks[rid][device_id]
+            defer.returnValue(A())
+        if device_id in self.tracks:
+            defer.returnValue(self.tracks[device_id])
         else:
-            d = self.pool.runQuery(pe.select('track_n_label', 'track'),
-                ('_'.join((rid, 'online')), cnumber))
-            d.addCallback(self._restore_or_create_track, rid, device_id, cnumber)
-            return d
+            row = yield self.pool.runQuery(pe.select('track_n_label',
+                'track'), ('_'.join((rid, 'online')), cnumber))
+            contest_id = API.get_device_contest(device_id)
+            if not contest_id:
+                defer.returnValue(A())
+            tr = yield self._restore_or_create_track(row, rid, device_id,
+                cnumber, contest_id)
+            defer.returnValue(tr)
 
     @defer.inlineCallbacks
-    def _restore_or_create_track(self, row, rid, device_id, contest_number):
+    def _restore_or_create_track(self, row, rid, device_id, contest_number,
+            contest_id):
         '''
         Отдаёт уже существующий трек, иначе создаёт его, сохраняет события о
          его создании и добавлении в гонку, и отдаёт.
@@ -270,7 +273,6 @@ class OnlineTrashService(SinglePollerService):
         @return:
         @rtype: C{Track}
         '''
-        tracks = self.tracks[rid]
         log.msg("Restore or create track for race %s and device %s" %
                 (rid, device_id))
         if row:
@@ -278,7 +280,7 @@ class OnlineTrashService(SinglePollerService):
             result = yield self.repo.get_by_id(row[0][1])
         else:
             log.msg("Create new track")
-            race_task = API.get_race_task(str(rid))
+            race_task = API.get_race_task(contest_id, str(rid))
             if not isinstance(race_task, dict):
                 log.msg("Race task wasn't received from API: %r" % race_task)
                 defer.returnValue('')
@@ -292,7 +294,7 @@ class OnlineTrashService(SinglePollerService):
                 track_type=track_type, track_id=str(track_id))
             result.changes.append(rgt)
             yield pe.event_store().persist([tc])
-        tracks[device_id] = result
+        self.tracks[device_id] = result
         log.msg("Restored or created track %s for device %s" % (
                     result.id, device_id))
         defer.returnValue(result)
@@ -328,16 +330,21 @@ class OnlineTrashService(SinglePollerService):
 
     @defer.inlineCallbacks
     def _handle_track_started(self, data):
+        yield self._handle_track_ended(data)
         device_id, track_id, ts = data['imei'], data['track_id'], data['ts']
         track_id = track.TrackID.fromstring(track_id)
-        track_contest = yield defer.maybeDeferred(API.get_device_contest,
+        tracker_contest = yield defer.maybeDeferred(API.get_device_contest,
             device_id)
-        if track_contest is None:
+        if tracker_contest is None:
+            # Private tracking.
             tr = yield defer.maybeDeferred(API.get_track_owner, device_id)\
                 .addCallback(self._create_private_track, track_id, ts)
-            yield self._handle_track_ended(data)
             self.tracks[device_id] = tr
             defer.returnValue(None)
+        race_id, cont_num = yield self._get_race_by_tracker(device_id)
+        yield self._get_track((race_id, cont_num), device_id)
+        defer.returnValue(None)
+
 
     def _create_private_track(self, owner, track_id, ts):
         if owner is None:

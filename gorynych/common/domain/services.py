@@ -68,20 +68,23 @@ class APIAccessor(APIClient):
             raise e
         return result
 
-    def get_device_contest(self, device_id):
-        '''
-        Return current contest number in which this device is participating.
-        '''
-
-    def get_track_owner(self, device_id):
+    def get_tracker_owner(self, tracker_id):
         '''
         Return owner id for which this track is corresponding.
         '''
+        url = '/'.join((self.url, 'tracker', tracker_id))
+        return self._return_page(url)['owner']
 
-    def get_current_race_by_tracker(self, contest_id):
+    def get_current_race_by_tracker(self, tracker_id):
         '''
         Return race id and contest number.
+        @return: (contest_id, race_id, contest_number)
+        @rtype: C{tuple}
         '''
+        url = '/'.join((self.url, 'tracker', tracker_id, 'contest_info'))
+        res = self._return_page(url)
+        return res.get('contest'), res.get('race'), res.get('contest_number')
+
 
 class SinglePollerService(Service):
     """

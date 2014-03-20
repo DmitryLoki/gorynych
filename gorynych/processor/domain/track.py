@@ -22,7 +22,8 @@ EARTH_RADIUS = 6371000
 
 def track_types(ttype):
     types = dict(competition_aftertask=services.FileParserAdapter(DTYPE),
-        online=services.OnlineTrashAdapter(DTYPE))
+                online=services.OnlineTrashAdapter(DTYPE),
+                private=services.PrivateTrackAdapter(DTYPE))
     return types.get(ttype)
 
 
@@ -98,7 +99,11 @@ class TrackState(ValueObject):
         self.in_air = False
         self.ended = True
         self.end_time = self.in_air_changed = ev.occured_on
-        self.last_distance = ev.payload.get('distance')
+        if len(self._buffer) == 0:
+            dist = 0
+        else:
+            dist = self._buffer['distance'][-1]
+        self.last_distance = ev.payload.get('distance', dist)
 
     def apply_TrackFinished(self, ev):
         if not self.state == 'finished':

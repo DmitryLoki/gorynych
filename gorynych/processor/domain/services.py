@@ -216,6 +216,42 @@ class OnlineTrashAdapter(object):
         return ParagliderSkyEarth(trck._state).state_work(trck.points)
 
 
+@implementer(interfaces.ITrackType)
+class PrivateTrackAdapter(object):
+    type = 'private'
+
+    def __init__(self, dtype):
+        self.dtype = dtype
+
+    def read(self, data):
+        result = np.empty(1, self.dtype)
+        result['timestamp'] = data['ts']
+        result['lat'] = data['lat']
+        result['lon'] = data['lon']
+        result['alt'] = data['alt']
+        result['g_speed'] = data['h_speed']
+        return result
+
+    def process(self, data, trck):
+        '''
+        @param trck: track which I process.
+        @type trck: L{gorynych.processor.domain.track.Track}
+        '''
+        if len(data) == 0:
+            return None, []
+        if len(trck.processed)>0:
+            first_v_speed = trck.processed[-1]['v_speed']
+        else:
+            first_v_speed = 1.0
+        data['v_speed'] = vspeed_calculator(data['alt'],
+            data['timestamp'], to_begin=first_v_speed)
+        data['g_speed'] = data['g_speed'] / 3.6
+        return data, []
+
+    def postprocess(self, trck):
+        return []
+
+
 class ParaglidingTrackCorrector(object):
     '''
 
@@ -498,8 +534,8 @@ def runs_of_ones_array(bits):
 
 class ParagliderSkyEarth(object):
     # Threshold value for 'flying'-'not started' or 'not started-flying'
-    # change in km/h.
-    t_speed = 10
+    # change in m/s.
+    t_speed = 2.7
 
     def __init__(self, trackstate):
         '''

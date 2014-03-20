@@ -87,6 +87,7 @@ class TrackCreated(DomainEvent):
     @param payload: {race_task, track_type}
     '''
     serializer = serializers.JSONSerializer()
+    aggregate_type = 'track'
 
 
 class TrackCheckpointTaken(DomainEvent):
@@ -96,6 +97,7 @@ class TrackCheckpointTaken(DomainEvent):
     @param payload: (checkpoint number, dist from pilot to checkpoint).
     '''
     serializer = serializers.TupleOf(serializers.IntSerializer())
+    aggregate_type = 'track'
 
 
 class TrackStarted(DomainEvent):
@@ -104,6 +106,7 @@ class TrackStarted(DomainEvent):
     @param aggregate_id: TrackID
     '''
     serializer = serializers.NoneSerializer()
+    aggregate_type = 'track'
 
 
 class PointsAddedToTrack(DomainEvent):
@@ -113,6 +116,7 @@ class PointsAddedToTrack(DomainEvent):
     @param payload: array with track points which are considered to be a part of track.
     '''
     serializer = serializers.PickleSerializer()
+    aggregate_type = 'track'
 
 
 class TrackFinishTimeReceived(DomainEvent):
@@ -122,6 +126,7 @@ class TrackFinishTimeReceived(DomainEvent):
     @param payload: finishtime.
     '''
     serializer = serializers.IntSerializer()
+    aggregate_type = 'track'
 
 
 class TrackFinished(DomainEvent):
@@ -131,6 +136,7 @@ class TrackFinished(DomainEvent):
     @param payload: None
     '''
     serializer = serializers.NoneSerializer()
+    aggregate_type = 'track'
 
 
 class TrackEnded(DomainEvent):
@@ -140,6 +146,7 @@ class TrackEnded(DomainEvent):
     @param payload: {state, distance}
     '''
     serializer = serializers.JSONSerializer()
+    aggregate_type = 'track'
 
 
 class TrackDataReceived(DomainEvent):
@@ -149,6 +156,7 @@ class TrackDataReceived(DomainEvent):
     t, gs(ground speed)}
     '''
     serializer = serializers.JSONSerializer()
+    aggregate_type = 'track'
 
 
 class TrackInAir(DomainEvent):
@@ -157,6 +165,7 @@ class TrackInAir(DomainEvent):
     @param payload: None
     '''
     serializer = serializers.NoneSerializer()
+    aggregate_type = 'track'
 
 
 class TrackSpeedExceeded(DomainEvent):
@@ -164,6 +173,7 @@ class TrackSpeedExceeded(DomainEvent):
     Скорость трека стала больше пороговой.
     '''
     serializer = serializers.NoneSerializer()
+    aggregate_type = 'track'
 
 
 class TrackSlowedDown(DomainEvent):
@@ -171,6 +181,7 @@ class TrackSlowedDown(DomainEvent):
     Скорость трека стала меньше пороговой.
     '''
     serializer = serializers.NoneSerializer()
+    aggregate_type = 'track'
 
 
 class TrackLanded(DomainEvent):
@@ -180,6 +191,7 @@ class TrackLanded(DomainEvent):
      passed distance - depends on race).
     '''
     serializer = serializers.IntSerializer()
+    aggregate_type = 'track'
 
 
 ########## Person events ##################################
@@ -190,6 +202,7 @@ class PersonGotTrack(DomainEvent):
     @param payload: TrackID
     '''
     serializer = serializers.StringSerializer()
+    aggregate_type = 'person'
 
 
 class ParagliderRegisteredOnContest(DomainEvent):
@@ -201,6 +214,7 @@ class ParagliderRegisteredOnContest(DomainEvent):
     @param payload: ContestID
     '''
     serializer = serializers.DomainIdentifierSerializer('ContestID')
+    aggregate_type = 'person'
 
 
 class TrackerAssigned(DomainEvent):
@@ -214,6 +228,7 @@ class TrackerAssigned(DomainEvent):
     @param payload: (tracker_id, contest_id).
     '''
     serializer = serializers.TupleOf(serializers.StringSerializer())
+    aggregate_type = 'person'
 
 
 class TrackerUnAssigned(DomainEvent):
@@ -224,6 +239,7 @@ class TrackerUnAssigned(DomainEvent):
     @param payload: (tracker_id, contest_id)
     '''
     serializer = serializers.TupleOf(serializers.StringSerializer())
+    aggregate_type = 'person'
 
 ######### Contest events #################################
 

@@ -534,8 +534,8 @@ def runs_of_ones_array(bits):
 
 class ParagliderSkyEarth(object):
     # Threshold value for 'flying'-'not started' or 'not started-flying'
-    # change in km/h.
-    t_speed = 10
+    # change in m/s.
+    t_speed = 2.7
 
     def __init__(self, trackstate):
         '''

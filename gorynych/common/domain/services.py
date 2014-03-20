@@ -2,6 +2,8 @@ __author__ = 'Boris Tsema'
 
 import math
 import decimal
+import datetime
+from calendar import timegm
 
 import requests
 import simplejson as json
@@ -52,7 +54,23 @@ class APIAccessor(APIClient):
 
     def get_race_task(self, contest_id, race_id):
         url = '/'.join((self.url, 'contest', contest_id, 'race', race_id))
-        return self._return_page(url)
+        result = self._return_page(url)
+
+        # parsing iso datetimes
+        for k, v in result['properties'].iteritems():
+            try:
+                result['properties'][k] = timegm(datetime.datetime.strptime(v, "%Y-%m-%dT%H:%M:%S").timetuple())
+            except:
+                pass
+
+        for chp in result['checkpoints']['features']:
+            otime = chp['properties'].get('open_time', '')
+            ctime = chp['properties'].get('close_time', '')
+            if otime:
+                chp['properties']['open_time'] = timegm(datetime.datetime.strptime(otime, "%Y-%m-%dT%H:%M:%S").timetuple())
+            if ctime:
+                chp['properties']['close_time'] = timegm(datetime.datetime.strptime(ctime, "%Y-%m-%dT%H:%M:%S").timetuple())
+        return result
 
     def get_contest_paragliders(self, contest_id):
         url = '/'.join((self.url, 'contest', contest_id, 'paraglider'))

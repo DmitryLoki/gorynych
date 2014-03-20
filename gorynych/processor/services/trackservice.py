@@ -84,7 +84,7 @@ class ProcessorService(EventPollingService):
             log.msg(">>>Adding track %s to group %s <<<" % (track_id,
                                                                 group_id))
             yield self.pool.runOperation(ADD_TRACK_TO_GROUP, (group_id,
-                track_id, cn))
+                track_id, str(cn)))
         except Exception as e:
             log.msg("Track %s hasn't been added to group %s because of %r" %
                     (track_id, group_id, e))
@@ -260,7 +260,7 @@ class OnlineTrashService(SinglePollerService):
         if not cnumber or not contest_id or not rid:
             defer.returnValue(A())
         row = yield self.pool.runQuery(pe.select('track_n_label',
-            'track'), ('_'.join((rid, 'online')), cnumber))
+            'track'), ('_'.join((rid, 'online')), str(cnumber)))
         tr = yield self._restore_or_create_track(row, rid, tracker_id,
             cnumber, contest_id)
         defer.returnValue(tr)

@@ -241,16 +241,20 @@ class OnlineTrashService(SinglePollerService):
         @rtype: C{tuple}
         '''
         now = int(time.time())
-        result = self.trackers.get(tracker_id)
-        if result and now - result[3] < 300:
-            defer.returnValue((result[0], result[1], result[2]))
+        current_result = self.trackers.get(tracker_id)
+        current_race = current_result[1] if current_result else None
         contest_id, race_id, cont_num = yield defer.maybeDeferred(
             API.get_current_race_by_tracker, tracker_id)
+        cont_num = str(cont_num)
+        if current_race != race_id and tracker_id in self.tracks:  # race has been changed in the api
+            # delete current track
+            del self.tracks[tracker_id]
         self.trackers[tracker_id] = (contest_id, race_id, cont_num, now)
         defer.returnValue((contest_id, race_id, cont_num))
 
     @defer.inlineCallbacks
     def _get_track(self, row, tracker_id):
+
         if tracker_id in self.tracks:
             defer.returnValue(self.tracks[tracker_id])
         if not row:
@@ -260,7 +264,7 @@ class OnlineTrashService(SinglePollerService):
         if not cnumber or not contest_id or not rid:
             defer.returnValue(A())
         row = yield self.pool.runQuery(pe.select('track_n_label',
-            'track'), ('_'.join((rid, 'online')), str(cnumber)))
+            'track'), ('_'.join((rid, 'online')), cnumber))
         tr = yield self._restore_or_create_track(row, rid, tracker_id,
             cnumber, contest_id)
         defer.returnValue(tr)
@@ -338,9 +342,10 @@ class OnlineTrashService(SinglePollerService):
         yield self._handle_track_ended(data)
         track_id, ts = data['track_id'], data['ts']
         tracker_id = '-'.join((data['device_type'], data['imei']))
-        track_id = track.TrackID.fromstring(track_id)
+        # track_id = track.TrackID.fromstring(track_id)
         cont_id, race_id, cont_num = yield self._get_race_by_tracker(
             tracker_id)
+        cont_num = str(cont_num)
         if race_id is None:
             # Private tracking.
             tracker_id = '-'.join((data['device_type'], tracker_id))
@@ -348,6 +353,11 @@ class OnlineTrashService(SinglePollerService):
                 .addCallback(self._create_private_track, track_id, ts)
             self.tracks[tracker_id] = tr
             defer.returnValue(None)
+        else:
+            current_result = self.trackers.get(tracker_id)
+            current_race = current_result[1] if current_result else None
+            if current_race != race_id and tracker_id in self.tracks:
+                del self.tracks[tracker_id]
         yield self._get_track((cont_id, race_id, cont_num), tracker_id)
 
 

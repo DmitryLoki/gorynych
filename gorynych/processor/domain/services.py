@@ -596,12 +596,12 @@ class ParagliderSkyEarth(object):
                 elif data['g_speed'] < self.t_speed:
                     result.append(self._slowed_down(data))
             else:
-                # Пилот замедлился и летит ниже пороговой скорости.
+                # Пилот замедлился и летит ниже пороговой скорости либо ещё не взлетел.
                 if data['g_speed'] > self.t_speed:
                     # Был медленный, стал быстрый.
                     result.append(self._speed_exceed(data))
-            if self._alt_diff(data) > 30:
-                # Перепад высот за минуту больше 30 метров.
+            if self._alt_diff(data) > 30 and self._max_v_speed(data) < 5 and self._min_g_speed(data) > 0.3:
+                # Перепад высот за минуту больше 30 метров и он не является ошибкой GPS (вертикальная скорость меньше 5 м/с, горизонтальная больше 1 км/ч).
                 result.append(self._track_in_air(data))
         return result
 
@@ -634,15 +634,35 @@ class ParagliderSkyEarth(object):
         @return:
         @rtype:
         '''
+        data = self._get_data_for_interval(data, 60)
+        return abs(np.max(data['alt']) - np.min(data['alt']))
+
+    def _get_data_for_interval(self, data, time_interval):
+        '''
+        Return altitudes for time interval.
+        @rtype: C{np.ndarray}
+        '''
         ts = data['timestamp']
-        start = np.where(self.trackstate._buffer['timestamp'] >= ts - 60)[0]
+        start = np.where(self.trackstate._buffer['timestamp'] >= ts - time_interval)[0]
         end = np.where(self.trackstate._buffer['timestamp'] == ts)[0]
         if len(start) == 0 or len(end) == 0:
             return False
         start = start[0] # Left index in time interval.
         end = end[0] + 1 # Right index in time interval.
-        alts = self.trackstate._buffer['alt'][start:end]
-        return abs(np.max(alts) - np.min(alts))
+        return self.trackstate._buffer[start:end]
+
+    def _max_v_speed(self, data):
+        '''
+        Calculate maximum vertical speed for last minute.
+        '''
+        data = self._get_data_for_interval(data, 60)
+        return max(data['v_speed'])
+
+    def _min_g_speed(self, data):
+        data = self._get_data_for_interval(data, 60)
+        return min(data['g_speed'])
+
+
 
 
 class Point(object):

@@ -133,20 +133,23 @@ class PathMakerProtocol(FrameReceivingProtocol):
 
     def confirm(self, frame):
         # legacy confirmation
-        response = self.factory.service.parser.get_response(frame)
-        self.transport.write(response)
+        # response = self.factory.service.parser.get_response(frame)
+        # self.transport.write(response)
 
         # new-style confirmation
         self.frames_recieved += 1
         conf = FrameConf()
         conf.frames_recieved = self.frames_recieved
         f = Frame(FrameId.FRAME_CONF, conf.SerializeToString())
+        print f.serialize().encode('string_escape')
         self.transport.write(f.serialize())
 
     def frameReceived(self, frame):
         # log'n'check
+        print 'gotcha', frame.serialize().encode('string_escape')
         result = self.factory.service.check_message(frame.serialize(), proto='TCP')
         self.confirm(frame)
+        print self.factory.service.parser
         parsed = self.factory.service.parser.parse(frame)
         if frame.id == FrameId.MOBILEID:
             self.session.init(parsed)
@@ -154,6 +157,7 @@ class PathMakerProtocol(FrameReceivingProtocol):
             if self.session.is_valid():
                 for item in parsed:
                     item.update(self.session.params)
+                    print item
                 result.addCallback(lambda _: self.factory.service.store_point(parsed))
             else:
                 self.reset()
@@ -198,7 +202,7 @@ class RedViewGT60Protocol(protocol.Protocol):
 tr203_tcp_protocol = TR203ReceivingProtocol
 tr203_udp_protocol = UDPTR203Protocol
 telt_gh3000_udp_protocol = UDPTeltonikaGH3000Protocol
-app13_tcp_protocol = App13ProtobuffMobileProtocol
+app13_tcp_protocol = PathMakerProtocol
 gt60_tcp_protocol = RedViewGT60Protocol
 pmtracker_tcp_protocol = PathMakerProtocol
 pmtracker_sbd_tcp_protocol = PathMakerSBDProtocol

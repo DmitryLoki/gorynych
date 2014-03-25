@@ -65,7 +65,7 @@ class TrackArchive(ValueObject):
         return result
 
     def download_archive(self):
-        r = requests.get(self.archive_url)
+        r = requests.get(self.archive_url, auth=('air', 'tribune'))
         archive_path = os.path.join(self.download_dir, self.race_id + '.zip')
         with open(archive_path, 'wb') as f:
             f.write(r.content)

@@ -91,7 +91,7 @@ class APIAccessor(APIClient):
         Return owner id for which this track is corresponding.
         '''
         url = '/'.join((self.url, 'tracker', tracker_id))
-        return self._return_page(url)['owner']
+        return self._return_page(url).get('owner')
 
     def get_current_race_by_tracker(self, tracker_id):
         '''

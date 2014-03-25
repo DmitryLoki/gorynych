@@ -35,7 +35,7 @@ from app13.parser import App13Parser, PathMakerParser
 from gt60 import RedViewGT60
 
 tr203 = GlobalSatTR203
-app13 = App13Parser
+app13 = PathMakerParser
 telt_gh3000 = TeltonikaGH3000UDP
 gt60 = RedViewGT60
 pmtracker = PathMakerParser

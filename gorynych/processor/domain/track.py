@@ -44,7 +44,7 @@ class TrackState(ValueObject):
     '''
     Hold track state. Memento.
     '''
-    states = ['not started', 'started', 'es_taken', 'finished']
+    # states = ['not started', 'started', 'es_taken', 'finished']
     def __init__(self, id, event_list):
         self.id = id
         # Time when track speed become more then threshold.
@@ -127,6 +127,7 @@ class TrackState(ValueObject):
         self.become_slow, self.become_fast = None, ev.occured_on
 
     def apply_TrackLanded(self, ev):
+        self.state = 'landed'
         self.in_air = False
         self.in_air_changed = ev.occured_on
         self.ended = True
@@ -145,8 +146,7 @@ class TrackState(ValueObject):
 
     @state.setter
     def state(self, state):
-        if self.states.index(self.state) < self.states.index(state):
-            self._state = state
+        self._state = state
 
 
 class Track(AggregateRoot):
@@ -209,6 +209,12 @@ class Track(AggregateRoot):
         self.apply(postprocessed_evs)
         self.changes = services.clean_events(self.changes)
 
+        # dirty workaround in case that a bunch of points gets processed at once
+        # to ensure points after landed are not saved
+        if self.state['state'] == 'landed':
+            print 'gonna cut that shit'
+            self.cut(self._state.in_air_changed)
+
     @property
     def state(self):
         return self._state.get_state()
@@ -231,3 +237,9 @@ class Track(AggregateRoot):
         self.processed = services.create_uniq_hstack(self.processed,
             self.points)[-100:]
         self.points = np.empty(0, dtype=self.dtype)
+
+    def cut(self, from_time):
+        # cuts points occured after specified time
+        print self.points.size
+        print self.points[np.where(self.points['timestamp'] <= from_time)].size
+        self.points = self.points[np.where(self.points['timestamp'] <= from_time)]

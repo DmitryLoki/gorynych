@@ -58,11 +58,13 @@ class RaceToGoal(object):
             if trackstate.last_distance:
                 for p in points:
                     p['distance'] = self.calculate_distance(trackstate.last_distance)
-                return points, []
+                # return points, []
+                return np.empty(0, dtype=points.dtype), []
             else:
                 for p in points:
                     p['distance'] = self.calculate_distance(200)
-                return points, []
+                # return points, []
+                return np.empty(0, dtype=points.dtype), []
 
         calculation_ended = trackstate.ended
         for idx, p in np.ndenumerate(points):
@@ -136,11 +138,13 @@ class SpeedRun(object):
             if trackstate.last_distance:
                 for p in points:
                     p['distance'] = self.calculate_distance(trackstate.last_distance)
-                return points, []
+                # return points, []
+                return np.empty(0, dtype=points.dtype), []
             else:
                 for p in points:
                     p['distance'] = self.calculate_distance(200)
-                return points, []
+                # return points, []
+                return np.empty(0, dtype=points.dtype), []
 
         calculation_ended = trackstate.ended
         for idx, p in np.ndenumerate(points):

@@ -231,4 +231,3 @@ class Track(AggregateRoot):
         self.processed = services.create_uniq_hstack(self.processed,
             self.points)[-100:]
         self.points = np.empty(0, dtype=self.dtype)
-

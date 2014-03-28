@@ -18,10 +18,15 @@ class RaceToGoal(object):
     '''
     type = 'racetogoal'
 
-    def __init__(self, task, checkpoints):
+    def __init__(self, task, checkpoints, max_distance):
         self.checkpoints = checkpoints
         self.start_time = int(task['properties']['window_open'])
         self.end_time = int(task['properties']['deadline'])
+        self.current_distance = max_distance
+
+    def calculate_distance(self, value):
+        self.current_distance = min(self.current_distance, value)
+        return self.current_distance
 
     def process(self, points, trackstate, _id):
         '''
@@ -43,20 +48,20 @@ class RaceToGoal(object):
             # Last point has been taken but we still have data.
             if trackstate.last_distance:
                 for p in points:
-                    p['distance'] = trackstate.last_distance
+                    p['distance'] = self.calculate_distance(trackstate.last_distance)
                 return points, []
             else:
                 for p in points:
-                    p['distance'] = 200
+                    p['distance'] = self.calculate_distance(200)  # wtf? why 200?
                 return points, []
         if trackstate.state == 'landed':
             if trackstate.last_distance:
                 for p in points:
-                    p['distance'] = trackstate.last_distance
+                    p['distance'] = self.calculate_distance(trackstate.last_distance)
                 return points, []
             else:
                 for p in points:
-                    p['distance'] = 200
+                    p['distance'] = self.calculate_distance(200)
                 return points, []
 
         calculation_ended = trackstate.ended
@@ -82,7 +87,7 @@ class RaceToGoal(object):
                 if lastchp + 1 < len(self.checkpoints) - 1:
                     nextchp = self.checkpoints[lastchp + 2]
                     lastchp += 1
-            p['distance'] = nextchp.dist_to_point(lat, lon) + nextchp.distance
+            p['distance'] = self.calculate_distance(nextchp.dist_to_point(lat, lon) + nextchp.distance)
 
         return points, eventlist
 
@@ -91,10 +96,15 @@ class RaceToGoal(object):
 class SpeedRun(object):
     type = 'speedrun'
 
-    def __init__(self, task, checkpoints):
+    def __init__(self, task, checkpoints, max_distance):
         self.checkpoints = checkpoints
         self.start_time = int(task['properties']['window_open'])
         self.end_time = int(task['properties']['deadline'])
+        self.current_distance = max_distance
+
+    def calculate_distance(self, value):
+        self.current_distance = min(self.current_distance, value)
+        return self.current_distance
 
     def process(self, points, trackstate, _id):
         '''
@@ -116,20 +126,20 @@ class SpeedRun(object):
             # Last point has been taken but we still have data.
             if trackstate.last_distance:
                 for p in points:
-                    p['distance'] = trackstate.last_distance
+                    p['distance'] = self.calculate_distance(trackstate.last_distance)
                 return points, []
             else:
                 for p in points:
-                    p['distance'] = 200
+                    p['distance'] = self.calculate_distance(200)
                 return points, []
         if trackstate.state == 'landed':
             if trackstate.last_distance:
                 for p in points:
-                    p['distance'] = trackstate.last_distance
+                    p['distance'] = self.calculate_distance(trackstate.last_distance)
                 return points, []
             else:
                 for p in points:
-                    p['distance'] = 200
+                    p['distance'] = self.calculate_distance(200)
                 return points, []
 
         calculation_ended = trackstate.ended
@@ -155,7 +165,7 @@ class SpeedRun(object):
                 if lastchp + 1 < len(self.checkpoints) - 1:
                     nextchp = self.checkpoints[lastchp + 2]
                     lastchp += 1
-            p['distance'] = nextchp.dist_to_point(lat, lon) + nextchp.distance
+            p['distance'] = self.calculate_distance(nextchp.dist_to_point(lat, lon) + nextchp.distance)
 
         return points, eventlist
 
@@ -164,7 +174,7 @@ class SpeedRun(object):
 class OpenDistance(object):
     type = 'opendistance'
 
-    def __init__(self, task, checkpoints):
+    def __init__(self, task, checkpoints, max_distance):
         self.checkpoints = checkpoints
         self.task = task
         _bearing = task['properties'].get('bearing')
@@ -174,6 +184,11 @@ class OpenDistance(object):
             self.bearing = int(_bearing)
         self.start_time = int(task['properties']['window_open'])
         self.end_time = int(task['properties']['deadline'])
+        self.current_distance = max_distance
+
+    def calculate_distance(self, value):
+        self.current_distance = min(self.current_distance, value)
+        return self.current_distance
 
     def process(self, points, trackstate, _id):
         '''
@@ -199,7 +214,7 @@ class OpenDistance(object):
             nextchp = self.checkpoints[lastchp_num + 1]
             for idx, p in np.ndenumerate(points):
                 lat, lon = p['lat'], p['lon']
-                p['distance'] = previous_leg + lastchp.dist_to_point(lat, lon)
+                p['distance'] = self.calculate_distance(previous_leg + lastchp.dist_to_point(lat, lon))
                 if nextchp.is_taken_by(lat, lon, p['timestamp']):
                     eventlist.append(
                         events.TrackCheckpointTaken(_id,
@@ -230,7 +245,7 @@ class OpenDistance(object):
                 dist = int(dist * math.cos(
                     math.radians(bearing(chp.opt_lat, chp.opt_lon, lat, lon)
                     - self.bearing)))
-            p['distance'] = previous_leg + dist
+            p['distance'] = self.calculate_distance(previous_leg + dist)
 
         if eventlist is None:
             eventlist = []
@@ -369,7 +384,7 @@ class RaceTypesFactory(object):
         except KeyError:
             raise ValueError("No such race type %s" % rtask.get('type'))
         checkpoints = checkpoint_collection_from_geojson(rtask['checkpoints'])
-        points, _ = services.JavaScriptShortWay().calculate(checkpoints)
+        points, max_distance = services.JavaScriptShortWay().calculate(checkpoints)
         race_checkpoints = []
         for i, ch in enumerate(checkpoints):
             if ch.geometry.geom_type == 'Point':
@@ -385,7 +400,7 @@ class RaceTypesFactory(object):
                 race_checkpoints.append(cp)
         race_checkpoints = getattr(self, '_distances_for_' + rtask[
             'type'])(race_checkpoints)
-        return race(rtask, race_checkpoints)
+        return race(rtask, race_checkpoints, max_distance)
 
     def _distances_for_racetogoal(self, race_checkpoints):
         '''

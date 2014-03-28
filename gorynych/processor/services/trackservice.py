@@ -2,6 +2,7 @@
 from collections import defaultdict
 import time
 import cPickle
+import traceback
 
 from twisted.python import log
 from twisted.internet import threads, defer, task
@@ -209,6 +210,15 @@ class OnlineTrashService(SinglePollerService):
         self.processor.start(60, False)
         # tracker_id:(contest_id, race_id, contest_number, time)
         self.trackers = dict()
+        self.air_states = dict()
+
+    def add_track_to_memory(self, device_id, track):
+        self.tracks[device_id] = track
+        self.air_states[device_id] = track._state.in_air
+
+    def delete_track_from_memory(self, device_id):
+        del self.tracks[device_id]
+        del self.air_states[device_id]
 
     def handle_payload(self, channel, method_frame, header_frame, body, queue_name):
         data = cPickle.loads(body)
@@ -242,13 +252,13 @@ class OnlineTrashService(SinglePollerService):
         now = int(time.time())
         current_result = self.trackers.get(tracker_id)
         current_race = current_result[1] if current_result else None
-        contest_id, race_id, cont_num = yield defer.maybeDeferred(
+        contest_id, race_id, cont_num, person_id = yield defer.maybeDeferred(
             API.get_current_race_by_tracker, tracker_id)
         cont_num = str(cont_num)
         if current_race != race_id and tracker_id in self.tracks:  # race has been changed in the api
             # delete current track
-            del self.tracks[tracker_id]
-        self.trackers[tracker_id] = (contest_id, race_id, cont_num, now)
+            self.delete_track_from_memory(tracker_id)
+        self.trackers[tracker_id] = (contest_id, race_id, cont_num, person_id, now)
         defer.returnValue((contest_id, race_id, cont_num))
 
     @defer.inlineCallbacks
@@ -302,10 +312,24 @@ class OnlineTrashService(SinglePollerService):
                 track_type=track_type, track_id=str(track_id))
             result.changes.append(rgt)
             yield pe.event_store().persist([tc])
-        self.tracks[device_id] = result
+        self.add_track_to_memory(device_id, result)
         log.msg("Restored or created track %s for device %s" % (
                     result.id, device_id))
         defer.returnValue(result)
+
+    def track_state_changed(self, device_id):
+        old_in_air_state = self.air_states[device_id]
+        new_in_air_state = self.tracks[device_id]._state.in_air
+        if old_in_air_state == new_in_air_state:
+            return False, None
+        else:
+            self.air_states[device_id] = new_in_air_state
+            if old_in_air_state is False and new_in_air_state is True:
+                # was on the ground but flies
+                return True, 'fly'
+            elif old_in_air_state is True and new_in_air_state is False:
+                # was flying but now takes the ground
+                return True, 'landed'
 
     @defer.inlineCallbacks
     def process(self):
@@ -314,12 +338,27 @@ class OnlineTrashService(SinglePollerService):
         @return:
         @rtype:
         '''
+        to_delete = set()
         for key in self.tracks.keys():
             try:
                 self.tracks[key].process_data()
+    
+                state_changed, action = self.track_state_changed(key)
+                if state_changed:
+                    race_id = self.trackers[key][1]
+                    person_id = self.trackers[key][3]
+                    log.msg("{}'s state is changed to '{}'".format(key, action))
+                    if action == 'fly':
+                        API.set_retrieve_status(race_id, person_id, 'fly')
+                    elif action == 'landed':
+                        API.set_retrieve_status(race_id, person_id, 'landed')
+    
                 yield self.repo.save(self.tracks[key])
-            except Exception as e:
-                log.err("%r" % e)
+            except Exception:
+                traceback.print_exc()
+
+        for key in to_delete:
+            self.delete_track_from_memory(key)
         return
 
     def handle_event(self, data):

@@ -101,7 +101,17 @@ class APIAccessor(APIClient):
         '''
         url = '/'.join((self.url, 'tracker', tracker_id, 'contest_info'))
         res = self._return_page(url)
-        return res.get('contest'), res.get('race'), res.get('contest_number')
+        return res.get('contest'), res.get('race'), res.get('contest_number'), res.get('paraglider')
+
+    def set_retrieve_status(self, race_id, person_id, status):
+        url = '/'.join((self.url, 'chatroom', race_id))
+        params = {
+            'to': person_id,
+            'from': 'Trackservice',
+            'body': 'system:new_status:{}'.format(status),
+            'sender': 'Gorynych'
+        }
+        requests.post(url, params)
 
 
 class SinglePollerService(Service):

@@ -212,7 +212,6 @@ class Track(AggregateRoot):
         # dirty workaround in case that a bunch of points gets processed at once
         # to ensure points after landed are not saved
         if self.state['state'] == 'landed':
-            print 'gonna cut that shit'
             self.cut(self._state.in_air_changed)
 
     @property
@@ -240,6 +239,4 @@ class Track(AggregateRoot):
 
     def cut(self, from_time):
         # cuts points occured after specified time
-        print self.points.size
-        print self.points[np.where(self.points['timestamp'] <= from_time)].size
         self.points = self.points[np.where(self.points['timestamp'] <= from_time)]

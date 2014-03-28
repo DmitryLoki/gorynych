@@ -203,6 +203,7 @@ class OnlineTrashService(SinglePollerService):
         self.repo = track_repository
         # {device_id:Track}
         self.tracks = dict()
+        self.private_tracks = dict()
         self.processor = task.LoopingCall(self.process)
         # TODO: remove this from constructor.
         self.processor.start(60, False)
@@ -223,9 +224,7 @@ class OnlineTrashService(SinglePollerService):
     def handle_track_data(self, data):
         d = defer.Deferred()
         tracker_id = '-'.join((data['device_type'], data['imei']))
-        if data['device_type'] in ['tr203', 'telt_gh3000', 'gt60',
-            'pmtracker', 'pmtracker_sbd']:
-            d.addCallback(lambda _: self._get_race_by_tracker(tracker_id))
+        d.addCallback(lambda _: self._get_race_by_tracker(tracker_id))
         d.addCallback(self._get_track, tracker_id)
         d.addCallback(lambda tr: tr.append_data(data))
         d.callback(None)
@@ -338,27 +337,24 @@ class OnlineTrashService(SinglePollerService):
 
     @defer.inlineCallbacks
     def _handle_track_started(self, data):
-        yield self._handle_track_ended(data)
-        track_id, ts = data['track_id'], data['ts']
-        tracker_id = '-'.join((data['device_type'], data['imei']))
-        # track_id = track.TrackID.fromstring(track_id)
         cont_id, race_id, cont_num = yield self._get_race_by_tracker(
             tracker_id)
         cont_num = str(cont_num)
         if race_id is None:
             # Private tracking.
+            yield self._handle_track_ended(data)
+            track_id, ts = data['track_id'], data['ts']
+            tracker_id = '-'.join((data['device_type'], data['imei']))
+            # track_id = track.TrackID.fromstring(track_id)
             tracker_id = '-'.join((data['device_type'], tracker_id))
             tr = yield defer.maybeDeferred(API.get_tracker_owner, tracker_id)\
                 .addCallback(self._create_private_track, track_id, ts)
             self.tracks[tracker_id] = tr
             defer.returnValue(None)
         else:
-            current_result = self.trackers.get(tracker_id)
-            current_race = current_result[1] if current_result else None
-            if current_race != race_id and tracker_id in self.tracks:
-                del self.tracks[tracker_id]
-        yield self._get_track((cont_id, race_id, cont_num), tracker_id)
-
+            # competition is going on, no private tracks
+            # TODO: discuss this logic
+            pass
 
     def _create_private_track(self, owner, track_id, ts):
         if owner is None:

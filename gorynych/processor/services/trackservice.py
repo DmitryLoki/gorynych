@@ -216,7 +216,7 @@ class OnlineTrashService(SinglePollerService):
             return
         if 'event' in data:
             return self.handle_event(data)
-        if data['lat'] < 0.1 and data['lon'] < 0.1:
+        if abs(data['lat']) < 0.1 and abs(data['lon']) < 0.1:
             return
         return self.handle_track_data(data)
 
@@ -254,7 +254,6 @@ class OnlineTrashService(SinglePollerService):
 
     @defer.inlineCallbacks
     def _get_track(self, row, tracker_id):
-
         if tracker_id in self.tracks:
             defer.returnValue(self.tracks[tracker_id])
         if not row:

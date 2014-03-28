@@ -155,9 +155,13 @@ class PathMakerProtocol(FrameReceivingProtocol):
             self.session.init(parsed)
         else:
             if self.session.is_valid():
-                for item in parsed:
-                    item.update(self.session.params)
-                    print item
+                if isinstance(parsed, list):
+                    for item in parsed:
+                        item.update(self.session.params)
+                        print item
+                else:
+                    parsed.update(self.session.params)
+                    print parsed
                 result.addCallback(lambda _: self.factory.service.store_point(parsed))
             else:
                 self.reset()

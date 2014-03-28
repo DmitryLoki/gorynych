@@ -65,6 +65,7 @@ class EventPollingService(Service):
                 log.msg("Event %s returned undispatched from %s" % (evname,
                                                     self.__class__.__name__))
                 yield self.pool.runOperation(RETURN_UNDISPATCHED, (ev.id,))
+                yield self.sleep(self.polling_interval)  # give other services a change to fetch this event
 
     def event_dispatched(self, ev_id):
         if ev_id in self.in_progress:
@@ -72,6 +73,10 @@ class EventPollingService(Service):
         ev_id = long(ev_id)
         return self.pool.runOperation(EVENT_DISPATCHED, (ev_id,))
 
+    def sleep(self, secs):
+        d = defer.Deferred()
+        reactor.callLater(secs, d.callback, None)
+        return d
 
 class DBPoolService(Service):
     def __init__(self, pool, event_store):

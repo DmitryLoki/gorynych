@@ -89,8 +89,6 @@ class RaceToGoal(object):
                 if lastchp + 1 < len(self.checkpoints) - 1:
                     nextchp = self.checkpoints[lastchp + 2]
                     lastchp += 1
-            print p['timestamp'], nextchp.checkpoint.name, nextchp.distance, nextchp.dist_to_point(lat, lon), self.calculate_distance(nextchp.dist_to_point(lat, lon) + nextchp.distance)
-            # print 'position', p['lat'], p['lon'], nextchp.opt_lat, nextchp.opt_lon
             p['distance'] = self.calculate_distance(nextchp.dist_to_point(lat, lon) + nextchp.distance)
 
         return points, eventlist
@@ -290,8 +288,6 @@ def taken_on_enter(self, lat, lon, on_time):
         self.checkpoint.radius + self.error_margin)
     if is_taken:
         self.take_time = on_time
-    if is_taken:
-        print 'Im', self.checkpoint.name, 'and Im taken!', self.dist_to_center, self.checkpoint.radius, self.error_margin
     return is_taken
 
 
@@ -393,7 +389,6 @@ class RaceTypesFactory(object):
             raise ValueError("No such race type %s" % rtask.get('type'))
         checkpoints = checkpoint_collection_from_geojson(rtask['checkpoints'])
         points, max_distance = services.JavaScriptShortWay().calculate(checkpoints)
-        print 'race dists', points, max_distance
         race_checkpoints = []
         for i, ch in enumerate(checkpoints):
             if ch.geometry.geom_type == 'Point':
